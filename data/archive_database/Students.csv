@@ -1,0 +1,21 @@
+id,name,branch,year,email,phone,role
+1,Alice Johnson,CSE,4,alice@univ.in,9876543210,Student
+2,Bob Smith,ECE,3,bob@univ.in,9876543211,Student
+3,Charlie Brown,MECH,2,charlie@univ.in,9876543212,Student
+4,David Wilson,CSE,1,david@univ.in,9876543213,Student
+5,Eva Martinez,ECE,2,eva@univ.in,9876543214,Student
+6,Frank Lee,CSE,3,frank@univ.in,9876543215,Student
+7,Grace Kim,EEE,4,grace@univ.in,9876543216,Student
+8,Henry Davis,MECH,1,henry@univ.in,9876543217,Student
+9,Ivy Chen,CSE,2,ivy@univ.in,9876543218,Student
+10,Jack Taylor,IT,3,jack@univ.in,9876543219,Student
+11,Karen White,ECE,4,karen@univ.in,9876543220,Student
+12,Leo Garcia,MECH,3,leo@univ.in,9876543221,Student
+13,Mia Anderson,CSE,2,mia@univ.in,9876543222,Student
+14,Noah Thomas,EEE,1,noah@univ.in,9876543223,Student
+15,Olivia Clark,IT,4,olivia@univ.in,9876543224,Student
+16,Paul Harris,CIVIL,2,paul@univ.in,9876543225,Student
+17,Quinn Lewis,CSE,3,quinn@univ.in,9876543226,Student
+18,Rachel Walker,ECE,1,rachel@univ.in,9876543227,Student
+19,Sam Robinson,MECH,4,sam@univ.in,9876543228,Student
+20,Tina Hall,IT,2,tina@univ.in,9876543229,Student

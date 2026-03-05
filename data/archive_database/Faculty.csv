@@ -1,0 +1,11 @@
+id,name,department,designation,email,phone
+1,Dr. Rajesh Kumar,CSE,Professor,rajesh@univ.in,9800000001
+2,Dr. Sunita Rao,ECE,Professor,sunita@univ.in,9800000002
+3,Dr. Venkat Reddy,MECH,Professor,venkat@univ.in,9800000003
+4,Prof. Anita Desai,CSE,Associate Professor,anita@univ.in,9800000004
+5,Prof. Ramesh Gupta,ECE,Assistant Professor,ramesh@univ.in,9800000005
+6,Dr. Priya Sharma,EEE,Professor,priya@univ.in,9800000006
+7,Prof. Kiran Patel,IT,Associate Professor,kiran@univ.in,9800000007
+8,Prof. Meera Nair,CSE,Assistant Professor,meera@univ.in,9800000008
+9,Dr. Ramesh Babu,CIVIL,Professor,babu@univ.in,9800000009
+10,Dr. Lakshmi Devi,IT,Professor,lakshmi@univ.in,9800000010

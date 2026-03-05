@@ -1,0 +1,101 @@
+id,student_id,issued_id,fine_amount,fine_type,fine_date,status
+1,43,420,107,Late Return,2025-05-21,Disputed
+2,44,8,139,Late Return,2025-08-02,Waived
+3,78,64,121,Special Permission Fee,2025-02-28,Paid
+4,65,395,70,Processing Fee,2025-04-08,Disputed
+5,81,236,371,Damaged Book,2026-01-04,Disputed
+6,38,421,58,Special Permission Fee,2025-10-01,Disputed
+7,29,413,54,Late Return,2025-11-04,Waived
+8,73,342,421,Damaged Book,2025-10-01,Disputed
+9,39,167,150,Special Permission Fee,2025-08-14,Waived
+10,12,203,108,Processing Fee,2025-12-11,Paid
+11,44,49,173,Damaged Book,2025-12-13,Disputed
+12,71,447,1183,Lost Book,2025-09-20,Paid
+13,74,325,146,Processing Fee,2025-04-25,Unpaid
+14,6,395,87,Processing Fee,2025-06-20,Disputed
+15,90,500,366,Damaged Book,2025-08-06,Unpaid
+16,88,466,1577,Lost Book,2025-10-12,Disputed
+17,63,174,28,Late Return,2025-06-28,Waived
+18,9,354,110,Processing Fee,2025-08-29,Unpaid
+19,72,488,134,Special Permission Fee,2026-02-19,Paid
+20,68,273,62,Special Permission Fee,2025-04-03,Paid
+21,59,230,407,Damaged Book,2025-11-08,Disputed
+22,23,214,120,Processing Fee,2025-02-28,Unpaid
+23,42,177,10,Late Return,2025-12-11,Unpaid
+24,96,171,830,Lost Book,2025-12-25,Unpaid
+25,85,197,61,Processing Fee,2025-04-22,Disputed
+26,38,426,447,Damaged Book,2025-07-31,Paid
+27,96,430,304,Damaged Book,2025-07-03,Waived
+28,23,210,142,Special Permission Fee,2025-03-08,Unpaid
+29,40,346,102,Processing Fee,2025-07-20,Disputed
+30,59,96,67,Late Return,2025-08-02,Unpaid
+31,100,155,103,Processing Fee,2025-07-04,Paid
+32,86,352,246,Damaged Book,2025-02-23,Waived
+33,76,435,142,Processing Fee,2025-12-12,Waived
+34,33,31,78,Special Permission Fee,2026-02-19,Paid
+35,60,242,54,Special Permission Fee,2025-07-22,Unpaid
+36,60,275,121,Damaged Book,2025-10-12,Unpaid
+37,81,13,461,Damaged Book,2025-10-05,Unpaid
+38,49,277,81,Processing Fee,2025-12-29,Paid
+39,6,56,91,Special Permission Fee,2025-03-07,Unpaid
+40,50,354,1745,Lost Book,2025-12-11,Unpaid
+41,81,336,280,Damaged Book,2025-08-11,Unpaid
+42,13,60,1687,Lost Book,2025-05-30,Disputed
+43,75,401,529,Lost Book,2025-03-29,Unpaid
+44,17,155,141,Special Permission Fee,2025-04-09,Waived
+45,20,100,457,Damaged Book,2025-07-01,Paid
+46,65,20,144,Special Permission Fee,2025-10-06,Disputed
+47,75,474,132,Processing Fee,2025-09-22,Disputed
+48,80,195,141,Late Return,2025-07-29,Unpaid
+49,65,449,183,Late Return,2025-12-26,Unpaid
+50,91,492,117,Special Permission Fee,2026-01-08,Waived
+51,11,86,195,Late Return,2025-12-20,Unpaid
+52,5,137,104,Processing Fee,2026-02-06,Disputed
+53,36,161,1073,Lost Book,2025-08-29,Paid
+54,19,375,125,Late Return,2025-06-18,Paid
+55,77,279,783,Lost Book,2025-09-10,Paid
+56,37,434,66,Processing Fee,2025-03-09,Disputed
+57,99,259,28,Late Return,2025-09-23,Unpaid
+58,7,434,721,Lost Book,2025-03-24,Paid
+59,65,240,1510,Lost Book,2026-01-09,Disputed
+60,35,345,188,Late Return,2025-06-11,Disputed
+61,43,220,1780,Lost Book,2025-12-07,Disputed
+62,44,312,406,Damaged Book,2025-09-20,Waived
+63,53,323,1430,Lost Book,2025-02-24,Paid
+64,36,179,16,Late Return,2025-03-13,Disputed
+65,46,145,71,Special Permission Fee,2025-08-26,Unpaid
+66,100,423,77,Processing Fee,2025-11-28,Waived
+67,71,86,618,Lost Book,2025-07-13,Disputed
+68,75,367,102,Processing Fee,2025-09-28,Paid
+69,43,109,1507,Lost Book,2025-08-26,Unpaid
+70,96,83,25,Late Return,2025-07-05,Disputed
+71,67,345,96,Processing Fee,2025-10-12,Paid
+72,3,495,143,Special Permission Fee,2025-04-04,Disputed
+73,20,52,1103,Lost Book,2025-04-10,Waived
+74,88,20,62,Processing Fee,2025-08-01,Disputed
+75,10,485,1190,Lost Book,2025-08-23,Paid
+76,16,465,143,Processing Fee,2025-07-17,Waived
+77,96,200,278,Damaged Book,2025-03-29,Unpaid
+78,34,186,1631,Lost Book,2025-03-26,Disputed
+79,60,373,175,Damaged Book,2025-10-04,Unpaid
+80,96,105,1012,Lost Book,2025-08-11,Unpaid
+81,16,185,55,Special Permission Fee,2025-10-13,Unpaid
+82,60,34,199,Late Return,2025-11-13,Waived
+83,32,213,87,Special Permission Fee,2025-06-17,Disputed
+84,92,377,116,Late Return,2026-01-11,Disputed
+85,1,441,833,Lost Book,2025-06-04,Unpaid
+86,52,120,131,Processing Fee,2025-12-06,Unpaid
+87,77,51,141,Late Return,2025-11-12,Waived
+88,80,154,83,Late Return,2025-06-13,Unpaid
+89,68,356,325,Damaged Book,2025-03-25,Paid
+90,7,75,60,Special Permission Fee,2026-02-16,Unpaid
+91,98,5,152,Damaged Book,2025-04-30,Paid
+92,71,292,90,Special Permission Fee,2025-03-10,Disputed
+93,84,142,1703,Lost Book,2025-05-20,Paid
+94,89,277,1200,Lost Book,2025-03-19,Disputed
+95,12,330,222,Damaged Book,2025-08-12,Paid
+96,1,392,1270,Lost Book,2025-05-31,Waived
+97,84,431,55,Late Return,2026-01-29,Waived
+98,46,313,136,Late Return,2025-07-09,Waived
+99,89,467,1188,Lost Book,2025-11-15,Disputed
+100,33,144,145,Processing Fee,2026-02-13,Paid

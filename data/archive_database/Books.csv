@@ -1,0 +1,16 @@
+id,title,author,category,publisher_id,total_copies,available_copies
+1,Introduction to Python,Guido van Rossum,Computers,5,10,7
+2,Digital Electronics,Morris Mano,Electronics,1,5,3
+3,Thermodynamics,Yunus Cengel,Mechanical,4,8,6
+4,AI: A Modern Approach,Stuart Russell,Computers,2,3,1
+5,Data Structures,Narasimha Karumanchi,Computers,5,12,8
+6,Control Systems,Nagrath & Gopal,Electronics,1,6,4
+7,Machine Learning,Tom Mitchell,Computers,1,4,2
+8,Database Systems,Ramez Elmasri,Computers,2,7,5
+9,Operating Systems,Silberschatz,Computers,2,6,4
+10,Computer Networks,Tanenbaum,Computers,2,5,3
+11,Fluid Mechanics,R.K. Bansal,Mechanical,6,7,5
+12,Signals and Systems,Oppenheim,Electronics,3,4,2
+13,Strength of Materials,R.K. Rajput,Mechanical,6,6,4
+14,Discrete Mathematics,Kenneth Rosen,Computers,3,8,6
+15,Engineering Drawing,N.D. Bhatt,Civil,7,10,8

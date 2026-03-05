@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Dashboard</title>
+    <meta name="description" content="Speak2DB: NLP-Driven Multi-Database Query Assistant Dashboard">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/script.js"></script>
+</head>
+
+<body>
+    <div class="dashboard">
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Toggle Button -->
+            <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <span id="toggleIcon">◀</span>
+            </button>
+            <div class="sidebar-brand">
+                <div class="brand-icon">🗃️</div>
+                <div class="brand-text">
+                    <h2>Speak2DB</h2>
+                    <span>Query Assistant</span>
+                </div>
+            </div>
+
+            <!-- User Card -->
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="user-avatar">{{ user|upper }}</div>
+                    <div>
+                        <div class="user-name">{{ user }}</div>
+                        <span class="role-badge role-{{ role.lower() }}">{{ role }}</span>
+                    </div>
+                </div>
+                <a href="/logout" class="btn-logout">⏻ Sign Out</a>
+            </div>
+
+            <!-- Modern Navigation -->
+            <div class="nav-section">
+                <div class="section-title">📍 Navigation</div>
+                <nav class="modern-nav">
+                    <a href="/" class="nav-link active">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="/query" class="nav-link">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query Console</span>
+                    </a>
+                    <a href="/recommendations" class="nav-link">
+                        <span class="nav-icon">💡</span>
+                        <span class="nav-text">Recommendations</span>
+                    </a>
+                    <a href="/analytics" class="nav-link">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Analytics</span>
+                    </a>
+                    <a href="/settings" class="nav-link">
+                        <span class="nav-icon">⚙</span>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="header-content">
+                    <div>
+                        <h1 class="page-title">Welcome back, {{ user }} 👋</h1>
+                        <p class="page-subtitle">Your NLP-powered database query assistant is ready</p>
+                    </div>
+                    <div class="header-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">12</span>
+                            <span class="stat-label">Queries Today</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">3</span>
+                            <span class="stat-label">Active Sessions</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Query Section -->
+            <section class="query-section">
+                <div class="section-header">
+                    <h2 class="section-title floating-icon">🔍 Ask me anything about your library</h2>
+                    <p class="section-subtitle">I'll help you find exactly what you need</p>
+                </div>
+                
+                <div class="query-container">
+                    <textarea 
+                        id="queryInput" 
+                        class="query-input search-input-enhanced" 
+                        placeholder="Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
+                        rows="4"
+                    ></textarea>
+                    
+                    <div class="query-actions">
+                        <button id="queryBtn" class="btn-primary btn-interactive">
+                            <span class="floating-icon">🚀</span>
+                            Execute Query
+                        </button>
+                        <button id="clearBtn" class="btn-secondary btn-interactive">
+                            <span class="floating-icon">🗑️</span>
+                            Clear
+                        </button>
+                        <button id="micBtn" class="btn-secondary btn-interactive">
+                            <span class="floating-icon">🎤</span>
+                            Voice Input
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📊 Query Results</h2>
+                    <div class="result-actions">
+                        <button id="exportBtn" class="btn-secondary">📥 Export</button>
+                        <button id="visualizeBtn" class="btn-primary">📈 Visualize</button>
+                    </div>
+                </div>
+                
+                <div class="results-container">
+                    <div class="query-info">
+                        <span class="query-text" id="queryText"></span>
+                        <span class="query-sql" id="querySql"></span>
+                    </div>
+                    <div class="table-container">
+                        <table class="results-table" id="resultsTable">
+                            <thead id="tableHead"></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualization Section -->
+            <section class="visualization-section" id="visualizationSection" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📈 Data Visualization</h2>
+                    <div class="viz-controls">
+                        <select id="chartType" class="chart-select">
+                            <option value="bar">Bar Chart</option>
+                            <option value="line">Line Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="doughnut">Doughnut Chart</option>
+                        </select>
+                        <button id="updateVizBtn" class="btn-update">Update Chart</button>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="dataChart"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Processing your query...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Debug Result Box -->
+    <div id="result" style="display:none; margin: 20px; padding: 10px; background: #333; color: white; border-radius: 5px;"></div>
+
+    </body>
+
+</html>

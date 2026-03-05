@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommend Book - Faculty Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/student.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+        <div class="container">
+            <a class="navbar-brand" href="/faculty/dashboard">
+                <i class="fas fa-graduation-cap"></i> Faculty Portal
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/faculty/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a class="nav-link active" href="/faculty/recommend-book">
+                    <i class="fas fa-book"></i> Recommend Book
+                </a>
+                <a class="nav-link" href="/faculty/course-books">
+                    <i class="fas fa-graduation-cap"></i> Course Books
+                </a>
+                <a class="nav-link" href="/logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5><i class="fas fa-book-medical"></i> Recommend Book to Students</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="recommendBookForm">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="bookTitle" class="form-label">Book Title *</label>
+                                    <input type="text" class="form-control" id="bookTitle" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="author" class="form-label">Author *</label>
+                                    <input type="text" class="form-control" id="author" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="targetAudience" class="form-label">Target Audience *</label>
+                                    <select class="form-select" id="targetAudience" required>
+                                        <option value="">Select audience...</option>
+                                        <option value="1st Year">1st Year Students</option>
+                                        <option value="2nd Year">2nd Year Students</option>
+                                        <option value="3rd Year">3rd Year Students</option>
+                                        <option value="4th Year">4th Year Students</option>
+                                        <option value="All Years">All Years</option>
+                                        <option value="Research">Research Scholars</option>
+                                        <option value="Faculty">Faculty Members</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="difficultyLevel" class="form-label">Difficulty Level *</label>
+                                    <select class="form-select" id="difficultyLevel" required>
+                                        <option value="">Select level...</option>
+                                        <option value="Beginner">Beginner</option>
+                                        <option value="Intermediate">Intermediate</option>
+                                        <option value="Advanced">Advanced</option>
+                                        <option value="Expert">Expert</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="category" class="form-label">Category *</label>
+                                    <select class="form-select" id="category" required>
+                                        <option value="">Select category...</option>
+                                        <option value="Computer Science">Computer Science</option>
+                                        <option value="Electronics">Electronics</option>
+                                        <option value="Mechanical">Mechanical</option>
+                                        <option value="Civil">Civil</option>
+                                        <option value="Electrical">Electrical</option>
+                                        <option value="Mathematics">Mathematics</option>
+                                        <option value="Physics">Physics</option>
+                                        <option value="Chemistry">Chemistry</option>
+                                        <option value="Business">Business</option>
+                                        <option value="General">General</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="recommendationReason" class="form-label">Recommendation Reason *</label>
+                                <textarea class="form-control" id="recommendationReason" rows="4" required
+                                    placeholder="Explain why you recommend this book and how it will benefit students..."></textarea>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="bookId" class="form-label">Book ID (if exists in library)</label>
+                                    <input type="number" class="form-control" id="bookId" placeholder="Optional">
+                                    <small class="text-muted">Enter book ID if it exists in the library catalog</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Recommendation Date</label>
+                                    <input type="text" class="form-control" value="{{ moment().format('YYYY-MM-DD') }}" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary me-md-2" onclick="clearForm()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-paper-plane"></i> Submit Recommendation
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Recommendations -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h6><i class="fas fa-history"></i> Your Recent Recommendations</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentRecommendations">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading your recommendations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-check-circle"></i> Recommendation Submitted</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Your book recommendation has been submitted successfully!</p>
+                    <p>Students will be able to see this recommendation in their dashboard.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="window.location.href='/faculty/dashboard'">
+                        Back to Dashboard
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Add Another</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('recommendBookForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                book_title: document.getElementById('bookTitle').value,
+                author: document.getElementById('author').value,
+                book_id: document.getElementById('bookId').value || null,
+                target_audience: document.getElementById('targetAudience').value,
+                difficulty_level: document.getElementById('difficultyLevel').value,
+                category: document.getElementById('category').value,
+                recommendation_reason: document.getElementById('recommendationReason').value
+            };
+            
+            try {
+                const response = await fetch('/faculty/recommend-book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success modal
+                    const modal = new bootstrap.Modal(document.getElementById('successModal'));
+                    modal.show();
+                    
+                    // Clear form
+                    clearForm();
+                    
+                    // Reload recommendations
+                    loadRecentRecommendations();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while submitting your recommendation');
+            }
+        });
+        
+        function clearForm() {
+            document.getElementById('recommendBookForm').reset();
+        }
+        
+        // Load recent recommendations
+        async function loadRecentRecommendations() {
+            try {
+                const response = await fetch('/faculty/api/my-recommendations');
+                const result = await response.json();
+                
+                if (result.recommendations && result.recommendations.length > 0) {
+                    const container = document.getElementById('recentRecommendations');
+                    container.innerHTML = result.recommendations.slice(0, 5).map(rec => `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="card-title">${rec.book_title}</h6>
+                                <p class="card-text text-muted">by ${rec.author}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-users"></i> ${rec.target_audience} | 
+                                        <i class="fas fa-signal"></i> ${rec.difficulty_level}
+                                    </small>
+                                    <span class="badge bg-success">${rec.status}</span>
+                                </div>
+                                <p class="card-text mt-2">${rec.recommendation_reason.substring(0, 100)}...</p>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('recentRecommendations').innerHTML = 
+                        '<p class="text-muted text-center">No recommendations yet. Start by adding your first recommendation!</p>';
+                }
+            } catch (error) {
+                console.error('Error loading recommendations:', error);
+            }
+        }
+        
+        // Set today's date and load recommendations on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.querySelector('input[readonly]').value = today;
+            loadRecentRecommendations();
+        });
+    </script>
+</body>
+</html>

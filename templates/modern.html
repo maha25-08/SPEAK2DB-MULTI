@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Modern Interface</title>
+    <link rel="stylesheet" href="/static/css/modern-ui.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Particles Background -->
+    <div class="particles" id="particles"></div>
+    
+    <!-- Modern Container -->
+    <div class="modern-container">
+        <div class="modern-card">
+            <!-- Header -->
+            <div class="modern-header">
+                <h1 class="modern-title neon-text">🗃️ Speak2DB</h1>
+                <p class="modern-subtitle">AI-Powered Library Management System</p>
+            </div>
+            
+            <!-- User Info -->
+            <div class="modern-stats">
+                <div class="modern-stat">
+                    <div class="modern-stat-number" id="userRole">Student</div>
+                    <div class="modern-stat-label">Your Role</div>
+                </div>
+                <div class="modern-stat">
+                    <div class="modern-stat-number" id="queryCount">0</div>
+                    <div class="modern-stat-label">Queries</div>
+                </div>
+                <div class="modern-stat">
+                    <div class="modern-stat-number" id="activeUsers">3</div>
+                    <div class="modern-stat-label">Active Users</div>
+                </div>
+            </div>
+            
+            <!-- Query Section -->
+            <div class="modern-query-container">
+                <textarea 
+                    id="queryInput" 
+                    class="modern-input" 
+                    placeholder="🔍 Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
+                    rows="4"
+                ></textarea>
+                
+                <div class="modern-button-group">
+                    <button id="queryBtn" class="modern-button modern-button-primary">
+                        🚀 Execute Query
+                    </button>
+                    <button id="clearBtn" class="modern-button modern-button-secondary">
+                        🗑️ Clear
+                    </button>
+                    <button id="voiceBtn" class="modern-button modern-button-info">
+                        🎤 Voice Input
+                    </button>
+                    <button id="exportBtn" class="modern-button modern-button-success">
+                        📥 Export
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Results Section -->
+            <div id="resultsSection" class="modern-results">
+                <h2 style="color: var(--light); margin-bottom: 1.5rem; font-size: 2rem;">📊 Query Results</h2>
+                <div id="resultsContainer">
+                    <table class="modern-table">
+                        <thead>
+                            <tr id="tableHeader">
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Status</th>
+                                <th>Created Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="modern-loading">
+        <div class="modern-spinner"></div>
+        <div class="modern-loading-text">Processing your query...</div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+    
+    <script>
+        // Global variables
+        let currentData = [];
+        let currentColumns = [];
+        let queryCount = 0;
+        
+        // Initialize particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'article';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `modern-toast ${type}`;
+            toast.textContent = message;
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // Show/hide loading
+        function showLoading(show) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.style.display = show ? 'block' : 'none';
+        }
+        
+        // Display results
+        function displayResults(data, columns, query, sql) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsBody = document.getElementById('resultsBody');
+            const tableHeader = document.getElementById('tableHeader');
+            
+            // Clear existing content
+            resultsBody.innerHTML = '';
+            tableHeader.innerHTML = '';
+            
+            // Update header
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                tableHeader.appendChild(th);
+            });
+            
+            // Show results section
+            resultsSection.classList.add('show');
+            
+            if (data.length === 0) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = columns.length;
+                cell.textContent = 'No results found';
+                cell.style.textAlign = 'center';
+                cell.style.padding = '2rem';
+                row.appendChild(cell);
+                resultsBody.appendChild(row);
+            } else {
+                // Create rows with animation
+                data.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.style.opacity = '0';
+                    tr.style.transform = 'translateY(20px)';
+                    
+                    columns.forEach(key => {
+                        const td = document.createElement('td');
+                        td.textContent = row[key] !== null ? row[key] : 'NULL';
+                        tr.appendChild(td);
+                    });
+                    
+                    resultsBody.appendChild(tr);
+                    
+                    // Animate row appearance
+                    setTimeout(() => {
+                        tr.style.transition = 'all 0.3s ease';
+                        tr.style.opacity = '1';
+                        tr.style.transform = 'translateY(0)';
+                    }, index * 100);
+                });
+            }
+            
+            // Update query count
+            queryCount++;
+            document.getElementById('queryCount').textContent = queryCount;
+            
+            currentData = data;
+            currentColumns = columns;
+        }
+        
+        // Execute query
+        async function executeQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                showToast('Please enter a query', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result.data, result.columns, query, result.sql);
+                    showToast('Query executed successfully!', 'success');
+                } else {
+                    showToast(result.error || 'Query failed', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Clear query
+        function clearQuery() {
+            document.getElementById('queryInput').value = '';
+            document.getElementById('resultsSection').classList.remove('show');
+            showToast('Query cleared', 'info');
+        }
+        
+        // Export results
+        function exportResults() {
+            if (!currentData || currentData.length === 0) {
+                showToast('No data to export', 'warning');
+                return;
+            }
+            
+            // Convert to CSV
+            const headers = Object.keys(currentData[0]);
+            const csvContent = [
+                headers.join(','),
+                ...currentData.map(row => headers.map(header => row[header] || '').join(','))
+            ].join('\n');
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'query_results.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast('Results exported successfully!', 'success');
+        }
+        
+        // Voice input function
+        function startVoiceInput() {
+            if ('webkitSpeechRecognition' in window) {
+                const recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = function() {
+                    showToast('Voice recognition started...', 'info');
+                    document.getElementById('voiceBtn').classList.add('listening');
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('queryInput').value = transcript;
+                    showToast('Voice input captured', 'success');
+                };
+                
+                recognition.onerror = function(event) {
+                    showToast('Voice recognition error: ' + event.error, 'error');
+                    document.getElementById('voiceBtn').classList.remove('listening');
+                };
+                
+                recognition.onend = function() {
+                    document.getElementById('voiceBtn').classList.remove('listening');
+                };
+                
+                recognition.start();
+            } else {
+                showToast('Voice recognition not supported in this browser', 'warning');
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('queryBtn').addEventListener('click', executeQuery);
+        document.getElementById('clearBtn').addEventListener('click', clearQuery);
+        document.getElementById('voiceBtn').addEventListener('click', startVoiceInput);
+        document.getElementById('exportBtn').addEventListener('click', exportResults);
+        
+        // Enter key support
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                executeQuery();
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            
+            // Get user info from session
+            fetch('/api/user-info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.role) {
+                        document.getElementById('userRole').textContent = data.role.charAt(0).toUpperCase() + data.role.slice(1);
+                    }
+                })
+                .catch(error => {
+                    console.log('Could not fetch user info');
+                });
+        });
+
+        // Speech Recognition Script
+        const voiceBtn = document.getElementById("voiceBtn");
+        console.log("Voice button element found:", voiceBtn);
+
+        // Multiple ways to ensure button event is connected
+        voiceBtn.addEventListener("click", function() {
+            console.log("Mic button clicked via addEventListener");
+            startSpeechRecognition();
+        });
+
+        // Backup event binding
+        voiceBtn.onclick = function() {
+            console.log("Mic button clicked via onclick");
+            startSpeechRecognition();
+        };
+
+        console.log("Voice button events bound successfully");
+
+        function startSpeechRecognition(){
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if(!SpeechRecognition){
+                alert("Speech recognition not supported in this browser");
+                return;
+            }
+
+            // Request microphone permission
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function(stream) {
+                    // Permission granted, stop the stream immediately
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    const recognition = new SpeechRecognition();
+
+                    recognition.lang = "en-US";
+                    recognition.continuous = true;
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
+
+                    recognition.start();
+
+                    recognition.onstart = function(){
+                        console.log("=== SPEECH RECOGNITION STARTED ===");
+                        console.log("Speech recognition started");
+                        voiceBtn.innerText = "🎤 Listening...";
+                    }
+
+                    recognition.onresult = function(event){
+                        console.log("=== SPEECH RESULT EVENT FIRED ===");
+                        console.log("Speech result event fired");
+                        console.log("Full event object:", event);
+                        console.log("Event results:", event.results);
+                        
+                        if(event.results && event.results.length > 0) {
+                            const speechText = event.results[0][0].transcript;
+                            console.log("Detected text:", speechText);
+                            console.log("Confidence score:", event.results[0][0].confidence);
+                            
+                            const confirmQuery = confirm(
+                                "You said: " + speechText + "\nRun this query?"
+                            );
+                            console.log("User confirmation:", confirmQuery);
+                            
+                            if(confirmQuery){
+                                console.log("User confirmed - proceeding with query");
+                                document.getElementById("queryInput").value = speechText;
+                                sendQuery(speechText);
+                            } else {
+                                console.log("User cancelled - query not sent");
+                            }
+                        } else {
+                            console.log("No results in speech event");
+                        }
+                    }
+
+                    recognition.onerror = function(event){
+                        console.log("=== SPEECH RECOGNITION ERROR ===");
+                        console.log("Speech error:", event.error);
+                        console.log("Full error event:", event);
+                        
+                        if(event.error === 'not-allowed') {
+                            console.log("ERROR: Microphone permission denied");
+                            alert("Microphone permission denied. Please allow microphone access in your browser settings.");
+                        } else if(event.error === 'no-speech') {
+                            console.log("ERROR: No speech detected");
+                            alert("No speech detected. Please try again.");
+                        } else if(event.error === 'audio-capture') {
+                            console.log("ERROR: Audio capture failed");
+                            alert("Audio capture failed. Please check your microphone.");
+                        } else if(event.error === 'network') {
+                            console.log("ERROR: Network error");
+                            alert("Network error during speech recognition.");
+                        } else {
+                            console.log("ERROR: Unknown speech recognition error");
+                            alert("Speech recognition failed. Please try again.");
+                        }
+                        voiceBtn.innerText = "🎤 Speak";
+                    }
+
+                    recognition.onend = function(){
+                        console.log("=== SPEECH RECOGNITION ENDED ===");
+                        console.log("Speech recognition ended");
+                        voiceBtn.innerText = "🎤 Speak";
+                    }
+                })
+                .catch(function(err) {
+                    console.error("Microphone permission error:", err);
+                    if(err.name === 'NotAllowedError') {
+                        alert("Microphone access denied. Please click the microphone icon in your browser's address bar and select 'Allow'.");
+                    } else {
+                        alert("Could not access microphone. Please check your browser settings.");
+                    }
+                });
+        }
+
+        function sendQuery(queryText){
+            fetch("/query",{
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    query:queryText
+                })
+            })
+            .then(response=>response.json())
+            .then(data=>{
+                console.log("Server response:",data);
+                displayResults(data);
+            })
+            .catch(error=>{
+                console.error("Query error:",error);
+            });
+        }
+    </script>
+</body>
+</html>

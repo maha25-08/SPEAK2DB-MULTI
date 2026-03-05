@@ -1,0 +1,458 @@
+/**
+ * 🎨 ROLE-BASED UI STYLES
+ * Dynamic styling for different user roles and permissions
+ */
+
+/* ===== ROLE-SPECIFIC COLOR SCHEMES ===== */
+
+/* Student Theme - Green & Professional */
+.role-student {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.student-theme {
+    --primary-color: #4CAF50;
+    --secondary-color: #2196F3;
+    --accent-color: #FF9800;
+    --background-color: #f1f8e9;
+    --sidebar-color: #2E7D32;
+    --card-shadow: 0 4px 8px rgba(76, 175, 80, 0.15);
+}
+
+/* Librarian Theme - Blue & Professional */
+.role-librarian {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+.librarian-theme {
+    --primary-color: #2196F3;
+    --secondary-color: #FF9800;
+    --accent-color: #4CAF50;
+    --background-color: #e3f2fd;
+    --sidebar-color: #1565C0;
+    --card-shadow: 0 4px 8px rgba(33, 150, 243, 0.15);
+}
+
+/* Administrator Theme - Purple & Authoritative */
+.role-administrator {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    box-shadow: 0 2px 4px rgba(156, 39, 176, 0.3);
+}
+
+.admin-theme {
+    --primary-color: #9C27B0;
+    --secondary-color: #F44336;
+    --accent-color: #2196F3;
+    --background-color: #f3e5f5;
+    --sidebar-color: #6A1B9A;
+    --card-shadow: 0 4px 8px rgba(156, 39, 176, 0.15);
+}
+
+/* ===== DYNAMIC SIDEBAR ===== */
+.sidebar {
+    background: var(--sidebar-color, #2E7D32);
+    width: var(--sidebar-width, 250px);
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.sidebar-brand {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.brand-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.brand-text h2 {
+    color: white;
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.brand-text span {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+/* ===== USER CARD ADAPTATIONS ===== */
+.user-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.user-avatar {
+    background: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.user-name {
+    color: white;
+    font-weight: 600;
+}
+
+/* ===== NAVIGATION ADAPTATIONS ===== */
+.quick-action {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
+}
+
+.quick-action:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--primary-color);
+    transform: translateX(8px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.quick-action-icon {
+    color: var(--primary-color);
+    font-size: 20px;
+}
+
+/* ===== DASHBOARD WIDGETS ===== */
+.widget {
+    background: white;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow, 0 4px 8px rgba(0,0,0,0.1));
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.widget:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+.widget-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    margin: -20px -20px 15px -20px;
+    padding: 20px;
+    border-radius: 16px 16px 0 0;
+}
+
+.widget-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.widget-title {
+    font-weight: 600;
+    font-size: 18px;
+}
+
+/* ===== ROLE-SPECIFIC COMPONENTS ===== */
+
+/* Student Components */
+.student-widget {
+    border-left: 4px solid var(--primary-color);
+}
+
+.student-stats {
+    background: linear-gradient(135deg, #f1f8e9, #e8f5e8);
+}
+
+.student-alert {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid #e65100;
+}
+
+/* Librarian Components */
+.librarian-widget {
+    border-left: 4px solid var(--primary-color);
+}
+
+.librarian-stats {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+}
+
+.librarian-alert {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid #0D47A1;
+}
+
+/* Administrator Components */
+.admin-widget {
+    border-left: 4px solid var(--primary-color);
+}
+
+.admin-stats {
+    background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+}
+
+.admin-alert {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid #4A148C;
+}
+
+/* ===== PERMISSION-BASED VISIBILITY ===== */
+.permission-required {
+    opacity: 0.5;
+    pointer-events: none;
+    position: relative;
+}
+
+.permission-required::after {
+    content: '🔒';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 50%;
+    font-size: 16px;
+}
+
+.permission-granted {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ===== SEARCH BAR ADAPTATIONS ===== */
+.search-container {
+    position: relative;
+    margin: 20px 0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 16px 20px 16px 50px;
+    border: 2px solid rgba(0,0,0,0.1);
+    border-radius: 25px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background: rgba(255,255,255,0.9);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    background: white;
+}
+
+.search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 18px;
+    transition: color 0.3s ease;
+}
+
+.search-input:focus + .search-icon {
+    color: var(--primary-color);
+}
+
+/* ===== DYNAMIC CHART COLORS ===== */
+.chart-primary {
+    background-color: var(--primary-color);
+}
+
+.chart-secondary {
+    background-color: var(--secondary-color);
+}
+
+.chart-accent {
+    background-color: var(--accent-color);
+}
+
+/* ===== RESPONSIVE ADAPTATIONS ===== */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 70px;
+    }
+    
+    .sidebar-brand h2,
+    .sidebar-brand span,
+    .user-name,
+    .quick-action-label {
+        display: none;
+    }
+    
+    .brand-icon {
+        font-size: 24px;
+        margin: 0;
+    }
+    
+    .quick-action {
+        justify-content: center;
+        padding: 12px;
+    }
+    
+    .quick-action-icon {
+        margin: 0;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        margin: 15px;
+    }
+    
+    .widget {
+        padding: 15px;
+    }
+    
+    .widget-header {
+        padding: 15px;
+        margin: -15px -15px 10px -15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-grid {
+        margin: 10px;
+    }
+    
+    .widget {
+        padding: 12px;
+    }
+    
+    .widget-header {
+        padding: 12px;
+        margin: -12px -12px 8px -12px;
+    }
+    
+    .widget-title {
+        font-size: 16px;
+    }
+    
+    .widget-icon {
+        font-size: 24px;
+    }
+}
+
+/* ===== ANIMATION AND TRANSITIONS ===== */
+@keyframes slideInFromLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.widget {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.quick-action {
+    animation: slideInFromLeft 0.3s ease-out;
+}
+
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+.widget:focus-within {
+    box-shadow: 0 0 0 3px var(--primary-color);
+}
+
+.quick-action:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.search-input:focus {
+    outline: none;
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+    .widget {
+        background: #1a1a1a;
+        color: #ffffff;
+        border-color: rgba(255,255,255,0.1);
+    }
+    
+    .search-input {
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.2);
+        color: white;
+    }
+    
+    .search-input::placeholder {
+        color: rgba(255,255,255,0.6);
+    }
+}
+
+/* ===== ROLE-SPECIFIC BADGES ===== */
+.badge-student {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-librarian {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-administrator {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

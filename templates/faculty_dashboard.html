@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard - Library Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/student.css') }}" rel="stylesheet">
+    <style>
+        .faculty-welcome {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card.bg-faculty {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .dept-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .dept-header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 10px 10px 0 0;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+        <div class="container">
+            <a class="navbar-brand" href="/faculty/dashboard">
+                <i class="fas fa-graduation-cap"></i> Faculty Portal
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-user-tie"></i> {{ faculty_info[1] if faculty_info else 'Faculty' }}
+                </span>
+                <a class="nav-link" href="/faculty/students">
+                    <i class="fas fa-users"></i> Students
+                </a>
+                <a class="nav-link" href="/faculty/reports">
+                    <i class="fas fa-chart-bar"></i> Reports
+                </a>
+                <a class="nav-link" href="/">
+                    <i class="fas fa-home"></i> Main
+                </a>
+                <a class="nav-link" href="/logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Welcome Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="faculty-welcome">
+                    <h2 class="card-title">
+                        <i class="fas fa-chalkboard-teacher"></i> Welcome, {{ faculty_info[1] if faculty_info else 'Faculty' }}!
+                    </h2>
+                    <p class="card-text">
+                        {{ faculty_info[2] if faculty_info else '' }} Department • {{ faculty_info[3] if faculty_info else '' }}
+                    </p>
+                    <p class="card-text">
+                        <small>Specialization: {{ faculty_info[4] if faculty_info else 'Not specified' }}</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card dashboard-card stat-card bg-faculty text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ dept_student_count }}</h3>
+                        <p class="mb-0">Department Students</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ dept_issued_books|length }}</h3>
+                        <p class="mb-0">Active Borrowings</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ dept_overdue_books|length }}</h3>
+                        <p class="mb-0">Overdue Books</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card dashboard-card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ dept_fines|length }}</h3>
+                        <p class="mb-0">Unpaid Fines</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Current Borrowings -->
+        <div class="dept-section">
+            <div class="dept-header">
+                <h5><i class="fas fa-book-reader"></i> Department Current Borrowings</h5>
+            </div>
+            <div class="card-body">
+                {% if dept_issued_books %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Roll Number</th>
+                                    <th>Book Title</th>
+                                    <th>Author</th>
+                                    <th>Issue Date</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for book in dept_issued_books %}
+                                <tr>
+                                    <td>{{ book[9] }}</td>
+                                    <td>{{ book[10] }}</td>
+                                    <td>{{ book[7] }}</td>
+                                    <td>{{ book[8] }}</td>
+                                    <td>{{ book[3] }}</td>
+                                    <td>{{ book[4] }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'warning' if book[6] == 'Overdue' else 'success' }}">
+                                            {{ book[6] }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No active borrowings in your department.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Department Overdue Books -->
+        {% if dept_overdue_books %}
+        <div class="dept-section">
+            <div class="dept-header bg-warning">
+                <h5><i class="fas fa-exclamation-triangle"></i> Department Overdue Books</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Roll Number</th>
+                                <th>Book Title</th>
+                                <th>Due Date</th>
+                                <th>Days Overdue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for book in dept_overdue_books %}
+                            <tr>
+                                <td>{{ book[9] }}</td>
+                                <td>{{ book[10] }}</td>
+                                <td>{{ book[7] }}</td>
+                                <td>{{ book[4] }}</td>
+                                <td>
+                                    <span class="badge bg-danger">
+                                        {{ (book[4] | days_overdue) }} days
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Department Fines -->
+        {% if dept_fines %}
+        <div class="dept-section">
+            <div class="dept-header bg-danger text-white">
+                <h5><i class="fas fa-money-bill-wave"></i> Department Unpaid Fines</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Roll Number</th>
+                                <th>Fine Type</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fine in dept_fines %}
+                            <tr>
+                                <td>{{ fine[7] }}</td>
+                                <td>{{ fine[8] }}</td>
+                                <td>{{ fine[4] }}</td>
+                                <td>₹{{ fine[3] }}</td>
+                                <td>{{ fine[5] }}</td>
+                                <td>
+                                    <span class="badge bg-danger">{{ fine[6] }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Popular Books in Department -->
+        <div class="dept-section">
+            <div class="dept-header bg-primary">
+                <h5><i class="fas fa-chart-line"></i> Popular Books in {{ department }} Department</h5>
+            </div>
+            <div class="card-body">
+                {% if popular_books %}
+                    <div class="row">
+                        {% for book in popular_books %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ book[0] }}</h6>
+                                    <p class="card-text text-muted">{{ book[1] }}</p>
+                                    <span class="badge bg-primary">Borrowed {{ book[2] }} times</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No borrowing data available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/student.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+/* Student Dashboard Specific Styles - Using Main Theme Colors */
+
+.dashboard-card {
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.overdue {
+    background: linear-gradient(135deg, var(--warning) 0%, var(--accent2) 100%);
+    border-left: 4px solid var(--accent);
+}
+
+.unpaid-fine {
+    background: linear-gradient(135deg, var(--danger) 0%, #c82333 100%);
+    border-left: 4px solid var(--danger);
+}
+
+.student-welcome {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    color: white;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.stat-card h3 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card.bg-info {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+}
+
+.stat-card.bg-warning {
+    background: linear-gradient(135deg, var(--warning) 0%, var(--accent2) 100%);
+}
+
+.stat-card.bg-danger {
+    background: linear-gradient(135deg, var(--danger) 0%, #c82333 100%);
+}
+
+.stat-card.bg-success {
+    background: linear-gradient(135deg, var(--success) 0%, #218838 100%);
+}
+
+.book-table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: 1px solid var(--border);
+}
+
+.book-table .table {
+    margin-bottom: 0;
+}
+
+.book-table .table th {
+    background: var(--bg-card);
+    border-bottom: 2px solid var(--border-active);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.book-table .table td {
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+}
+
+.badge-status {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.alert-custom {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    background: var(--bg-card);
+    color: var(--text);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.profile-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    text-align: center;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.profile-header i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.info-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 2rem;
+}
+
+.info-row {
+    border-bottom: 1px solid #e9ecef;
+    padding: 1rem 0;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-row strong {
+    color: #495057;
+    font-weight: 600;
+}
+
+.navbar-student {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.navbar-student .navbar-brand {
+    color: white !important;
+    font-weight: 600;
+}
+
+.navbar-student .navbar-nav .nav-link {
+    color: rgba(255,255,255,0.8) !important;
+    transition: color 0.3s ease;
+}
+
+.navbar-student .navbar-nav .nav-link:hover {
+    color: white !important;
+}
+
+.navbar-student .navbar-text {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stat-card h3 {
+        font-size: 2rem;
+    }
+    
+    .student-welcome {
+        padding: 1.5rem;
+    }
+    
+    .book-table {
+        font-size: 0.9rem;
+    }
+}
+
+/* Loading animation */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Fade in animation */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}

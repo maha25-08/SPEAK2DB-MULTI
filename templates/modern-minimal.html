@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Minimal Interface</title>
+    <link rel="stylesheet" href="/static/css/modern-minimal.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Particles Background -->
+    <div class="particles" id="particles"></div>
+    
+    <!-- Minimal Container -->
+    <div class="minimal-container">
+        <!-- Minimal Header -->
+        <header class="minimal-header">
+            <div class="header-left">
+                <h1 class="brand-title">🗃️ Speak2DB</h1>
+            </div>
+            <div class="header-center">
+                <span class="user-info" id="userInfo">Student | 0 Queries | 3 Sessions</span>
+            </div>
+            <div class="header-right">
+                <button class="header-btn" id="sidebarToggle">☰</button>
+            </div>
+        </header>
+        
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Collapsible Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-header" onclick="toggleSection('core-engine')">
+                        <span class="section-icon">⚙️</span>
+                        <span class="section-title">Core Engine</span>
+                        <span class="section-toggle">▼</span>
+                    </div>
+                    <div class="section-content" id="core-engine">
+                        <div class="sidebar-item">Query Console</div>
+                        <div class="sidebar-item">Results Viewer</div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="section-header" onclick="toggleSection('text-to-sql')">
+                        <span class="section-icon">🔤</span>
+                        <span class="section-title">Text-to-SQL</span>
+                        <span class="section-toggle">▼</span>
+                    </div>
+                    <div class="section-content" id="text-to-sql">
+                        <div class="sidebar-item">Natural Language</div>
+                        <div class="sidebar-item">SQL Generation</div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="section-header" onclick="toggleSection('intelligence')">
+                        <span class="section-icon">🧠</span>
+                        <span class="section-title">Intelligence Layer</span>
+                        <span class="section-toggle">▼</span>
+                    </div>
+                    <div class="section-content" id="intelligence">
+                        <div class="sidebar-item">Ambiguity Engine</div>
+                        <div class="sidebar-item">Recommendations</div>
+                        <div class="sidebar-item">Domain Vocabulary</div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="section-header" onclick="toggleSection('security')">
+                        <span class="section-icon">🔐</span>
+                        <span class="section-title">Security</span>
+                        <span class="section-toggle">▼</span>
+                    </div>
+                    <div class="section-content" id="security">
+                        <div class="sidebar-item">Role-Based Access</div>
+                        <div class="sidebar-item">Row-Level Security</div>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Query Console Section -->
+                <section class="query-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Query Console</h2>
+                    </div>
+                    <div class="query-container">
+                        <textarea 
+                            id="queryInput" 
+                            class="query-input" 
+                            placeholder="🔍 Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
+                            rows="3"
+                        ></textarea>
+                        <div class="query-actions">
+                            <button id="queryBtn" class="btn btn-primary">
+                                <span class="btn-icon">🚀</span>
+                                <span class="btn-text">Execute Query</span>
+                            </button>
+                            <button id="clearBtn" class="btn btn-secondary">
+                                <span class="btn-icon">🗑️</span>
+                                <span class="btn-text">Clear</span>
+                            </button>
+                            <button id="voiceBtn" class="btn btn-info">
+                                <span class="btn-icon">🎤</span>
+                                <span class="btn-text">Voice Input</span>
+                            </button>
+                            <button id="exportBtn" class="btn btn-tertiary">
+                                <span class="btn-icon">📥</span>
+                                <span class="btn-text">Export</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Conditional Ambiguity Section -->
+                <section class="ambiguity-section" id="ambiguitySection" style="display: none;">
+                    <div class="section-header">
+                        <h2 class="section-title">🤔 Ambiguity Clarification</h2>
+                    </div>
+                    <div class="ambiguity-container">
+                        <div class="ambiguity-message">
+                            <span class="ambiguity-text" id="ambiguityText"></span>
+                        </div>
+                        <div class="ambiguity-options">
+                            <div id="ambiguityOptions"></div>
+                        </div>
+                        <div class="ambiguity-actions">
+                            <button id="submitClarification" class="btn btn-primary">Submit Clarification</button>
+                            <button id="cancelClarification" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Results Section -->
+                <section class="results-section" id="resultsSection">
+                    <div class="section-header">
+                        <h2 class="section-title">Query Results</h2>
+                        <div class="results-meta">
+                            <span class="results-count" id="resultsCount">0 rows</span>
+                        </div>
+                    </div>
+                    <div class="results-container">
+                        <div class="table-wrapper">
+                            <table class="results-table">
+                                <thead>
+                                    <tr id="tableHeader">
+                                        <th>ID</th>
+                                        <th>Title</th>
+                                        <th>Author</th>
+                                        <th>Status</th>
+                                        <th>Created Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsBody">
+                                    <!-- Results will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Conditional Recommendations Section -->
+                <section class="recommendations-section" id="recommendationsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2 class="section-title">💡 Smart Recommendations</h2>
+                        <button class="btn btn-ghost" id="closeRecommendations">×</button>
+                    </div>
+                    <div class="recommendations-container">
+                        <div class="recommendation-list" id="recommendationList">
+                            <!-- Recommendations will be populated here -->
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing your query...</div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <script>
+        // Global variables
+        let currentData = [];
+        let currentColumns = [];
+        let queryCount = 0;
+        let sidebarOpen = true;
+        
+        // Initialize particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+        
+        // Toggle sidebar sections
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const toggle = section.previousElementSibling.querySelector('.section-toggle');
+            
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                toggle.textContent = '▼';
+                toggle.style.transform = 'rotate(0deg)';
+            } else {
+                section.style.display = 'none';
+                toggle.textContent = '▶';
+                toggle.style.transform = 'rotate(-90deg)';
+            }
+        }
+        
+        // Toggle sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('.main-content');
+            
+            if (sidebarOpen) {
+                sidebar.style.transform = 'translateX(-100%)';
+                mainContent.style.marginLeft = '0';
+                sidebarOpen = false;
+            } else {
+                sidebar.style.transform = 'translateX(0)';
+                mainContent.style.marginLeft = '280px';
+                sidebarOpen = true;
+            }
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('toast-hide');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // Show/hide loading
+        function showLoading(show) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.style.display = show ? 'flex' : 'none';
+        }
+        
+        // Show ambiguity section with animation
+        function showAmbiguitySection() {
+            const ambiguitySection = document.getElementById('ambiguitySection');
+            ambiguitySection.style.display = 'block';
+            setTimeout(() => {
+                ambiguitySection.classList.add('show');
+            }, 10);
+        }
+        
+        // Hide ambiguity section with animation
+        function hideAmbiguitySection() {
+            const ambiguitySection = document.getElementById('ambiguitySection');
+            ambiguitySection.classList.remove('show');
+            setTimeout(() => {
+                ambiguitySection.style.display = 'none';
+            }, 300);
+        }
+        
+        // Show recommendations section
+        function showRecommendations(recommendations) {
+            const recommendationsSection = document.getElementById('recommendationsSection');
+            const recommendationList = document.getElementById('recommendationList');
+            
+            recommendationList.innerHTML = '';
+            recommendations.forEach(rec => {
+                const item = document.createElement('div');
+                item.className = 'recommendation-item';
+                item.innerHTML = `
+                    <div class="recommendation-icon">${rec.icon}</div>
+                    <div class="recommendation-content">
+                        <div class="recommendation-title">${rec.title}</div>
+                        <div class="recommendation-description">${rec.description}</div>
+                    </div>
+                    <button class="btn btn-ghost" onclick="applyRecommendation('${rec.query}')">Apply</button>
+                `;
+                recommendationList.appendChild(item);
+            });
+            
+            recommendationsSection.style.display = 'block';
+        }
+        
+        // Apply recommendation
+        function applyRecommendation(query) {
+            document.getElementById('queryInput').value = query;
+            document.getElementById('queryInput').focus();
+        }
+        
+        // Display results
+        function displayResults(data, columns, query, sql) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsBody = document.getElementById('resultsBody');
+            const tableHeader = document.getElementById('tableHeader');
+            const resultsCount = document.getElementById('resultsCount');
+            
+            // Clear existing content
+            resultsBody.innerHTML = '';
+            tableHeader.innerHTML = '';
+            
+            // Update header
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                tableHeader.appendChild(th);
+            });
+            
+            // Update results count
+            resultsCount.textContent = `${data.length} rows`;
+            
+            if (data.length === 0) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = columns.length;
+                cell.textContent = 'No results found';
+                cell.className = 'no-results';
+                row.appendChild(cell);
+                resultsBody.appendChild(row);
+            } else {
+                // Create rows with animation
+                data.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'result-row';
+                    
+                    columns.forEach(key => {
+                        const td = document.createElement('td');
+                        td.textContent = row[key] !== null ? row[key] : 'NULL';
+                        tr.appendChild(td);
+                    });
+                    
+                    resultsBody.appendChild(tr);
+                    
+                    // Animate row appearance
+                    setTimeout(() => {
+                        tr.classList.add('show');
+                    }, index * 50);
+                });
+            }
+            
+            // Update query count
+            queryCount++;
+            updateUserInfo();
+            
+            currentData = data;
+            currentColumns = columns;
+            
+            // Show recommendations after query
+            setTimeout(() => {
+                const recommendations = generateRecommendations(query, data);
+                if (recommendations.length > 0) {
+                    showRecommendations(recommendations);
+                }
+            }, 1000);
+        }
+        
+        // Generate recommendations based on query
+        function generateRecommendations(query, data) {
+            const recommendations = [];
+            const queryLower = query.toLowerCase();
+            
+            if (queryLower.includes('fines') || queryLower.includes('owe')) {
+                recommendations.push({
+                    icon: '💰',
+                    title: 'Check Payment History',
+                    description: 'View your complete payment history and transaction records',
+                    query: 'show my payment history'
+                });
+            }
+            
+            if (queryLower.includes('books') || queryLower.includes('borrowed')) {
+                recommendations.push({
+                    icon: '📚',
+                    title: 'Check Due Dates',
+                    description: 'See when your borrowed books are due',
+                    query: 'when are my books due'
+                });
+            }
+            
+            if (data.length > 0) {
+                recommendations.push({
+                    icon: '📊',
+                    title: 'Export Results',
+                    description: 'Download these results as CSV',
+                    query: 'export current results'
+                });
+            }
+            
+            return recommendations.slice(0, 3);
+        }
+        
+        // Update user info
+        function updateUserInfo() {
+            const userInfo = document.getElementById('userInfo');
+            const role = userInfo.textContent.split(' | ')[0];
+            userInfo.textContent = `${role} | ${queryCount} Queries | 3 Sessions`;
+        }
+        
+        // Execute query
+        async function executeQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                showToast('Please enter a query', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            hideAmbiguitySection();
+            
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result.data, result.columns, query, result.sql);
+                    showToast('Query executed successfully!', 'success');
+                } else {
+                    showToast(result.error || 'Query failed', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Clear query
+        function clearQuery() {
+            document.getElementById('queryInput').value = '';
+            document.getElementById('resultsSection').classList.remove('show');
+            document.getElementById('recommendationsSection').style.display = 'none';
+            showToast('Query cleared', 'info');
+        }
+        
+        // Export results
+        function exportResults() {
+            if (!currentData || currentData.length === 0) {
+                showToast('No data to export', 'warning');
+                return;
+            }
+            
+            // Convert to CSV
+            const headers = Object.keys(currentData[0]);
+            const csvContent = [
+                headers.join(','),
+                ...currentData.map(row => headers.map(header => row[header] || '').join(','))
+            ].join('\n');
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'query_results.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast('Results exported successfully!', 'success');
+        }
+        
+        // Voice input function
+        function startVoiceInput() {
+            if ('webkitSpeechRecognition' in window) {
+                const recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = function() {
+                    showToast('Voice recognition started...', 'info');
+                    document.getElementById('voiceBtn').classList.add('listening');
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('queryInput').value = transcript;
+                    showToast('Voice input captured', 'success');
+                };
+                
+                recognition.onerror = function(event) {
+                    showToast('Voice recognition error: ' + event.error, 'error');
+                    document.getElementById('voiceBtn').classList.remove('listening');
+                };
+                
+                recognition.onend = function() {
+                    document.getElementById('voiceBtn').classList.remove('listening');
+                };
+                
+                recognition.start();
+            } else {
+                showToast('Voice recognition not supported in this browser', 'warning');
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+        document.getElementById('queryBtn').addEventListener('click', executeQuery);
+        document.getElementById('clearBtn').addEventListener('click', clearQuery);
+        document.getElementById('voiceBtn').addEventListener('click', startVoiceInput);
+        document.getElementById('exportBtn').addEventListener('click', exportResults);
+        document.getElementById('closeRecommendations').addEventListener('click', function() {
+            document.getElementById('recommendationsSection').style.display = 'none';
+        });
+        
+        // Enter key support
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                executeQuery();
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            
+            // Get user info from session
+            fetch('/api/user-info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.role) {
+                        const userInfo = document.getElementById('userInfo');
+                        userInfo.textContent = `${data.role.charAt(0).toUpperCase() + data.role.slice(1)} | 0 Queries | 3 Sessions`;
+                    }
+                })
+                .catch(error => {
+                    console.log('Could not fetch user info');
+                });
+        });
+
+        // Speech Recognition Script
+        const voiceBtn = document.getElementById("voiceBtn");
+        console.log("Voice button element found:", voiceBtn);
+
+        // Multiple ways to ensure button event is connected
+        voiceBtn.addEventListener("click", function() {
+            console.log("Mic button clicked via addEventListener");
+            startSpeechRecognition();
+        });
+
+        // Backup event binding
+        voiceBtn.onclick = function() {
+            console.log("Mic button clicked via onclick");
+            startSpeechRecognition();
+        };
+
+        console.log("Voice button events bound successfully");
+
+        function startSpeechRecognition(){
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if(!SpeechRecognition){
+                alert("Speech recognition not supported in this browser");
+                return;
+            }
+
+            // Request microphone permission
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function(stream) {
+                    // Permission granted, stop the stream immediately
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    const recognition = new SpeechRecognition();
+
+                    recognition.lang = "en-US";
+                    recognition.continuous = true;
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
+
+                    recognition.start();
+
+                    recognition.onstart = function(){
+                        console.log("=== SPEECH RECOGNITION STARTED ===");
+                        console.log("Speech recognition started");
+                        voiceBtn.innerText = "🎤 Listening...";
+                    }
+
+                    recognition.onresult = function(event){
+                        console.log("=== SPEECH RESULT EVENT FIRED ===");
+                        console.log("Speech result event fired");
+                        console.log("Full event object:", event);
+                        console.log("Event results:", event.results);
+                        
+                        if(event.results && event.results.length > 0) {
+                            const speechText = event.results[0][0].transcript;
+                            console.log("Detected text:", speechText);
+                            console.log("Confidence score:", event.results[0][0].confidence);
+                            
+                            const confirmQuery = confirm(
+                                "You said: " + speechText + "\nRun this query?"
+                            );
+                            console.log("User confirmation:", confirmQuery);
+                            
+                            if(confirmQuery){
+                                console.log("User confirmed - proceeding with query");
+                                document.getElementById("queryInput").value = speechText;
+                                sendQuery(speechText);
+                            } else {
+                                console.log("User cancelled - query not sent");
+                            }
+                        } else {
+                            console.log("No results in speech event");
+                        }
+                    }
+
+                    recognition.onerror = function(event){
+                        console.log("=== SPEECH RECOGNITION ERROR ===");
+                        console.log("Speech error:", event.error);
+                        console.log("Full error event:", event);
+                        
+                        if(event.error === 'not-allowed') {
+                            console.log("ERROR: Microphone permission denied");
+                            alert("Microphone permission denied. Please allow microphone access in your browser settings.");
+                        } else if(event.error === 'no-speech') {
+                            console.log("ERROR: No speech detected");
+                            alert("No speech detected. Please try again.");
+                        } else if(event.error === 'audio-capture') {
+                            console.log("ERROR: Audio capture failed");
+                            alert("Audio capture failed. Please check your microphone.");
+                        } else if(event.error === 'network') {
+                            console.log("ERROR: Network error");
+                            alert("Network error during speech recognition.");
+                        } else {
+                            console.log("ERROR: Unknown speech recognition error");
+                            alert("Speech recognition failed. Please try again.");
+                        }
+                        voiceBtn.innerText = "🎤 Speak";
+                    }
+
+                    recognition.onend = function(){
+                        console.log("=== SPEECH RECOGNITION ENDED ===");
+                        console.log("Speech recognition ended");
+                        voiceBtn.innerText = "🎤 Speak";
+                    }
+                })
+                .catch(function(err) {
+                    console.error("Microphone permission error:", err);
+                    if(err.name === 'NotAllowedError') {
+                        alert("Microphone access denied. Please click the microphone icon in your browser's address bar and select 'Allow'.");
+                    } else {
+                        alert("Could not access microphone. Please check your browser settings.");
+                    }
+                });
+        }
+
+        function sendQuery(queryText){
+            fetch("/query",{
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    query:queryText
+                })
+            })
+            .then(response=>response.json())
+            .then(data=>{
+                console.log("Server response:",data);
+                displayResults(data);
+            })
+            .catch(error=>{
+                console.error("Query error:",error);
+            });
+        }
+    </script>
+</body>
+</html>

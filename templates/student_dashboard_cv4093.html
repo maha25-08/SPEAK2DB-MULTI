@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student 93 - Student Dashboard | Speak2DB</title>
+    <link rel="stylesheet" href="/static/css/student-dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Particles Background -->
+    <div class="particles" id="particles"></div>
+    
+    <!-- Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <h1 class="brand-title">🗃️ Speak2DB</h1>
+                <span class="header-subtitle">Student Dashboard</span>
+            </div>
+            <div class="header-center">
+                <div class="student-info">
+                    <div class="student-avatar">
+                        <span class="avatar-icon">👤</span>
+                    </div>
+                    <div class="student-details">
+                        <div class="student-name">Student 93</div>
+                        <div class="student-meta">CV4093 | CIVIL</div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="header-btn" onclick="window.location.href='/minimal'">🔍 Query</button>
+                <button class="header-btn" onclick="window.location.href='/logout'">🚪 Logout</button>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Statistics Cards -->
+            <section class="stats-section">
+                <div class="stats-grid">
+                    <div class="stat-card stat-primary">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-content">
+                            <div class="stat-number">15</div>
+                            <div class="stat-label">Total Books Borrowed</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card stat-success">
+                        <div class="stat-icon">📖</div>
+                        <div class="stat-content">
+                            <div class="stat-number">9</div>
+                            <div class="stat-label">Currently Borrowed</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card stat-warning">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-content">
+                            <div class="stat-number">3</div>
+                            <div class="stat-label">Unpaid Fines</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card stat-info">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-content">
+                            <div class="stat-number">3</div>
+                            <div class="stat-label">Book Requests</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Current Borrowed Books -->
+            <section class="current-books-section" id="current-books">
+                <div class="section-header">
+                    <h2>📖 Currently Borrowed Books</h2>
+                    <div class="section-count">9 books</div>
+                </div>
+                <div class="books-grid">
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Data Structures</h3>
+                            <p class="book-author">by Narasimha Karumanchi</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 5</span>
+                                <span class="due-date">Due: 1</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Thermodynamics</h3>
+                            <p class="book-author">by Yunus Cengel</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 3</span>
+                                <span class="due-date">Due: 2</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Digital Electronics</h3>
+                            <p class="book-author">by Morris Mano</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 2</span>
+                                <span class="due-date">Due: 2</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Control Systems</h3>
+                            <p class="book-author">by Nagrath & Gopal</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 6</span>
+                                <span class="due-date">Due: 2026-03-16</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Data Structures</h3>
+                            <p class="book-author">by Narasimha Karumanchi</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 5</span>
+                                <span class="due-date">Due: 2026-03-23</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Data Structures</h3>
+                            <p class="book-author">by Narasimha Karumanchi</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 5</span>
+                                <span class="due-date">Due: 2026-03-29</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Computer Networks</h3>
+                            <p class="book-author">by Tanenbaum</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 10</span>
+                                <span class="due-date">Due: 3</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Computer Networks</h3>
+                            <p class="book-author">by Tanenbaum</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 10</span>
+                                <span class="due-date">Due: 3</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                    <div class="book-card current-book">
+                        <div class="book-cover">
+                            <span class="book-icon">📚</span>
+                        </div>
+                        <div class="book-info">
+                            <h3 class="book-title">Digital Electronics</h3>
+                            <p class="book-author">by Morris Mano</p>
+                            <div class="book-meta">
+                                <span class="book-isbn">Book ID: 2</span>
+                                <span class="due-date">Due: 3</span>
+                            </div>
+                        </div>
+                        <div class="book-status">
+                            <span class="status-badge status-current">Borrowed</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Borrowing History -->
+            <section class="history-section" id="borrowing-history">
+                <div class="section-header">
+                    <h2>📚 Borrowing History</h2>
+                    <div class="section-count">{total_borrowed} total</div>
+                </div>
+                <div class="history-table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Book Title</th>
+                                <th>Author</th>
+                                <th>Issue Date</th>
+                                <th>Return Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Data Structures</td>
+                                <td>Narasimha Karumanchi</td>
+                                <td>2026-02-09</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">AI: A Modern Approach</td>
+                                <td>Stuart Russell</td>
+                                <td>2026-01-30</td>
+                                <td>2026-02-23</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Data Structures</td>
+                                <td>Narasimha Karumanchi</td>
+                                <td>2026-01-28</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Control Systems</td>
+                                <td>Nagrath & Gopal</td>
+                                <td>2026-01-20</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Thermodynamics</td>
+                                <td>Yunus Cengel</td>
+                                <td>2026-01-15</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Computer Networks</td>
+                                <td>Tanenbaum</td>
+                                <td>2026-01-04</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Thermodynamics</td>
+                                <td>Yunus Cengel</td>
+                                <td>2025-12-20</td>
+                                <td>2026-01-03</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Thermodynamics</td>
+                                <td>Yunus Cengel</td>
+                                <td>2025-12-17</td>
+                                <td>2026-01-08</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Digital Electronics</td>
+                                <td>Morris Mano</td>
+                                <td>2025-12-06</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">AI: A Modern Approach</td>
+                                <td>Stuart Russell</td>
+                                <td>2025-11-24</td>
+                                <td>2025-12-18</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Computer Networks</td>
+                                <td>Tanenbaum</td>
+                                <td>2025-11-01</td>
+                                <td>2025-11-29</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Computer Networks</td>
+                                <td>Tanenbaum</td>
+                                <td>2025-10-22</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Data Structures</td>
+                                <td>Narasimha Karumanchi</td>
+                                <td>2025-09-29</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">AI: A Modern Approach</td>
+                                <td>Stuart Russell</td>
+                                <td>2025-09-18</td>
+                                <td>2025-10-01</td>
+                                <td>
+                                    <span class="status-badge status-returned">Returned</span>
+                                </td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="book-title-cell">Digital Electronics</td>
+                                <td>Morris Mano</td>
+                                <td>2025-09-13</td>
+                                <td>Not returned</td>
+                                <td>
+                                    <span class="status-badge status-current">Borrowed</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <!-- Fines Section -->
+            <section class="fines-section" id="fines">
+                <div class="section-header">
+                    <h2>💰 Fines & Payments</h2>
+                    <div class="section-count">{total_fines} fines</div>
+                </div>
+                <div class="fines-grid">
+                    <div class="fine-card">
+                        <div class="fine-header">
+                            <span class="fine-amount">₹122.0</span>
+                            <span class="fine-status status-unpaid">
+                                Unpaid
+                            </span>
+                        </div>
+                        <div class="fine-details">
+                            <p class="fine-reason">Lost Book</p>
+                            <p class="fine-date">Issued: 2026-02-27</p>
+                        </div>
+                    </div>
+                    <div class="fine-card">
+                        <div class="fine-header">
+                            <span class="fine-amount">₹247.0</span>
+                            <span class="fine-status status-unpaid">
+                                Unpaid
+                            </span>
+                        </div>
+                        <div class="fine-details">
+                            <p class="fine-reason">Lost Book</p>
+                            <p class="fine-date">Issued: 2026-02-01</p>
+                        </div>
+                    </div>
+                    <div class="fine-card">
+                        <div class="fine-header">
+                            <span class="fine-amount">₹362.0</span>
+                            <span class="fine-status status-unpaid">
+                                Unpaid
+                            </span>
+                        </div>
+                        <div class="fine-details">
+                            <p class="fine-reason">Noise Complaint</p>
+                            <p class="fine-date">Issued: 2026-01-08</p>
+                        </div>
+                    </div>
+                    <div class="fine-card">
+                        <div class="fine-header">
+                            <span class="fine-amount">₹448.0</span>
+                            <span class="fine-status status-paid">
+                                Paid
+                            </span>
+                        </div>
+                        <div class="fine-details">
+                            <p class="fine-reason">Late Return</p>
+                            <p class="fine-date">Issued: 2025-12-28</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Book Requests Section -->
+            <section class="requests-section" id="requests">
+                <div class="section-header">
+                    <h2>📋 Book Requests</h2>
+                    <div class="section-count">{pending_requests} requests</div>
+                </div>
+                <div class="requests-grid">
+                    <div class="request-card">
+                        <div class="request-header">
+                            <span class="request-date">2026-02-22</span>
+                            <span class="request-status status-pending">Pending</span>
+                        </div>
+                        <div class="request-details">
+                            <h3 class="request-title">Data Structures</h3>
+                            <p class="request-author">by Narasimha Karumanchi</p>
+                        </div>
+                    </div>
+                    <div class="request-card">
+                        <div class="request-header">
+                            <span class="request-date">2026-02-20</span>
+                            <span class="request-status status-pending">Pending</span>
+                        </div>
+                        <div class="request-details">
+                            <h3 class="request-title">Thermodynamics</h3>
+                            <p class="request-author">by Yunus Cengel</p>
+                        </div>
+                    </div>
+                    <div class="request-card">
+                        <div class="request-header">
+                            <span class="request-date">2026-02-11</span>
+                            <span class="request-status status-pending">Pending</span>
+                        </div>
+                        <div class="request-details">
+                            <h3 class="request-title">AI: A Modern Approach</h3>
+                            <p class="request-author">by Stuart Russell</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <script>
+        // Initialize particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.textContent = message;
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('toast-hide');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            
+            // Animate stat cards on load
+            const statCards = document.querySelectorAll('.stat-card');
+            statCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('animate-in');
+                }, index * 100);
+            });
+            
+            // Animate book cards on scroll
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animate-in');
+                    }
+                });
+            }, observerOptions);
+            
+            document.querySelectorAll('.book-card, .fine-card, .request-card').forEach(card => {
+                observer.observe(card);
+            });
+        });
+    </script>
+</body>
+</html>

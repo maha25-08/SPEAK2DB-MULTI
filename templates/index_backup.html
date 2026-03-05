@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Dashboard</title>
+    <meta name="description" content="Speak2DB: NLP-Driven Multi-Database Query Assistant Dashboard">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/script.js"></script>
+</head>
+
+<body>
+    <div class="dashboard">
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Toggle Button -->
+            <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <span id="toggleIcon">◀</span>
+            </button>
+            <div class="sidebar-brand">
+                <div class="brand-icon">🗃️</div>
+                <div class="brand-text">
+                    <h2>Speak2DB</h2>
+                    <span>Query Assistant</span>
+                </div>
+            </div>
+
+            <!-- User Card -->
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="user-avatar">{{ user|upper }}</div>
+                    <div>
+                        <div class="user-name">{{ user }}</div>
+                        <span class="role-badge role-{{ role.lower() }}">{{ role }}</span>
+                    </div>
+                </div>
+                <a href="/logout" class="btn-logout">⏻ Sign Out</a>
+            </div>
+
+            <!-- Modern Navigation -->
+            <div class="nav-section">
+                <div class="section-title">📍 Navigation</div>
+                <nav class="modern-nav">
+                    <a href="/" class="nav-link active">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="/query" class="nav-link">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query Console</span>
+                    </a>
+                    <a href="/recommendations" class="nav-link">
+                        <span class="nav-icon">💡</span>
+                        <span class="nav-text">Recommendations</span>
+                    </a>
+                    <a href="/analytics" class="nav-link">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Analytics</span>
+                    </a>
+                    <a href="/settings" class="nav-link">
+                        <span class="nav-icon">⚙</span>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="header-content">
+                    <div>
+                        <h1 class="page-title">Welcome back, {{ user }} 👋</h1>
+                        <p class="page-subtitle">Your NLP-powered database query assistant is ready</p>
+                    </div>
+                    <div class="header-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">12</span>
+                            <span class="stat-label">Queries Today</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">3</span>
+                            <span class="stat-label">Active Sessions</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Query Section -->
+            <section class="query-section">
+                <div class="section-header">
+                    <h2 class="section-title floating-icon">🔍 Ask me anything about your library</h2>
+                    <p class="section-subtitle">I'll help you find exactly what you need</p>
+                </div>
+                
+                <div class="query-container">
+                    <textarea 
+                        id="queryInput" 
+                        class="query-input search-input-enhanced" 
+                        placeholder="Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
+                        rows="4"
+                    ></textarea>
+                    
+                    <div class="query-actions">
+                        <button id="queryBtn" class="btn-primary btn-interactive">
+                            <span class="floating-icon">🚀</span>
+                            Execute Query
+                        </button>
+                        <button id="clearBtn" class="btn-secondary btn-interactive">
+                            <span class="floating-icon">🗑️</span>
+                            Clear
+                        </button>
+                        <button id="micBtn" class="btn-secondary btn-interactive">
+                            <span class="floating-icon">🎤</span>
+                            Voice Input
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📊 Query Results</h2>
+                    <div class="result-actions">
+                        <button id="exportBtn" class="btn-secondary">📥 Export</button>
+                        <button id="visualizeBtn" class="btn-primary">📈 Visualize</button>
+                    </div>
+                </div>
+                
+                <div class="results-container">
+                    <div class="query-info">
+                        <span class="query-text" id="queryText"></span>
+                        <span class="query-sql" id="querySql"></span>
+                    </div>
+                    <div class="table-container">
+                        <table class="results-table" id="resultsTable">
+                            <thead id="tableHead"></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualization Section -->
+            <section class="visualization-section" id="visualizationSection" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">📈 Data Visualization</h2>
+                    <div class="viz-controls">
+                        <select id="chartType" class="chart-select">
+                            <option value="bar">Bar Chart</option>
+                            <option value="line">Line Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="doughnut">Doughnut Chart</option>
+                        </select>
+                        <button id="updateVizBtn" class="btn-update">Update Chart</button>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="dataChart"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Processing your query...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // Global variables
+        let currentData = null;
+        let currentChart = null;
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('collapsed');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.textContent = '▶';
+            } else {
+                toggleIcon.textContent = '◀';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // Setup event listeners
+            document.getElementById('queryBtn').addEventListener('click', executeQuery);
+            document.getElementById('clearBtn').addEventListener('click', clearQuery);
+            document.getElementById('micBtn').addEventListener('click', startVoiceInput);
+            document.getElementById('exportBtn').addEventListener('click', exportResults);
+            document.getElementById('visualizeBtn').addEventListener('click', showVisualization);
+            document.getElementById('updateVizBtn').addEventListener('click', updateVisualization);
+            
+            // Setup enter key for query input
+            document.getElementById('queryInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    executeQuery();
+                }
+            });
+            document.getElementById('queryInput').focus();
+        }
+
+        function executeQuery() {
+            var input = document.getElementById('queryInput');
+            if (!input) return;
+            var query = input.value.trim();
+            if (!query) {
+                showToast('⚠️ Enter or speak a query first.', 'error');
+                input.focus();
+                return;
+            }
+
+            var runBtn = document.getElementById('queryBtn');
+            if (runBtn) {
+                runBtn.disabled = true;
+                runBtn.textContent = '⏳ Processing...';
+            }
+
+            hideEl('resultsSection');
+            hideEl('visualizationSection');
+            showEl('loadingOverlay');
+
+            try {
+                var response = await fetch('/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                var result = await response.json();
+
+                if (result.clarification) {
+                    showClarification(result.message, result.suggestions);
+                    showToast('🤔 Ambiguous — pick a suggestion', 'info');
+                    return;
+                }
+
+                if (!response.ok) {
+                    showToast('❌ ' + (result.error || 'Error'), 'error');
+                    return;
+                }
+
+                displayResults(result);
+                showToast('✅ ' + (result.data ? result.data.length : 0) + ' rows from ' + (result.database || 'library_main.db'), 'info');
+            } catch (err) {
+                showToast('❌ Network: ' + err.message, 'error');
+            } finally {
+                if (runBtn) {
+                    runBtn.disabled = false;
+                    runBtn.textContent = '▶ Run';
+                }
+                hideEl('loadingOverlay');
+            }
+        }
+
+        function clearQuery() {
+            var input = document.getElementById('queryInput');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            hideEl('resultsSection');
+            hideEl('visualizationSection');
+        }
+
+        function startVoiceInput() {
+            if ('webkitSpeechRecognition' in window) {
+                const recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = function() {
+                    showToast('Voice recognition started...', 'info');
+                    document.getElementById('micBtn').classList.add('listening');
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('queryInput').value = transcript;
+                    showToast('Voice input captured', 'success');
+                };
+                
+                recognition.onerror = function(event) {
+                    showToast('Voice recognition error: ' + event.error, 'error');
+                    document.getElementById('micBtn').classList.remove('listening');
+                };
+                
+                recognition.onend = function() {
+                    document.getElementById('micBtn').classList.remove('listening');
+                };
+                
+                recognition.start();
+            } else {
+                showToast('Voice recognition not supported in this browser', 'warning');
+            }
+        }
+
+        function displayResults(result) {
+            lastResult = result;
+            currentChartType = 'bar';
+
+            hideEl('welcomeScreen');
+            hideEl('clarificationCard');
+            showEl('resultsSection');
+
+            var badgesEl = getEl('resultBadges');
+            if (badgesEl) {
+                var dbBadge = result.database === 'library_archive.db' ? 'badge-archive' : 'badge-main';
+                var dbLabel = result.database === 'library_archive.db' ? 'Archive DB' : 'Main DB';
+                badgesEl.innerHTML = '<span class="badge badge-ai">AI + NLP</span>' + '<span class="badge ' + dbBadge + '">' + dbLabel + '</span>';
+            }
+
+            var sqlCode = getEl('sqlCode');
+            if (sqlCode) sqlCode.textContent = result.sql;
+
+            var thead = getEl('tableHead');
+            var tbody = getEl('tableBody');
+            var noRes = getEl('noResults');
+            if (thead) thead.innerHTML = '';
+            if (tbody) tbody.innerHTML = '';
+
+            if (!result.data || result.data.length === 0) {
+                if (noRes) noRes.style.display = 'block';
+                hideEl('chartsGrid');
+                return;
+            }
+            if (noRes) noRes.style.display = 'none';
+
+            if (thead) {
+                var headerRow = document.createElement('tr');
+                result.columns.forEach(function(col) {
+                    var th = document.createElement('th');
+                    th.textContent = col;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+            }
+
+            if (tbody) {
+                result.data.forEach(function(row) {
+                    var tr = document.createElement('tr');
+                    result.columns.forEach(function(col) {
+                        var td = document.createElement('td');
+                        var val = row[col];
+                        td.textContent = (val !== null && val !== undefined) ? val : '—';
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Build chart after a short delay to ensure DOM is rendered
+            setTimeout(function () {
+                buildChart(result, 'bar');
+            }, 100);
+        }
+
+        function showVisualization() {
+            if (!currentData || currentData.length === 0) {
+                showToast('No data available for visualization', 'warning');
+                return;
+            }
+            showEl('visualizationSection');
+            hideEl('resultsSection');
+        }
+
+        function updateVisualization() {
+            if (!currentData || currentData.length === 0) return;
+            var chartType = document.getElementById('chartType').value;
+            buildChart(currentData, chartType);
+        }
+
+        function buildChart(result, type) {
+            // Chart implementation here
+            console.log('Building chart:', type);
+        }
+
+        function hideEl(id) {
+            var el = getEl(id);
+            if (el) el.style.display = 'none';
+        }
+
+        function showEl(id, display) {
+            var el = getEl(id);
+            if (el) el.style.display = display || 'block';
+        }
+
+        function getEl(id) {
+            return document.getElementById(id);
+        }
+
+        function showToast(message, type) {
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.textContent = message;
+            
+            var container = document.getElementById('toastContainer');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        function exportResults() {
+            if (!currentData || currentData.length === 0) {
+                showToast('No data to export', 'warning');
+                return;
+            }
+            
+            var csvContent = currentData.map(row => 
+                Object.values(row).join(',')
+            ).join('\n');
+            
+            var blob = new Blob([csvContent], { type: 'text/csv' });
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'query_results.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast('Results exported successfully', 'success');
+        }
+    </script>
+</body>
+
+</html>

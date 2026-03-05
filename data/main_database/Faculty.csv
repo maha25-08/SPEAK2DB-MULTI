@@ -1,0 +1,11 @@
+id,name,department,role,specialization,email,phone
+1,Dr. Faculty 1,BME,Associate Professor,Transportation Engineering,faculty1@university.edu.in,+91-9990971414
+2,Dr. Faculty 2,CHEM,Associate Professor,Control Engineering,faculty2@university.edu.in,098-87468647
+3,Dr. Faculty 3,CHEM,Head of Department,Biomedical Engineering,faculty3@univ.in,+91-9058469845
+4,Dr. Faculty 4,MECH,Professor,Embedded Systems,faculty4@institute.ac.in,099-93799330
+5,Dr. Faculty 5,EEE,Head of Department,Embedded Systems,faculty5@college.edu,+91-8601243857
+6,Dr. Faculty 6,CIVIL,Head of Department,Power Systems,faculty6@college.edu,090-51737444
+7,Dr. Faculty 7,BME,Professor,Control Engineering,faculty7@univ.in,092-33104952
+8,Dr. Faculty 8,META,Head of Department,Artificial Intelligence,faculty8@institute.ac.in,+91-8761405386
+9,Dr. Faculty 9,META,Lecturer,Data Science,faculty9@university.edu.in,092-10881083
+10,Dr. Faculty 10,EEE,Head of Department,VLSI Design,faculty10@institute.ac.in,097-86862294

@@ -1,0 +1,101 @@
+id,roll_number,name,branch,year,student_type,email,phone,role
+1,MT3001,Student 1,META,3,Exchange Student,mt3001@univ.in,086-67075585,Student
+2,IT2002,Student 2,IT,2,Regular,it2002@univ.in,+91-9523993040,Student
+3,EE4003,Student 3,EEE,4,Part-time,ee4003@univ.in,080-10053121,Student
+4,BM4004,Student 4,BME,4,Exchange Student,bm4004@univ.in,083-44262832,Student
+5,CV4005,Student 5,CIVIL,4,Research Scholar,cv4005@univ.in,9661542619,Student
+6,CH4006,Student 6,CHEM,4,Regular,ch4006@univ.in,9954697140,Student
+7,EC3007,Student 7,ECE,3,Regular,ec3007@univ.in,+91-9886008386,Student
+8,CH2008,Student 8,CHEM,2,Distance Learning,ch2008@univ.in,+91-8401709765,Student
+9,MT1009,Student 9,META,1,Exchange Student,mt1009@univ.in,+91-9325786693,Student
+10,BM4010,Student 10,BME,4,Distance Learning,bm4010@univ.in,+91-9604961723,Student
+11,BM3011,Student 11,BME,3,Distance Learning,bm3011@univ.in,098-58140747,Student
+12,BM2012,Student 12,BME,2,Distance Learning,bm2012@univ.in,9832124331,Student
+13,EE2013,Student 13,EEE,2,Distance Learning,ee2013@univ.in,081-10053917,Student
+14,MT4014,Student 14,META,4,Distance Learning,mt4014@univ.in,8615067819,Student
+15,IT2015,Student 15,IT,2,Exchange Student,it2015@univ.in,8746374487,Student
+16,BM2016,Student 16,BME,2,Part-time,bm2016@univ.in,093-57091113,Student
+17,CV1017,Student 17,CIVIL,1,Distance Learning,cv1017@univ.in,+91-9291376261,Student
+18,AE1018,Student 18,AERO,1,Research Scholar,ae1018@univ.in,8874892456,Student
+19,CV4019,Student 19,CIVIL,4,Exchange Student,cv4019@univ.in,084-38468264,Student
+20,EC3020,Student 20,ECE,3,Part-time,ec3020@univ.in,9456214763,Student
+21,AE2021,Student 21,AERO,2,Exchange Student,ae2021@univ.in,9115121385,Student
+22,AE4022,Student 22,AERO,4,Regular,ae4022@univ.in,093-96402639,Student
+23,AE4023,Student 23,AERO,4,Regular,ae4023@univ.in,080-96669501,Student
+24,CH2024,Student 24,CHEM,2,Research Scholar,ch2024@univ.in,087-63095470,Student
+25,EC4025,Student 25,ECE,4,Exchange Student,ec4025@univ.in,088-81672360,Student
+26,CH2026,Student 26,CHEM,2,Research Scholar,ch2026@univ.in,091-75543992,Student
+27,EE2027,Student 27,EEE,2,Part-time,ee2027@univ.in,9484169196,Student
+28,MT1028,Student 28,META,1,Research Scholar,mt1028@univ.in,9628376980,Student
+29,MT1029,Student 29,META,1,Exchange Student,mt1029@univ.in,+91-9207922721,Student
+30,ME3030,Student 30,MECH,3,Exchange Student,me3030@univ.in,8694914695,Student
+31,EC2031,Student 31,ECE,2,Exchange Student,ec2031@univ.in,+91-9288931916,Student
+32,AE4032,Student 32,AERO,4,Regular,ae4032@univ.in,9981663919,Student
+33,CH4033,Student 33,CHEM,4,Research Scholar,ch4033@univ.in,9091506138,Student
+34,CV1034,Student 34,CIVIL,1,Exchange Student,cv1034@univ.in,088-56084271,Student
+35,MT1035,Student 35,META,1,Part-time,mt1035@univ.in,087-26631507,Student
+36,IT2036,Student 36,IT,2,Part-time,it2036@univ.in,088-71342992,Student
+37,AE2037,Student 37,AERO,2,Research Scholar,ae2037@univ.in,+91-8334475857,Student
+38,BM4038,Student 38,BME,4,Exchange Student,bm4038@univ.in,086-95103541,Student
+39,CS2039,Student 39,CSE,2,Exchange Student,cs2039@univ.in,8299986613,Student
+40,CV1040,Student 40,CIVIL,1,Research Scholar,cv1040@univ.in,8109874622,Student
+41,AE2041,Student 41,AERO,2,Distance Learning,ae2041@univ.in,+91-8353487125,Student
+42,ME1042,Student 42,MECH,1,Regular,me1042@univ.in,090-61599825,Student
+43,BM3043,Student 43,BME,3,Research Scholar,bm3043@univ.in,082-49763619,Student
+44,BM1044,Student 44,BME,1,Exchange Student,bm1044@univ.in,8115174253,Student
+45,ME1045,Student 45,MECH,1,Regular,me1045@univ.in,9058167076,Student
+46,IT1046,Student 46,IT,1,Distance Learning,it1046@univ.in,088-43889282,Student
+47,CS4047,Student 47,CSE,4,Distance Learning,cs4047@univ.in,089-30709467,Student
+48,BM2048,Student 48,BME,2,Exchange Student,bm2048@univ.in,8539355584,Student
+49,CH3049,Student 49,CHEM,3,Regular,ch3049@univ.in,+91-8081267906,Student
+50,CS1050,Student 50,CSE,1,Distance Learning,cs1050@univ.in,095-25452849,Student
+51,AE2051,Student 51,AERO,2,Distance Learning,ae2051@univ.in,095-43396368,Student
+52,AE3052,Student 52,AERO,3,Distance Learning,ae3052@univ.in,9162757317,Student
+53,BM3053,Student 53,BME,3,Research Scholar,bm3053@univ.in,8006236715,Student
+54,IT4054,Student 54,IT,4,Distance Learning,it4054@univ.in,+91-8178842080,Student
+55,CH3055,Student 55,CHEM,3,Part-time,ch3055@univ.in,087-29448920,Student
+56,CH3056,Student 56,CHEM,3,Regular,ch3056@univ.in,085-89967652,Student
+57,IT2057,Student 57,IT,2,Regular,it2057@univ.in,083-71881136,Student
+58,BM2058,Student 58,BME,2,Regular,bm2058@univ.in,+91-9972612818,Student
+59,EC2059,Student 59,ECE,2,Regular,ec2059@univ.in,9230924938,Student
+60,CV3060,Student 60,CIVIL,3,Exchange Student,cv3060@univ.in,8539431182,Student
+61,CH1061,Student 61,CHEM,1,Regular,ch1061@univ.in,084-89741286,Student
+62,AE2062,Student 62,AERO,2,Research Scholar,ae2062@univ.in,093-81339420,Student
+63,CH4063,Student 63,CHEM,4,Part-time,ch4063@univ.in,090-73783430,Student
+64,IT2064,Student 64,IT,2,Exchange Student,it2064@univ.in,096-60454491,Student
+65,EE2065,Student 65,EEE,2,Exchange Student,ee2065@univ.in,097-99706038,Student
+66,ME3066,Student 66,MECH,3,Distance Learning,me3066@univ.in,+91-8902235840,Student
+67,MT3067,Student 67,META,3,Distance Learning,mt3067@univ.in,+91-9017368515,Student
+68,EE3068,Student 68,EEE,3,Distance Learning,ee3068@univ.in,9875350648,Student
+69,CV1069,Student 69,CIVIL,1,Exchange Student,cv1069@univ.in,8661479067,Student
+70,EC2070,Student 70,ECE,2,Exchange Student,ec2070@univ.in,+91-9470046770,Student
+71,BM3071,Student 71,BME,3,Regular,bm3071@univ.in,+91-9399927297,Student
+72,EE2072,Student 72,EEE,2,Exchange Student,ee2072@univ.in,8017390459,Student
+73,CV3073,Student 73,CIVIL,3,Regular,cv3073@univ.in,085-36607079,Student
+74,CH2074,Student 74,CHEM,2,Regular,ch2074@univ.in,080-13251473,Student
+75,CS4075,Student 75,CSE,4,Part-time,cs4075@univ.in,+91-9258941101,Student
+76,MT3076,Student 76,META,3,Exchange Student,mt3076@univ.in,092-85844809,Student
+77,MT3077,Student 77,META,3,Research Scholar,mt3077@univ.in,+91-8400439647,Student
+78,BM2078,Student 78,BME,2,Research Scholar,bm2078@univ.in,+91-9553726029,Student
+79,MT3079,Student 79,META,3,Regular,mt3079@univ.in,080-77831869,Student
+80,CV4080,Student 80,CIVIL,4,Distance Learning,cv4080@univ.in,+91-8674784989,Student
+81,EC4081,Student 81,ECE,4,Research Scholar,ec4081@univ.in,+91-9505389372,Student
+82,ME2082,Student 82,MECH,2,Research Scholar,me2082@univ.in,8901782278,Student
+83,BM4083,Student 83,BME,4,Distance Learning,bm4083@univ.in,085-63644813,Student
+84,IT2084,Student 84,IT,2,Research Scholar,it2084@univ.in,091-85658935,Student
+85,ME3085,Student 85,MECH,3,Exchange Student,me3085@univ.in,9025449025,Student
+86,AE1086,Student 86,AERO,1,Research Scholar,ae1086@univ.in,097-87269795,Student
+87,IT4087,Student 87,IT,4,Research Scholar,it4087@univ.in,9472706476,Student
+88,CH2088,Student 88,CHEM,2,Research Scholar,ch2088@univ.in,+91-9249164358,Student
+89,BM1089,Student 89,BME,1,Regular,bm1089@univ.in,099-25153622,Student
+90,CH3090,Student 90,CHEM,3,Regular,ch3090@univ.in,+91-8760233318,Student
+91,EC4091,Student 91,ECE,4,Part-time,ec4091@univ.in,+91-8753564985,Student
+92,CH1092,Student 92,CHEM,1,Distance Learning,ch1092@univ.in,089-52241987,Student
+93,CV4093,Student 93,CIVIL,4,Regular,cv4093@univ.in,8213694533,Student
+94,AE1094,Student 94,AERO,1,Part-time,ae1094@univ.in,9965377140,Student
+95,EE1095,Student 95,EEE,1,Distance Learning,ee1095@univ.in,+91-9289446553,Student
+96,BM2096,Student 96,BME,2,Regular,bm2096@univ.in,+91-8110352084,Student
+97,BM2097,Student 97,BME,2,Exchange Student,bm2097@univ.in,9309329348,Student
+98,CS1098,Student 98,CSE,1,Research Scholar,cs1098@univ.in,085-87045240,Student
+99,BM4099,Student 99,BME,4,Part-time,bm4099@univ.in,9065018761,Student
+100,EC3100,Student 100,ECE,3,Exchange Student,ec3100@univ.in,098-41715542,Student
