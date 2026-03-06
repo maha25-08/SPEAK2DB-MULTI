@@ -1,76 +1,90 @@
 """
-query_correction.py
-~~~~~~~~~~~~~~~~~~~~
-Automatic spell-correction for natural-language queries before SQL generation.
+Spell-correction module for Speak2DB.
 
-Uses Python's built-in ``difflib`` plus the optional ``rapidfuzz`` package to
-find the closest domain keyword for each misspelled word.
-
-Pipeline position:
-    user query → [query_correction] → domain vocabulary → SQL generation
+Corrects misspelled words in natural-language queries against a curated
+domain dictionary using difflib.  When the optional ``rapidfuzz`` package
+is installed it is used instead for faster, higher-quality matching.
 """
+
+from __future__ import annotations
 
 import re
 from difflib import get_close_matches
+from typing import List
 
-# ── Optional rapidfuzz for faster / higher-quality fuzzy matching ─────────────
-try:
-    from rapidfuzz import process as _rf_process, fuzz as _rf_fuzz
-    _RAPIDFUZZ_AVAILABLE = True
-except ImportError:
-    _RAPIDFUZZ_AVAILABLE = False
-
-# ── Domain keyword dictionary ─────────────────────────────────────────────────
-DOMAIN_KEYWORDS = [
-    # Core entities
-    "books", "students", "fines", "issued", "reservations", "faculty",
-    "statistics", "library",
-    # Common actions used in NL queries
-    "show", "list", "display", "find", "get", "fetch", "search",
-    # Additional useful words
-    "all", "available", "overdue", "top", "count", "total", "by",
-    "with", "from", "where", "order", "limit", "name", "date",
-    "author", "category", "branch", "year", "email", "status",
-    "department", "publisher", "database",
+# ── Domain dictionary ─────────────────────────────────────────────────────────
+# All words that the corrector should be able to fix *to*.
+DOMAIN_WORDS: List[str] = [
+    # entities / tables
+    "books", "book", "students", "student", "fines", "fine",
+    "issued", "reservations", "reservation", "faculty",
+    "statistics", "library", "publishers", "publisher",
+    "departments", "department",
+    # common status / filter words
+    "available", "overdue", "borrowed", "unpaid", "paid",
+    "pending", "returned", "active", "inactive",
+    # operation verbs
+    "show", "list", "display", "find", "get", "fetch",
+    "give", "retrieve", "tell", "filter",
+    # common query words
+    "all", "my", "me", "only", "those", "them", "mine",
+    "with", "without", "by", "in", "from", "where",
+    "who", "what", "which", "how", "count", "total",
+    "top", "most", "popular", "recent", "last", "days",
+    "year", "category", "author", "title", "name",
+    "due", "date", "amount", "status",
 ]
 
-# Minimum similarity ratio (0–1) for a word to be corrected.
-# Words below this threshold are left unchanged.
-_SIMILARITY_THRESHOLD = 0.75
-# Words shorter than this are not corrected (too ambiguous).
-_MIN_WORD_LENGTH = 3
+# Build a set for O(1) membership checks
+_DOMAIN_SET: set = set(DOMAIN_WORDS)
 
+# Try to import rapidfuzz; fall back to difflib silently
+try:
+    from rapidfuzz import process as _rf_process, fuzz as _rf_fuzz
 
-def _best_match(word: str) -> str | None:
-    """Return the best-matching domain keyword for *word*, or None."""
-    if _RAPIDFUZZ_AVAILABLE:
+    def _best_match(word: str, candidates: List[str], cutoff: float = 0.75) -> str | None:
+        """Return the best match for *word* among *candidates* using rapidfuzz."""
         result = _rf_process.extractOne(
             word,
-            DOMAIN_KEYWORDS,
+            candidates,
             scorer=_rf_fuzz.ratio,
-            score_cutoff=_SIMILARITY_THRESHOLD * 100,  # rapidfuzz uses 0-100
+            score_cutoff=cutoff * 100,  # rapidfuzz uses 0-100 scale
         )
         return result[0] if result else None
-    else:
-        matches = get_close_matches(
-            word,
-            DOMAIN_KEYWORDS,
-            n=1,
-            cutoff=_SIMILARITY_THRESHOLD,
-        )
+
+except ImportError:
+    def _best_match(word: str, candidates: List[str], cutoff: float = 0.75) -> str | None:  # type: ignore[misc]
+        """Return the best match for *word* among *candidates* using difflib."""
+        matches = get_close_matches(word, candidates, n=1, cutoff=cutoff)
         return matches[0] if matches else None
 
+
+# ── Token-level corrector ─────────────────────────────────────────────────────
+
+def _correct_token(token: str) -> str:
+    """
+    Return the corrected form of a single *token*.
+
+    If the token already exists in the domain dictionary (case-insensitive)
+    it is returned unchanged.  Otherwise the closest match above the
+    similarity threshold is returned, or the original token if no good
+    match is found.
+    """
+    lower = token.lower()
+    if lower in _DOMAIN_SET:
+        return token  # already correct
+    match = _best_match(lower, DOMAIN_WORDS, cutoff=0.75)
+    return match if match is not None else token
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 
 def correct_query(query: str) -> str:
     """
     Return a spell-corrected version of *query*.
 
-    Each token is compared against DOMAIN_KEYWORDS.  When a close enough
-    match is found **and** the token is not already a valid keyword, it is
-    replaced by the closest keyword.
-
-    The original casing is not preserved – output is lower-case, which is
-    fine since all downstream processing is case-insensitive.
+    Each whitespace-delimited token is corrected independently against the
+    domain dictionary.  Punctuation attached to tokens is preserved.
 
     Examples::
 
@@ -78,32 +92,21 @@ def correct_query(query: str) -> str:
         'show books'
         >>> correct_query("lst studnts")
         'list students'
-        >>> correct_query("shw fines")
-        'show fines'
     """
     if not query or not query.strip():
         return query
 
-    lowered = query.lower().strip()
-    # Tokenise: keep only word characters (strip punctuation)
-    tokens = re.findall(r'\b\w+\b', lowered)
-    keyword_set = set(DOMAIN_KEYWORDS)
+    tokens = query.split()
+    corrected: List[str] = []
 
-    corrected_tokens = []
     for token in tokens:
-        if len(token) < _MIN_WORD_LENGTH or token in keyword_set:
-            # Short words or already-valid keywords are kept as-is
-            corrected_tokens.append(token)
-        else:
-            suggestion = _best_match(token)
-            if suggestion and suggestion != token:
-                corrected_tokens.append(suggestion)
-            else:
-                corrected_tokens.append(token)
+        # Strip leading/trailing punctuation before matching, then re-attach
+        leading = len(token) - len(token.lstrip(".,!?;:(\"'"))
+        trailing_stripped = token.lstrip(".,!?;:(\"'").rstrip(".,!?;:)\"'")
+        trailing = len(token.lstrip(".,!?;:(\"'")) - len(trailing_stripped)
+        prefix = token[:leading]
+        suffix = token[leading + len(trailing_stripped):]
+        corrected_word = _correct_token(trailing_stripped)
+        corrected.append(prefix + corrected_word + suffix)
 
-    corrected = " ".join(corrected_tokens)
-
-    if corrected != lowered:
-        print(f"[QUERY CORRECTED] '{query}' → '{corrected}'")
-
-    return corrected
+    return " ".join(corrected)

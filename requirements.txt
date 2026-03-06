@@ -6,4 +6,4 @@ sentencepiece
 openpyxl==3.1.2
 numpy==1.26.4
 requests
-rapidfuzz
+rapidfuzz>=3.0.0

@@ -19,7 +19,8 @@ from typing import Tuple
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
 from clarification import is_vague_query, get_clarification, apply_clarification_choice
-from query_context import detect_followup, rewrite_query
+from query_correction import correct_query
+from query_context import save_context, is_followup, rewrite_followup, get_last_query
 
 # ── RBAC (row-level + access validation) ────────────────────────────────────
 try:
@@ -825,15 +826,16 @@ def admin_dashboard_route():
 def query():
     """
     NL-to-SQL query pipeline:
-      1. Clarification detection (returns options if vague & no choice given)
-      2. Apply clarification choice (if provided)
-      3. Follow-up detection & context rewrite
-      4. Vocabulary preprocessing (append schema hints)
-      5. SQL generation via Ollama
-      6. Student-specific SQL rewriting / row-level filtering
-      7. SQL safety gate (SELECT-only, no DDL/write keywords)
-      8. RBAC table-access validation
-      9. Execute & return results
+      1. Spell correction
+      2. Context follow-up detection & query rewrite
+      3. Clarification detection (returns options if vague & no choice given)
+      4. Apply clarification choice (if provided)
+      5. Vocabulary preprocessing (append schema hints)
+      6. SQL generation via Ollama
+      7. Student-specific SQL rewriting / row-level filtering
+      8. SQL safety gate (SELECT-only, no DDL/write keywords)
+      9. RBAC table-access validation
+      10. Execute & return results
     """
     print("🔍 Query received - Processing request")
 
@@ -858,10 +860,22 @@ def query():
             print("❌ No query provided")
             return jsonify({'error': 'No query provided'}), 400
 
-        # ── Step 0: Query spell-correction ───────────────────────────────
-        user_query = correct_query(user_query)
+        # ── Step 1: Spell correction ──────────────────────────────────────
+        corrected_query = correct_query(user_query)
+        if corrected_query != user_query:
+            print("[SPELL FIX]", corrected_query)
+        user_query = corrected_query
 
-        # ── Step 1 & 2: Clarification chatbot ────────────────────────────
+        # ── Step 2: Context follow-up detection & rewrite ─────────────────
+        print("[CONTEXT] previous query:", session.get("last_query"))
+        if is_followup(user_query):
+            last_q = get_last_query(session)
+            if last_q:
+                rewritten_query = rewrite_followup(user_query, last_q)
+                print("[CONTEXT REWRITE]", rewritten_query)
+                user_query = rewritten_query
+
+        # ── Step 3 & 4: Clarification chatbot ────────────────────────────
         if clarification_choice:
             # User selected an option – expand into specific NL query
             user_query = apply_clarification_choice(user_query, clarification_choice)
@@ -875,18 +889,10 @@ def query():
                     'clarification': clarif
                 })
 
-        # ── Step 3: Follow-up detection & context rewrite ────────────────
-        prev_query = session.get("last_query")
-        print("[CONTEXT] Previous query:", prev_query)
-        if detect_followup(user_query) and prev_query:
-            print("[CONTEXT] Follow-up detected:", user_query)
-            user_query = rewrite_query(prev_query, user_query)
-            print("[CONTEXT] Rewritten query:", user_query)
-
-        # ── Step 4: Vocabulary preprocessing ─────────────────────────────
+        # ── Step 5: Vocabulary preprocessing ─────────────────────────────
         augmented_query = preprocess_query(user_query, MAIN_DB)
         if augmented_query != user_query:
-            print(f"📚 Vocabulary hints added: {augmented_query}")
+            print("[VOCABULARY HINTS]", augmented_query)
 
         print("🔗 Connecting to database...")
         conn = get_db_connection(MAIN_DB)
@@ -904,13 +910,13 @@ def query():
         if user_role == 'Student' and student_id:
             sql_query = sql_query.replace('[CURRENT_STUDENT_ID]', str(student_id))
 
-        # ── Step 4: Student-specific SQL rewriting ────────────────────────
+        # ── Step 7: Student-specific SQL rewriting ────────────────────────
         print("Role:", session.get("role"))
         print("Student Filter Applied:", session.get("student_id"))
         if user_role == 'Student' and student_id:
             sql_query = _apply_student_filters(user_query, sql_query, student_id)
 
-        # ── Step 4b: Security layer (injection check + table access + isolation)
+        # ── Step 8: Security layer (injection check + table access + isolation)
         if SECURITY_LAYER_AVAILABLE:
             allowed, sql_query, sec_error = security_validate_sql(
                 sql_query, user_role, student_id
@@ -922,13 +928,13 @@ def query():
                     'error': 'Query blocked by security layer',
                 }), 400
 
-        # ── Step 5: SQL safety gate ───────────────────────────────────────
+        # ── Step 9: SQL safety gate ───────────────────────────────────────
         safe, reason = _is_safe_sql(sql_query)
         if not safe:
             print(f"🚫 SQL blocked by safety gate: {reason}")
             return jsonify({'error': f'Query not permitted: {reason}'}), 400
 
-        # ── Step 6: RBAC table-access validation ──────────────────────────
+        # ── Step 10: RBAC table-access validation ─────────────────────────
         if RBAC_AVAILABLE:
             user_id_for_rbac = session.get('user_id', '')
             ok, msg = rbac.validate_query_access(user_id_for_rbac, sql_query)
@@ -960,27 +966,8 @@ def query():
 
         print(f"📊 Returning {len(rows)} rows with columns: {columns}")
 
-        # ── Query history logging ─────────────────────────────────────────
-        try:
-            _execution_time = round(time.time() - _query_start, 4)
-            _log_conn = get_db_connection(MAIN_DB)
-            _log_conn.execute(
-                """INSERT INTO QueryHistory
-                   (user_id, role, query, sql_query, response_time, timestamp, success)
-                   VALUES (?, ?, ?, ?, ?, ?, 1)""",
-                (
-                    session.get('user_id', ''),
-                    user_role,
-                    user_query,
-                    sql_query,
-                    _execution_time,
-                    datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-                ),
-            )
-            _log_conn.commit()
-            _log_conn.close()
-        except Exception as _log_err:
-            print(f"[QueryHistory] Logging failed (non-fatal): {_log_err}")
+        # ── Save context for follow-up queries ────────────────────────────
+        save_context(session, user_query, sql_query)
 
         return jsonify({
             'success':    True,
