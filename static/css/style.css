@@ -1,17 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Basic Dashboard Palette */
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #2d2d2d;
-    --bg-card: #2d2d2d;
-    --border: #444444;
+    /* Light Dashboard Palette */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-card: #ffffff;
+    --border: #dee2e6;
     --primary: #4a90e2;
     --secondary: #5cb85c;
     --accent: #f0ad4e;
-    --text: #ffffff;
-    --text-secondary: #cccccc;
-    --text-muted: #888888;
+    --text: #000000;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
 }
 
 * {
@@ -21,9 +21,9 @@
 }
 
 body {
-    background: var(--bg-primary);
-    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-primary);
     color: var(--text);
+    font-family: 'Inter', sans-serif;
     line-height: 1.6;
     min-height: 100vh;
 }
@@ -301,8 +301,8 @@ body {
 }
 
 .results-table th {
-    background: var(--bg-card);
-    color: var(--text);
+    background: var(--primary);
+    color: #ffffff;
     padding: 1rem;
     text-align: left;
     border-bottom: 2px solid var(--primary);
