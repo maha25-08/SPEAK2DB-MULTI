@@ -582,9 +582,10 @@ def student_dashboard_route():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    if session.get('role') != 'Student':
+        return "Access Denied", 403
+
     user_role = session.get('role', 'Student')
-    if user_role != 'Student':
-        return redirect(url_for('index'))
 
     user_id = session['user_id']
     student_id = session.get('student_id')
@@ -664,9 +665,10 @@ def librarian_dashboard_route():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    if session.get('role') != 'Librarian':
+        return "Access Denied", 403
+
     user_role = session.get('role', 'Librarian')
-    if user_role not in ('Librarian', 'Faculty'):
-        return redirect(url_for('index'))
 
     user_id = session['user_id']
 
@@ -718,9 +720,10 @@ def admin_dashboard_route():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    if session.get('role') != 'Administrator':
+        return "Access Denied", 403
+
     user_role = session.get('role', 'Administrator')
-    if user_role != 'Administrator':
-        return redirect(url_for('index'))
 
     user_id = session['user_id']
 
@@ -979,9 +982,9 @@ def analytics():
     """Analytics view – admin only."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session.get('role') != 'Administrator':
+        return "Access Denied", 403
     user_role = session.get('role', 'Student')
-    if user_role != 'Administrator':
-        return redirect(url_for('index'))
     user_id = session['user_id']
 
     try:
@@ -1013,9 +1016,9 @@ def recommendations():
     """Recommendations view – renders the main dashboard with query console."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session.get('role') != 'Administrator':
+        return "Access Denied", 403
     user_role = session.get('role', 'Student')
-    if user_role != 'Administrator':
-        return redirect(url_for('index'))
     user_id = session['user_id']
     try:
         conn = get_db_connection(MAIN_DB)
@@ -1039,17 +1042,17 @@ def recommendations():
 # ── Role-protected routes ────────────────────────────────────────────────────
 
 def _require_librarian_or_admin():
-    """Return an error redirect when the logged-in user is not at least Librarian."""
+    """Return a 403 response when the logged-in user is not at least Librarian."""
     role = session.get('role', 'Student')
     if role not in ('Librarian', 'Faculty', 'Administrator'):
-        return redirect(url_for('index'))
+        return "Access Denied", 403
     return None
 
 
 def _require_admin():
-    """Return an error redirect when the logged-in user is not an Administrator."""
+    """Return a 403 response when the logged-in user is not an Administrator."""
     if session.get('role') != 'Administrator':
-        return redirect(url_for('index'))
+        return "Access Denied", 403
     return None
 
 
@@ -1207,9 +1210,9 @@ def admin_dashboard():
     """Administrator dashboard."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session.get('role') != 'Administrator':
+        return "Access Denied", 403
     user_role = session.get('role', 'Student')
-    if user_role != 'Administrator':
-        return redirect(url_for('index'))
 
     user_id = session['user_id']
 
