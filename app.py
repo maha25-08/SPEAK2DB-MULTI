@@ -40,6 +40,19 @@ app.secret_key = 'your-secret-key-change-in-production'
 MAIN_DB = "library_main.db"
 ARCHIVE_DB = "library_archive.db"
 
+# ── Jinja2 custom filters ────────────────────────────────────────────────────
+@app.template_filter('days_overdue')
+def days_overdue_filter(due_date_str):
+    """Return the number of days a book is overdue (0 if not overdue or invalid)."""
+    if not due_date_str:
+        return 0
+    try:
+        due = datetime.strptime(str(due_date_str)[:10], '%Y-%m-%d').date()
+        delta = (datetime.now().date() - due).days
+        return max(delta, 0)
+    except Exception:
+        return 0
+
 # ── Option 2: Apply safe security headers to every response ─────────────────
 if SECURITY_HEADERS_AVAILABLE:
     @app.after_request
@@ -287,16 +300,13 @@ def login():
             return render_template('login.html')
     
     flash(f'Welcome, {session["role"]}!', 'success')
-    # Role-based redirect after login
-    user_role = session.get('role', 'Student')
-    if user_role == 'Student':
-        return redirect(url_for('student_dashboard'))
-    elif user_role == 'Administrator':
-        return redirect(url_for('admin_dashboard'))
-    elif user_role in ('Librarian', 'Faculty'):
-        return redirect(url_for('librarian_dashboard'))
+    role = session.get('role', 'Student')
+    if role == 'Student':
+        return redirect(url_for('student_dashboard_route'))
+    elif role in ('Librarian', 'Faculty'):
+        return redirect(url_for('librarian_dashboard_route'))
     else:
-        return redirect(url_for('index'))
+        return redirect(url_for('admin_dashboard_route'))
 
 @app.route('/logout')
 def logout():
@@ -481,6 +491,197 @@ def student_dashboard_individual():
     # Serve individual dashboard template
     template_name = f'student_dashboard_{roll_number.lower()}.html'
     return render_template(template_name)
+
+# ── Role-specific dashboards ─────────────────────────────────────────────────
+
+@app.route('/student_dashboard')
+def student_dashboard_route():
+    """Student dashboard (underscore URL as required by RBAC spec)"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('role', 'Student')
+    if user_role != 'Student':
+        return redirect(url_for('index'))
+
+    user_id = session['user_id']
+    student_id = session.get('student_id')
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        student_info = conn.execute(
+            "SELECT * FROM Students WHERE id = ?", (student_id,)
+        ).fetchone()
+        current_books = conn.execute(
+            """SELECT i.*, b.title, b.author FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               WHERE i.student_id = ? AND i.return_date IS NULL
+               ORDER BY i.due_date ASC""",
+            (student_id,)
+        ).fetchall()
+        overdue_books = conn.execute(
+            """SELECT i.*, b.title, b.author FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               WHERE i.student_id = ? AND i.return_date IS NULL
+               AND i.due_date < date('now')
+               ORDER BY i.due_date ASC""",
+            (student_id,)
+        ).fetchall()
+        borrowing_history = conn.execute(
+            """SELECT i.*, b.title, b.author FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               WHERE i.student_id = ? ORDER BY i.issue_date DESC""",
+            (student_id,)
+        ).fetchall()
+        unpaid_fines = conn.execute(
+            "SELECT * FROM Fines WHERE student_id = ? AND status = 'Unpaid' ORDER BY issue_date DESC",
+            (student_id,)
+        ).fetchall()
+        all_fines = conn.execute(
+            "SELECT * FROM Fines WHERE student_id = ? ORDER BY issue_date DESC",
+            (student_id,)
+        ).fetchall()
+        reservations = conn.execute(
+            """SELECT r.*, b.title, b.author FROM Reservations r
+               JOIN Books b ON r.book_id = b.id
+               WHERE r.student_id = ? ORDER BY r.reservation_date DESC""",
+            (student_id,)
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_borrowed': len(borrowing_history),
+            'current_borrowed': len(current_books),
+            'total_fines': len(all_fines),
+            'unpaid_fines': len(unpaid_fines),
+            'pending_requests': len(reservations),
+        }
+    except Exception as e:
+        print(f"[student_dashboard] DB error: {e}")
+        student_info = None
+        current_books = overdue_books = borrowing_history = []
+        unpaid_fines = all_fines = reservations = []
+        stats = {}
+
+    return render_template(
+        'student_dashboard.html',
+        student_info=student_info,
+        borrowing_history=borrowing_history,
+        current_books=current_books,
+        overdue_books=overdue_books,
+        unpaid_fines=unpaid_fines,
+        reservations=reservations,
+        stats=stats,
+        role=user_role,
+        user=user_id,
+    )
+
+
+@app.route('/librarian_dashboard')
+def librarian_dashboard_route():
+    """Librarian / Faculty dashboard"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('role', 'Librarian')
+    if user_role not in ('Librarian', 'Faculty'):
+        return redirect(url_for('index'))
+
+    user_id = session['user_id']
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Books"
+        ).fetchone()['cnt']
+        total_students = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Students"
+        ).fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        recent_issues = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 10"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines,
+        }
+    except Exception as e:
+        print(f"[librarian_dashboard] DB error: {e}")
+        recent_issues = []
+        stats = {}
+
+    return render_template(
+        'librarian_dashboard.html',
+        role=user_role,
+        user=user_id,
+        stats=stats,
+        recent_issues=recent_issues,
+    )
+
+
+@app.route('/admin_dashboard')
+def admin_dashboard_route():
+    """Administrator dashboard"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('role', 'Administrator')
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+
+    user_id = session['user_id']
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Books"
+        ).fetchone()['cnt']
+        total_students = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Students"
+        ).fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines_amount = conn.execute(
+            "SELECT COALESCE(SUM(fine_amount), 0) as total FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['total']
+        recent_activity = conn.execute(
+            """SELECT i.issue_date as date, s.name as user, b.title as detail
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 10"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines_amount': unpaid_fines_amount,
+        }
+    except Exception as e:
+        print(f"[admin_dashboard] DB error: {e}")
+        recent_activity = []
+        stats = {}
+
+    return render_template(
+        'admin_dashboard.html',
+        role=user_role,
+        user=user_id,
+        stats=stats,
+        recent_activity=recent_activity,
+    )
 
 @app.route('/query', methods=['POST'])
 def query():
