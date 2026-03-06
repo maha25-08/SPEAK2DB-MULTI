@@ -5,167 +5,143 @@ import socket
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "sqlcoder:latest"
 
-# Default fallback SQL used when no query can be generated
-_DEFAULT_SQL = "SELECT * FROM Books LIMIT 10"
+# ---------------------------------------------------------------------------
+# STEP 1: PATTERN MATCHING – regex patterns resolved before any LLM call
+# ---------------------------------------------------------------------------
 
-# ── Blocked DML/DDL keywords ──────────────────────────────────────────────────
-_SAFETY_BLOCKED = re.compile(
-    r"\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE)\b",
-    re.IGNORECASE,
-)
-
-# ── Database schema context for LLM ──────────────────────────────────────────
-_DB_SCHEMA = """
-Books(id, title, author, publisher, category)
-Students(id, name, roll_number, branch)
-Issued(id, book_id, student_id, issue_date, due_date, return_date)
-Fines(id, student_id, fine_amount, status)
-Faculty(id, name, department_id, email)
-Reservations(id, book_id, student_id, reservation_date, status)
-"""
-
-# ── Tier 1: Regex pattern → predefined SQL ────────────────────────────────────
-_PATTERNS = [
-    # "My ..." patterns first (most specific - must precede generic patterns)
-    (re.compile(r"my\s+fines?", re.IGNORECASE),
-     "SELECT * FROM Fines WHERE student_id = [CURRENT_STUDENT_ID]"),
-    (re.compile(r"my\s+(history|borrowing\s+history|reading\s+history)", re.IGNORECASE),
-     "SELECT b.title, b.author, i.issue_date, i.return_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID]"),
-    (re.compile(r"my\s+(books?|issued|borrowed|current)", re.IGNORECASE),
-     "SELECT b.id, b.title, b.author, i.issue_date, i.due_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] AND i.return_date IS NULL"),
-    # Overdue (before generic issued/borrowed)
-    (re.compile(r"(overdue).*books?", re.IGNORECASE),
-     "SELECT * FROM Issued WHERE return_date IS NULL AND due_date < date('now')"),
-    # Issued / borrowed books
-    (re.compile(r"(issued|borrowed).*books?", re.IGNORECASE),
-     "SELECT * FROM Issued"),
-    # Available books
-    (re.compile(r"(available).*books?", re.IGNORECASE),
-     "SELECT id, title, author FROM Books WHERE id NOT IN (SELECT book_id FROM Issued WHERE return_date IS NULL)"),
-    # Books
-    (re.compile(r"(show|list|display).*books?", re.IGNORECASE),
+_PATTERN_MAP = [
+    # books
+    (re.compile(r"(show|list|display).*\bbooks?\b", re.IGNORECASE),
      "SELECT id, title, author FROM Books"),
-    # Students with fines (before generic students pattern)
-    (re.compile(r"students?.*with.*fines?", re.IGNORECASE),
-     "SELECT s.id, s.name, s.roll_number, f.fine_amount, f.status FROM Students s JOIN Fines f ON s.id = f.student_id"),
-    # Students
-    (re.compile(r"(show|list|display).*students?", re.IGNORECASE),
+    (re.compile(r"\bavailable\b.*\bbooks?\b", re.IGNORECASE),
+     "SELECT * FROM Books WHERE id NOT IN (SELECT book_id FROM Issued WHERE return_date IS NULL)"),
+    (re.compile(r"\bissued?\b.*\bbooks?\b", re.IGNORECASE),
+     "SELECT * FROM Issued"),
+    (re.compile(r"\boverdue\b.*\bbooks?\b", re.IGNORECASE),
+     "SELECT * FROM Issued WHERE return_date IS NULL AND due_date < date('now')"),
+    # students
+    (re.compile(r"(show|list|display).*\bstudents?\b", re.IGNORECASE),
      "SELECT id, name, roll_number FROM Students"),
-    # Fines
-    (re.compile(r"(show|list|display).*fines?", re.IGNORECASE),
+    (re.compile(r"\bstudents?\b.*\bfines?\b", re.IGNORECASE),
+     "SELECT s.id, s.name, s.roll_number, f.fine_amount, f.status FROM Students s JOIN Fines f ON s.id = f.student_id"),
+    # fines
+    (re.compile(r"(show|list|display).*\bfines?\b", re.IGNORECASE),
      "SELECT * FROM Fines"),
-    # Faculty
-    (re.compile(r"(show|list|display).*faculty", re.IGNORECASE),
+    # faculty
+    (re.compile(r"(show|list|display).*\bfaculty\b", re.IGNORECASE),
      "SELECT * FROM Faculty"),
-    # Reservations
-    (re.compile(r"(show|list|display).*reservations?", re.IGNORECASE),
+    # reservations
+    (re.compile(r"(show|list|display).*\breservations?\b", re.IGNORECASE),
      "SELECT * FROM Reservations"),
-    # Library / database statistics
-    (re.compile(r"(library|database).*statistics?", re.IGNORECASE),
+    # statistics
+    (re.compile(r"(library|database)\b.*\bstatistics?\b", re.IGNORECASE),
      "SELECT (SELECT COUNT(*) FROM Books) AS books, (SELECT COUNT(*) FROM Students) AS students, (SELECT COUNT(*) FROM Issued) AS issued"),
+    # personal student queries
+    (re.compile(r"\bmy\b.*\b(borrowed|issued)\b.*\bbooks?\b", re.IGNORECASE),
+     "SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] ORDER BY i.issue_date DESC"),
+    (re.compile(r"\bmy\b.*\bfines?\b", re.IGNORECASE),
+     "SELECT * FROM Fines WHERE student_id = [CURRENT_STUDENT_ID]"),
+    (re.compile(r"\bmy\b.*\b(history|records?)\b", re.IGNORECASE),
+     "SELECT i.*, b.title FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] ORDER BY i.issue_date DESC"),
 ]
 
 
-def _pattern_match_sql(user_query):
-    """Tier 1: Try to match user_query against known regex patterns."""
-    for pattern, sql in _PATTERNS:
+def _pattern_match_sql(user_query: str):
+    """Return a predefined SQL string if a regex pattern matches, else None."""
+    for pattern, sql in _PATTERN_MAP:
         if pattern.search(user_query):
-            print(f"[PATTERN MATCH] pattern={pattern.pattern!r} -> {sql}")
+            print(f"[PATTERN MATCH] Matched pattern '{pattern.pattern}' → {sql}")
             return sql
-    return None
-
-
-def _is_ollama_up():
-    """Quick TCP port check to avoid long connection timeouts."""
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex(('localhost', 11434))
-        sock.close()
-        return result == 0
-    except Exception:
-        return False
-
-
-def _llm_generate_sql(user_query):
-    """Tier 3: Ask the Ollama SQLCoder model to generate SQL."""
-    if not _is_ollama_up():
-        print("[OLLAMA DOWN] Port 11434 not reachable, skipping LLM")
-        return None
-
-    prompt = (
-        "### Task\n"
-        "Generate a valid SQLite SELECT query for the following request.\n"
-        "Rules:\n"
-        "- Use only SELECT; never generate INSERT, UPDATE, DELETE, DROP.\n"
-        "- Return ONLY the SQL query with no explanation.\n"
-        "- Use exact table/column names from the schema below.\n\n"
-        f"### Schema\n{_DB_SCHEMA}\n\n"
-        f"### Request\n{user_query}\n\n"
-        "### SQL\n"
-    )
-
-    try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL_NAME,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.0,
-                    "top_p": 0.9,
-                    "repeat_penalty": 1.0,
-                    "num_predict": 150,
-                    "top_k": 10,
-                    "num_ctx": 2048,
-                },
-            },
-            timeout=10,
-        )
-        if response.status_code == 200:
-            raw = response.json().get("response", "").strip()
-            if raw and "SELECT" in raw.upper():
-                match = re.search(r"SELECT.*?(?:;|$)", raw, re.IGNORECASE | re.DOTALL)
-                if match:
-                    clean = match.group(0).strip().rstrip(";")
-                    # Reject if it contains dangerous keywords
-                    if not _SAFETY_BLOCKED.search(clean):
-                        print(f"[LLM SQL] {clean}")
-                        return clean
-    except Exception as exc:
-        print(f"[OLLAMA ERROR] {exc}")
-
     return None
 
 
 def generate_sql(user_query):
     """
-    Hybrid 3-tier SQL generation:
+    Hybrid SQL generation pipeline:
       1. Regex pattern matching (fastest, most reliable)
-      2. Rule-based keyword matching (generate_complex_sql)
-      3. LLM via Ollama SQLCoder model
-    Always returns a non-empty SELECT query.
+      2. Rule-based keyword dictionary (generate_complex_sql)
+      3. LLM (Ollama sqlcoder:latest) with schema-aware prompt
+      4. Hard fallback: SELECT * FROM Books LIMIT 10
     """
-    # ── Tier 1: Pattern matching ──────────────────────────────────────────
+
+    # ── STEP 1: pattern matching ──────────────────────────────────────────
     sql = _pattern_match_sql(user_query)
     if sql:
         return sql
 
-    # ── Tier 2: Rule-based keyword matching ──────────────────────────────
+    # ── STEP 2: rule-based keyword matching ──────────────────────────────
     sql = generate_complex_sql(user_query)
-    if sql:
-        print(f"[RULE MATCH] {sql}")
+    if sql and sql.strip():
+        print(f"[RULE MATCH] Keyword rule matched → {sql}")
         return sql
 
-    # ── Tier 3: LLM generation ────────────────────────────────────────────
-    sql = _llm_generate_sql(user_query)
-    if sql:
-        return sql
+    # ── STEP 3: LLM (Ollama sqlcoder:latest) ─────────────────────────────
+    try:
+        # Quick port check to avoid long timeouts
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        port_open = sock.connect_ex(('localhost', 11434)) == 0
+        sock.close()
 
-    # ── Fallback: always return a valid query ─────────────────────────────
-    print(f"[FALLBACK SQL] Returning default query for: {user_query!r}")
-    return _DEFAULT_SQL
+        if not port_open:
+            print("[OLLAMA DOWN] Port 11434 not reachable, skipping LLM")
+        else:
+            schema = (
+                "Database schema:\n"
+                "Books(id, title, author, publisher, category)\n"
+                "Students(id, name, roll_number, branch)\n"
+                "Issued(id, book_id, student_id, issue_date, due_date, return_date)\n"
+                "Fines(id, student_id, fine_amount, status)\n"
+                "Faculty(id, name, email, department_id)\n"
+                "Reservations(id, book_id, student_id, reservation_date, status)\n"
+            )
+            prompt = (
+                f"{schema}\n"
+                "Instructions:\n"
+                "- Generate a valid SQLite SELECT query only.\n"
+                "- Do NOT generate INSERT, UPDATE, DELETE, DROP, or ALTER.\n"
+                "- Return only SQL. No explanation.\n\n"
+                f"Question: {user_query}\n"
+                "SQL:"
+            )
+
+            response = requests.post(
+                OLLAMA_URL,
+                json={
+                    "model": MODEL_NAME,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.0,
+                        "top_p": 0.9,
+                        "repeat_penalty": 1.0,
+                        "num_predict": 100,
+                        "top_k": 10,
+                        "num_ctx": 2048,
+                    },
+                },
+                timeout=3,
+            )
+
+            if response.status_code == 200:
+                raw_sql = response.json().get("response", "").strip()
+                if raw_sql and "SELECT" in raw_sql.upper():
+                    sql_match = re.search(r"SELECT.*?(?:;|$)", raw_sql, re.IGNORECASE | re.DOTALL)
+                    if sql_match:
+                        clean_sql = sql_match.group(0).strip().rstrip(";")
+                        # Block dangerous keywords produced by LLM
+                        if not re.search(r"\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE)\b", clean_sql, re.IGNORECASE):
+                            print(f"[LLM SQL] {clean_sql}")
+                            return clean_sql
+
+    except Exception as e:
+        print(f"[OLLAMA ERROR] {e}")
+
+    # ── STEP 4: hard fallback – never return empty SQL ────────────────────
+    fallback = "SELECT * FROM Books LIMIT 10"
+    print(f"[FALLBACK SQL] All methods failed, returning: {fallback}")
+    return fallback
 
 def generate_complex_sql(user_query):
     """
