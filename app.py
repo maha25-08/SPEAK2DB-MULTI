@@ -889,15 +889,96 @@ def query_page():
 
 @app.route('/analytics')
 def analytics():
-    """Analytics view – renders the main dashboard with query console."""
+    """Analytics view – admin only."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user_id = session['user_id']
     user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return render_template('403.html'), 403
+    user_id = session['user_id']
     return render_template('index.html',
                            user=user_id,
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []})
+
+
+@app.route('/user_management')
+def user_management():
+    """User management – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return render_template('403.html'), 403
+    user_id = session['user_id']
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        students = conn.execute(
+            "SELECT id, roll_number, name, branch, year FROM Students ORDER BY name"
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[user_management] DB error: {e}")
+        students = []
+
+    return render_template('admin_dashboard.html',
+                           role=user_role,
+                           user=user_id,
+                           stats={},
+                           recent_activity=[],
+                           students=students,
+                           section='user_management')
+
+
+@app.route('/system_statistics')
+def system_statistics():
+    """System statistics – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return render_template('403.html'), 403
+    return redirect(url_for('admin_dashboard_route'))
+
+
+@app.route('/students')
+def students():
+    """Student records – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+    if user_role in ('Librarian', 'Faculty'):
+        return redirect(url_for('librarian_dashboard_route'))
+    return redirect(url_for('admin_dashboard_route'))
+
+
+@app.route('/issued_books')
+def issued_books():
+    """Issued books management – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+    if user_role in ('Librarian', 'Faculty'):
+        return redirect(url_for('librarian_dashboard_route'))
+    return redirect(url_for('admin_dashboard_route'))
+
+
+@app.route('/fine_management')
+def fine_management():
+    """Fine management – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+    if user_role in ('Librarian', 'Faculty'):
+        return redirect(url_for('librarian_dashboard_route'))
+    return redirect(url_for('admin_dashboard_route'))
 
 
 @app.route('/recommendations')
