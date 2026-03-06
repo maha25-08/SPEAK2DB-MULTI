@@ -743,6 +743,12 @@ function showToast(message, type) {
 }
 
 // ===== INITIALIZATION =====
+// ===== FULL DASHBOARD =====
+function loadFullDashboard() {
+    console.log("Button clicked: Full Dashboard");
+    window.location.href = "/analytics";
+}
+
 // ===== QUERY SUGGESTIONS =====
 var QUERY_SUGGESTIONS = [
     'show books',
