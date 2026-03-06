@@ -69,10 +69,10 @@
             <!-- User Card -->
             <div class="user-card">
                 <div class="user-info">
-                    <div class="user-avatar">{{ user|upper }}</div>
+                    <div class="user-avatar">{{ user[0]|upper if user else '?' }}</div>
                     <div>
                         <div class="user-name">{{ user }}</div>
-                        <span class="role-badge role-{{ role.lower() }}">{{ role }}</span>
+                        <span class="role-badge role-{{ role.lower() }}">Logged in as: {{ role|upper }}</span>
                     </div>
                 </div>
                 <a href="/logout" class="btn-logout">⏻ Sign Out</a>
@@ -82,26 +82,66 @@
             <div class="nav-section">
                 <div class="section-title">📍 Navigation</div>
                 <nav class="modern-nav">
+                    {% if role == 'Student' %}
+                    <a href="/student_dashboard" class="nav-link">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">My Dashboard</span>
+                    </a>
                     <a href="/" class="nav-link active">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query</span>
+                    </a>
+                    <a href="/student_dashboard#current-books" class="nav-link">
+                        <span class="nav-icon">📚</span>
+                        <span class="nav-text">My Books</span>
+                    </a>
+                    <a href="/student_dashboard#unpaid-fines" class="nav-link">
+                        <span class="nav-icon">💰</span>
+                        <span class="nav-text">My Fines</span>
+                    </a>
+                    {% elif role in ('Librarian', 'Faculty') %}
+                    <a href="/librarian_dashboard" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="/query" class="nav-link">
+                    <a href="/" class="nav-link active">
                         <span class="nav-icon">🔍</span>
-                        <span class="nav-text">Query Console</span>
+                        <span class="nav-text">Query</span>
                     </a>
-                    <a href="/recommendations" class="nav-link">
-                        <span class="nav-icon">💡</span>
-                        <span class="nav-text">Recommendations</span>
+                    <a href="/students" class="nav-link">
+                        <span class="nav-icon">🎓</span>
+                        <span class="nav-text">Students</span>
+                    </a>
+                    <a href="/issued_books" class="nav-link">
+                        <span class="nav-icon">📖</span>
+                        <span class="nav-text">Issued Books</span>
+                    </a>
+                    <a href="/fine_management" class="nav-link">
+                        <span class="nav-icon">💳</span>
+                        <span class="nav-text">Fines</span>
+                    </a>
+                    {% else %}
+                    <a href="/admin_dashboard" class="nav-link">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="/" class="nav-link active">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query</span>
                     </a>
                     <a href="/analytics" class="nav-link">
                         <span class="nav-icon">📈</span>
                         <span class="nav-text">Analytics</span>
                     </a>
-                    <a href="/settings" class="nav-link">
-                        <span class="nav-icon">⚙</span>
-                        <span class="nav-text">Settings</span>
+                    <a href="/user_management" class="nav-link">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">User Management</span>
                     </a>
+                    <a href="/admin_dashboard" class="nav-link">
+                        <span class="nav-icon">🎓</span>
+                        <span class="nav-text">System Statistics</span>
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
         </aside>
