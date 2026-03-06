@@ -92,6 +92,17 @@ OPERATION_VERBS: List[str] = [
 
 # ── Schema introspection ─────────────────────────────────────────────────────
 
+# Characters allowed in SQLite table/column identifiers (alphanumeric + underscore)
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _quote_identifier(name: str) -> str:
+    """Return a safely double-quoted SQLite identifier, rejecting unsafe names."""
+    if not _SAFE_IDENTIFIER.match(name):
+        raise ValueError(f"Unsafe identifier: {name!r}")
+    return f'"{name}"'
+
+
 def _get_schema_info(db_path: str) -> Dict:
     """Extract table names, columns, and foreign keys from SQLite schema."""
     conn = sqlite3.connect(db_path)
@@ -104,11 +115,13 @@ def _get_schema_info(db_path: str) -> Dict:
     tables = [row[0] for row in cur.fetchall()]
 
     for table in tables:
-        cur.execute(f"PRAGMA table_info({table})")
+        # Validate table name before interpolating into PRAGMA statements
+        quoted = _quote_identifier(table)
+        cur.execute(f"PRAGMA table_info({quoted})")
         cols = [row[1] for row in cur.fetchall()]
         schema["tables"][table] = cols
 
-        cur.execute(f"PRAGMA foreign_key_list({table})")
+        cur.execute(f"PRAGMA foreign_key_list({quoted})")
         for fk in cur.fetchall():
             schema["foreign_keys"].append(
                 {

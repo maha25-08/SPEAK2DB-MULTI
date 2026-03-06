@@ -667,6 +667,9 @@ def api_vocabulary():
         return jsonify({'success': True, 'vocabulary': sample})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# Error handlers
 @app.errorhandler(404)
 def not_found(error):
     return render_template('404.html'), 404
