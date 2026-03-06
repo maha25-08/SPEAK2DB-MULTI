@@ -41,6 +41,9 @@ function showEl(id, display) {
 var recognition = null;
 var isListening = false;
 
+// Priority keywords for query compression
+var VOICE_KEYWORDS = ["books","students","fines","issued","overdue","reservations"];
+
 function initVoice() {
     var SR = window.SpeechRecognition ||
         window.webkitSpeechRecognition;
@@ -59,7 +62,7 @@ function initVoice() {
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
+    recognition.maxAlternatives = 5;
 
     recognition.onstart = function () {
         isListening = true;
@@ -67,15 +70,20 @@ function initVoice() {
         if (mb) {
             mb.classList.add('recording');
             mb.innerHTML = '🔴';
+            mb.title = 'Listening...';
         }
+        setStatus('🎤 Listening... speak now', 'status-listening');
     };
 
     recognition.onresult = function(event){
         let finalTranscript = "";
         let bestTranscript = "";
+        let hasFinal = false;
 
         for(let i = event.resultIndex; i < event.results.length; i++){
             if(event.results[i].isFinal){
+                hasFinal = true;
+
                 // Get the best alternative from all available alternatives
                 const alternatives = event.results[i];
                 let bestConfidence = 0;
@@ -92,10 +100,26 @@ function initVoice() {
             }
         }
 
-        console.log("Final speech:", finalTranscript);
+        if(!hasFinal || !finalTranscript) return;
 
-        // Clean speech noise before processing
+        // Stop listening once final result is received for faster response
+        recognition.stop();
+
+        console.log("Raw speech:", finalTranscript);
+        console.log("[VOICE FINAL]", finalTranscript);
+
+        // Clean filler words first
         finalTranscript = cleanSpeech(finalTranscript);
+
+        // Normalize accent misrecognitions on cleaned text
+        finalTranscript = normalizeAccent(finalTranscript);
+
+        // Correct domain-specific keyword plurals
+        finalTranscript = correctDomain(finalTranscript);
+
+        // Compress overly long queries to essential keywords
+        finalTranscript = compressQuery(finalTranscript);
+
         console.log("Cleaned speech:", finalTranscript);
 
         var inp = getEl('queryInput');
@@ -111,7 +135,9 @@ function initVoice() {
         if (mb) {
             mb.classList.remove('recording');
             mb.innerHTML = '🎤';
+            mb.title = '';
         }
+        setStatus('❌ Error: ' + event.error, 'status-error');
     };
 
     recognition.onend = function () {
@@ -120,6 +146,7 @@ function initVoice() {
         if (mb) {
             mb.classList.remove('recording');
             mb.innerHTML = '🎤';
+            mb.title = '';
         }
     };
 }
@@ -130,15 +157,62 @@ function cleanSpeech(text){
     .toLowerCase()
     .replace(/\bcan you\b/gi,"")
     .replace(/\bcould you\b/gi,"")
+    .replace(/\bi want\b/gi,"")
+    .replace(/\bgive me\b/gi,"")
     .replace(/\bplease\b/gi,"")
     .replace(/\bshow me\b/gi,"")
     .replace(/\btell me\b/gi,"")
     .replace(/\buh\b/gi,"")
     .replace(/\bum\b/gi,"")
+    .replace(/\bah\b/gi,"")
+    .replace(/\byou know\b/gi,"")
+    .replace(/\bokay\b/gi,"")
+    .replace(/\balright\b/gi,"")
     .replace(/\bjust\b/gi,"")
     .replace(/\s+/g," ")
     .trim();
 
+}
+
+function normalizeAccent(text){
+    const accentMap = {
+        "bok": "book",
+        "buk": "book",
+        "studant": "student",
+        "studen": "student",
+        "fin": "fine"
+    };
+    for(const key in accentMap){
+        text = text.replace(new RegExp("\\b" + key + "\\b","gi"), accentMap[key]);
+    }
+    return text;
+}
+
+function correctDomain(text){
+    if(text.includes("book") && !text.includes("books")) text = text.replace(/\bbook\b/g,"books");
+    if(text.includes("fine") && !text.includes("fines")) text = text.replace(/\bfine\b/g,"fines");
+    if(text.includes("student") && !text.includes("students")) text = text.replace(/\bstudent\b/g,"students");
+    return text;
+}
+
+function compressQuery(text){
+    const words = text.split(/\s+/);
+    if(words.length <= 6) return text;
+
+    // Extract keywords that appear in the text, preserving their original order
+    let result = [];
+    VOICE_KEYWORDS.forEach(function(k){
+        if(new RegExp("\\b" + k + "\\b","i").test(text)) result.push(k);
+    });
+    return result.length > 0 ? result.join(" ") : text;
+}
+
+function setStatus(msg, cls) {
+    var st = getEl('status');
+    if (st) {
+        st.textContent = msg;
+        st.className = 'status ' + (cls || '');
+    }
 }
 
 function toggleMic() {
