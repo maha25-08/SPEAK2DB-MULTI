@@ -662,8 +662,89 @@ function showToast(message, type) {
 }
 
 // ===== INITIALIZATION =====
+// ===== QUERY SUGGESTIONS =====
+var QUERY_SUGGESTIONS = [
+    'show books',
+    'show students',
+    'show fines',
+    'show issued books',
+    'list books',
+    'list students',
+    'list fines',
+    'issued books',
+    'overdue books',
+    'available books',
+    'library statistics',
+    'database statistics',
+    'students with fines',
+    'show reservations',
+    'show faculty',
+    'find books by author',
+    'books by category',
+    'top borrowed books',
+    'students with overdue books',
+    'unpaid fines',
+];
+
+function filterSuggestions(value) {
+    if (!value || value.trim().length < 2) return [];
+    var lower = value.toLowerCase().trim();
+    return QUERY_SUGGESTIONS.filter(function(s) {
+        return s.indexOf(lower) !== -1;
+    });
+}
+
+function showSuggestions(matches) {
+    var box = getEl('querySuggestions');
+    if (!box) return;
+    if (!matches || matches.length === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    box.innerHTML = '';
+    matches.forEach(function(text) {
+        var li = document.createElement('li');
+        li.textContent = text;
+        li.style.cssText = 'padding:0.55rem 1rem; cursor:pointer; color:#1a3a6b; font-size:0.9rem; border-bottom:1px solid #edf2fb;';
+        li.addEventListener('mouseenter', function() { li.style.background = '#e8f0fe'; });
+        li.addEventListener('mouseleave', function() { li.style.background = ''; });
+        li.addEventListener('mousedown', function(e) {
+            // mousedown fires before blur – use it to populate without losing focus
+            e.preventDefault();
+            var inp = getEl('queryInput');
+            if (inp) inp.value = text;
+            box.style.display = 'none';
+        });
+        box.appendChild(li);
+    });
+    box.style.display = 'block';
+}
+
+function initSuggestions() {
+    var inp = getEl('queryInput');
+    var box = getEl('querySuggestions');
+    if (!inp || !box) return;
+
+    inp.addEventListener('input', function() {
+        showSuggestions(filterSuggestions(inp.value));
+    });
+
+    inp.addEventListener('focus', function() {
+        if (inp.value.trim().length >= 2) {
+            showSuggestions(filterSuggestions(inp.value));
+        }
+    });
+
+    inp.addEventListener('blur', function() {
+        // Delay hide so that mousedown on an item fires first
+        setTimeout(function() { box.style.display = 'none'; }, 150);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
+    initSuggestions();
 });
 
 function initializeApp() {

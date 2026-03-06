@@ -285,12 +285,21 @@
                 </div>
                 
                 <div class="query-container">
-                    <textarea 
-                        id="queryInput" 
-                        class="query-input search-input-enhanced" 
-                        placeholder="Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
-                        rows="4"
-                    >{{ prefill_query or '' }}</textarea>
+                    <div style="position:relative">
+                        <textarea 
+                            id="queryInput" 
+                            class="query-input search-input-enhanced" 
+                            placeholder="Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
+                            rows="4"
+                            autocomplete="off"
+                        >{{ prefill_query or '' }}</textarea>
+                        <ul id="querySuggestions" style="
+                            display:none; position:absolute; top:100%; left:0; right:0;
+                            background:#fff; border:1px solid #c5d8f5; border-radius:0 0 8px 8px;
+                            list-style:none; margin:0; padding:0; z-index:999;
+                            box-shadow:0 4px 12px rgba(0,0,0,.15); max-height:220px; overflow-y:auto;">
+                        </ul>
+                    </div>
                     
                     <div class="query-actions">
                         <button id="queryBtn" class="btn-primary btn-interactive">

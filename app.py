@@ -8,16 +8,18 @@ from flask import Flask, render_template, request, jsonify, session, flash, redi
 import sqlite3
 import os
 import jinja2
+import time
 from ollama_sql import generate_sql
 import pandas as pd
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
 from clarification import is_vague_query, get_clarification, apply_clarification_choice
+from query_correction import correct_query
 
 # ── RBAC (row-level + access validation) ────────────────────────────────────
 try:
@@ -47,6 +49,22 @@ app.secret_key = 'your-secret-key-change-in-production'
 # Database paths
 MAIN_DB = "library_main.db"
 ARCHIVE_DB = "library_archive.db"
+
+
+def _ensure_query_history_schema():
+    """Add the ``role`` column to QueryHistory if it was created without it."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(QueryHistory)").fetchall()}
+        if 'role' not in existing:
+            conn.execute("ALTER TABLE QueryHistory ADD COLUMN role TEXT")
+            conn.commit()
+        conn.close()
+    except Exception as _e:
+        print(f"[schema-init] QueryHistory migration skipped: {_e}")
+
+
+_ensure_query_history_schema()
 
 # ── Jinja2 custom filters ────────────────────────────────────────────────────
 @app.template_filter('days_overdue')
@@ -823,6 +841,8 @@ def query():
         return jsonify({'error': 'Not logged in'}), 401
 
     try:
+        _query_start = time.time()
+
         data = request.get_json()
         user_query = data.get('query', '').strip()
         # Optional: clarification choice sent back from the frontend
@@ -836,6 +856,9 @@ def query():
         if not user_query:
             print("❌ No query provided")
             return jsonify({'error': 'No query provided'}), 400
+
+        # ── Step 0: Query spell-correction ───────────────────────────────
+        user_query = correct_query(user_query)
 
         # ── Step 1 & 2: Clarification chatbot ────────────────────────────
         if clarification_choice:
@@ -921,6 +944,28 @@ def query():
             columns = _fallback_columns(sql_query)
 
         print(f"📊 Returning {len(rows)} rows with columns: {columns}")
+
+        # ── Query history logging ─────────────────────────────────────────
+        try:
+            _execution_time = round(time.time() - _query_start, 4)
+            _log_conn = get_db_connection(MAIN_DB)
+            _log_conn.execute(
+                """INSERT INTO QueryHistory
+                   (user_id, role, query, sql_query, response_time, timestamp, success)
+                   VALUES (?, ?, ?, ?, ?, ?, 1)""",
+                (
+                    session.get('user_id', ''),
+                    user_role,
+                    user_query,
+                    sql_query,
+                    _execution_time,
+                    datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                ),
+            )
+            _log_conn.commit()
+            _log_conn.close()
+        except Exception as _log_err:
+            print(f"[QueryHistory] Logging failed (non-fatal): {_log_err}")
 
         return jsonify({
             'success':    True,
@@ -1015,6 +1060,72 @@ def api_vocabulary():
         sample = get_vocabulary_sample(db_path)
         return jsonify({'success': True, 'vocabulary': sample})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/query_analytics')
+def api_query_analytics():
+    """Query analytics – Administrator only.
+
+    Returns JSON with:
+      - queries_today      int
+      - most_common        list of {query, count}
+      - top_users          list of {user_id, count}
+      - avg_execution_time float (seconds)
+      - queries_per_day    list of {date, count}
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    if session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+        queries_today = conn.execute(
+            "SELECT COUNT(*) as cnt FROM QueryHistory WHERE timestamp LIKE ?",
+            (today + '%',),
+        ).fetchone()['cnt']
+
+        most_common = [
+            dict(r) for r in conn.execute(
+                "SELECT query, COUNT(*) as count FROM QueryHistory "
+                "GROUP BY query ORDER BY count DESC LIMIT 10"
+            ).fetchall()
+        ]
+
+        top_users = [
+            dict(r) for r in conn.execute(
+                "SELECT user_id, COUNT(*) as count FROM QueryHistory "
+                "GROUP BY user_id ORDER BY count DESC LIMIT 10"
+            ).fetchall()
+        ]
+
+        avg_row = conn.execute(
+            "SELECT AVG(response_time) as avg_time FROM QueryHistory "
+            "WHERE response_time IS NOT NULL"
+        ).fetchone()
+        avg_execution_time = round(avg_row['avg_time'] or 0, 4)
+
+        queries_per_day = [
+            dict(r) for r in conn.execute(
+                "SELECT substr(timestamp, 1, 10) as date, COUNT(*) as count "
+                "FROM QueryHistory GROUP BY date ORDER BY date DESC LIMIT 30"
+            ).fetchall()
+        ]
+
+        conn.close()
+        return jsonify({
+            'success': True,
+            'queries_today': queries_today,
+            'most_common': most_common,
+            'top_users': top_users,
+            'avg_execution_time': avg_execution_time,
+            'queries_per_day': queries_per_day,
+        })
+    except Exception as e:
+        print(f"[api_query_analytics] error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
