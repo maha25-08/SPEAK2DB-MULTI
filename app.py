@@ -300,13 +300,9 @@ def login():
             return render_template('login.html')
     
     flash(f'Welcome, {session["role"]}!', 'success')
-    role = session.get('role', 'Student')
-    if role == 'Student':
-        return redirect(url_for('student_dashboard_route'))
-    elif role in ('Librarian', 'Faculty'):
-        return redirect(url_for('librarian_dashboard_route'))
-    else:
-        return redirect(url_for('admin_dashboard_route'))
+    # All roles land on the main query interface; role-specific dashboards are
+    # accessible as separate sections from within the query interface.
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
@@ -317,23 +313,79 @@ def logout():
 
 @app.route('/')
 def index():
-    """Main dashboard"""
+    """Main dashboard – query interface with embedded role-specific widgets."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    
+
     user_id = session['user_id']
     user_role = session.get('role', 'Student')
-    
+    student_id = session.get('student_id')
+
     user_info = {
         'username': user_id,
         'role': user_role,
         'permissions': []
     }
-    
-    return render_template('index.html', 
-                         user=user_info.get('username', user_id),
-                         role=user_role,
-                         user_info=user_info)
+
+    # ── Fetch role-specific dashboard data to embed as widgets ───────────────
+    dashboard_data = {}
+    try:
+        conn = get_db_connection(MAIN_DB)
+
+        if user_role == 'Student' and student_id:
+            student_info = conn.execute(
+                "SELECT * FROM Students WHERE id = ?", (student_id,)
+            ).fetchone()
+            current_books = conn.execute(
+                """SELECT i.*, b.title, b.author FROM Issued i
+                   JOIN Books b ON i.book_id = b.id
+                   WHERE i.student_id = ? AND i.return_date IS NULL
+                   ORDER BY i.due_date ASC LIMIT 5""",
+                (student_id,)
+            ).fetchall()
+            overdue_books = conn.execute(
+                """SELECT i.*, b.title, b.author FROM Issued i
+                   JOIN Books b ON i.book_id = b.id
+                   WHERE i.student_id = ? AND i.return_date IS NULL
+                   AND i.due_date < date('now')""",
+                (student_id,)
+            ).fetchall()
+            unpaid_fines = conn.execute(
+                "SELECT * FROM Fines WHERE student_id = ? AND status = 'Unpaid'",
+                (student_id,)
+            ).fetchall()
+            dashboard_data = {
+                'student_info': dict(student_info) if student_info else {},
+                'current_books': [dict(r) for r in current_books],
+                'overdue_count': len(overdue_books),
+                'unpaid_fines': len(unpaid_fines),
+            }
+
+        elif user_role in ('Librarian', 'Faculty', 'Administrator'):
+            total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+            total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+            active_issues = conn.execute(
+                "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+            ).fetchone()['cnt']
+            unpaid_fines_count = conn.execute(
+                "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+            ).fetchone()['cnt']
+            dashboard_data = {
+                'total_books': total_books,
+                'total_students': total_students,
+                'active_issues': active_issues,
+                'unpaid_fines': unpaid_fines_count,
+            }
+
+        conn.close()
+    except Exception as e:
+        print(f"[index] Dashboard data fetch error: {e}")
+
+    return render_template('index.html',
+                           user=user_info.get('username', user_id),
+                           role=user_role,
+                           user_info=user_info,
+                           dashboard_data=dashboard_data)
 
 @app.route('/modern')
 def modern_ui():
