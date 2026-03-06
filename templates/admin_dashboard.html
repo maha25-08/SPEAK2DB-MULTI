@@ -91,14 +91,35 @@
             <a class="navbar-brand" href="/admin_dashboard">
                 <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
             </a>
-            <div class="ms-auto d-flex align-items-center gap-3">
-                <span class="text-white">
-                    <i class="fas fa-user-shield me-1"></i>{{ user }}
-                    <span class="badge bg-light text-dark ms-1">{{ role }}</span>
-                </span>
-                <a href="/logout" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/"><i class="fas fa-search me-1"></i>Query</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/analytics"><i class="fas fa-chart-bar me-1"></i>Analytics</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/user_management"><i class="fas fa-users-cog me-1"></i>User Management</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/system_statistics"><i class="fas fa-server me-1"></i>System Statistics</a>
+                    </li>
+                </ul>
+                <div class="ms-auto d-flex align-items-center gap-3">
+                    <span class="text-white">
+                        <i class="fas fa-user-shield me-1"></i>{{ user }}
+                    </span>
+                    <span class="badge" style="background:#dc3545;color:white;font-size:.85rem;padding:.4rem .75rem;">
+                        Logged in as: ADMIN
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </a>
+                </div>
             </div>
         </div>
     </nav>

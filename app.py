@@ -941,28 +941,144 @@ def query_page():
 
 @app.route('/analytics')
 def analytics():
-    """Analytics view – renders the main dashboard with query console."""
+    """Analytics view – admin only."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user_id = session['user_id']
     user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+    user_id = session['user_id']
     return render_template('index.html',
                            user=user_id,
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []})
 
 
-@app.route('/recommendations')
-def recommendations():
-    """Recommendations view – renders the main dashboard with query console."""
+@app.route('/user_management')
+def user_management():
+    """User management – admin only."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user_id = session['user_id']
     user_role = session.get('role', 'Student')
-    return render_template('index.html',
-                           user=user_id,
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        users = conn.execute("SELECT * FROM Users").fetchall()
+        students = conn.execute("SELECT id, roll_number, name, department FROM Students ORDER BY name").fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[user_management] DB error: {e}")
+        users = []
+        students = []
+    return render_template('admin_dashboard.html',
                            role=user_role,
-                           user_info={'username': user_id, 'role': user_role, 'permissions': []})
+                           user=user_id,
+                           stats={},
+                           recent_activity=[],
+                           users=users,
+                           students=students,
+                           page='user_management')
+
+
+@app.route('/system_statistics')
+def system_statistics():
+    """System statistics – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+    return redirect(url_for('admin_dashboard_route'))
+
+
+@app.route('/students')
+def students():
+    """Students list – librarian and admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return redirect(url_for('index'))
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        all_students = conn.execute(
+            "SELECT id, roll_number, name, department, year FROM Students ORDER BY name"
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[students] DB error: {e}")
+        all_students = []
+    return render_template('librarian_dashboard.html',
+                           role=user_role,
+                           user=user_id,
+                           stats={},
+                           recent_issues=[],
+                           all_students=all_students,
+                           page='students')
+
+
+@app.route('/issued_books')
+def issued_books():
+    """Issued books list – librarian and admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return redirect(url_for('index'))
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        issued = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name, s.roll_number
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               WHERE i.return_date IS NULL
+               ORDER BY i.issue_date DESC"""
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[issued_books] DB error: {e}")
+        issued = []
+    return render_template('librarian_dashboard.html',
+                           role=user_role,
+                           user=user_id,
+                           stats={},
+                           recent_issues=issued,
+                           page='issued_books')
+
+
+@app.route('/fine_management')
+def fine_management():
+    """Fine management – librarian and admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return redirect(url_for('index'))
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        fines = conn.execute(
+            """SELECT f.*, s.name as student_name, s.roll_number
+               FROM Fines f
+               JOIN Students s ON f.student_id = s.id
+               ORDER BY f.issue_date DESC"""
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[fine_management] DB error: {e}")
+        fines = []
+    return render_template('librarian_dashboard.html',
+                           role=user_role,
+                           user=user_id,
+                           stats={},
+                           recent_issues=[],
+                           fines=fines,
+                           page='fine_management')
 
 
 @app.route('/admin-dashboard')
