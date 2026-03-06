@@ -383,6 +383,10 @@ function displayResults(result) {
         badgesEl.innerHTML = '<span class="badge badge-ai">AI + NLP</span>' + '<span class="badge ' + dbBadge + '">' + dbLabel + '</span>';
     }
 
+    // Update row count badge (used in dashboard pages)
+    var rowBadge = getEl('rowCountBadge');
+    if (rowBadge) rowBadge.textContent = (result.data ? result.data.length : 0) + ' rows';
+
     var sqlCode = getEl('sqlCode');
     if (sqlCode) sqlCode.textContent = result.sql;
 
@@ -640,6 +644,13 @@ function showToast(message, type) {
     toast.textContent = message;
     
     var container = document.getElementById('toastContainer');
+    if (!container) {
+        // Fallback: create a temporary container
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:10000;display:flex;flex-direction:column;gap:.5rem;';
+        document.body.appendChild(container);
+    }
     container.appendChild(toast);
     
     setTimeout(() => {
@@ -653,23 +664,37 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    // Setup event listeners
-    document.getElementById('queryBtn').addEventListener('click', submitQuery);
-    document.getElementById('clearBtn').addEventListener('click', clearQuery);
-    document.getElementById('micBtn').addEventListener('click', toggleMic);
-    document.getElementById('exportBtn').addEventListener('click', exportResults);
-    document.getElementById('visualizeBtn').addEventListener('click', showVisualization);
-    document.getElementById('updateVizBtn').addEventListener('click', updateVisualization);
-    
+    // Setup event listeners with null guards (some buttons only exist on index.html)
+    var qBtn = getEl('queryBtn');
+    if (qBtn) qBtn.addEventListener('click', submitQuery);
+
+    var cBtn = getEl('clearBtn');
+    if (cBtn) cBtn.addEventListener('click', clearQuery);
+
+    var mBtn = getEl('micBtn');
+    if (mBtn) mBtn.addEventListener('click', toggleMic);
+
+    var eBtn = getEl('exportBtn');
+    if (eBtn) eBtn.addEventListener('click', exportResults);
+
+    var vBtn = getEl('visualizeBtn');
+    if (vBtn) vBtn.addEventListener('click', showVisualization);
+
+    var uBtn = getEl('updateVizBtn');
+    if (uBtn) uBtn.addEventListener('click', updateVisualization);
+
     // Setup enter key for query input
-    document.getElementById('queryInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            submitQuery();
-        }
-    });
-    document.getElementById('queryInput').focus();
-    
-    // Initialize voice
-    initVoice();
+    var qInput = getEl('queryInput');
+    if (qInput) {
+        qInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitQuery();
+            }
+        });
+        qInput.focus();
+    }
+
+    // Initialize voice only when mic button is present
+    if (getEl('micBtn')) initVoice();
 }
