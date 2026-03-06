@@ -192,7 +192,7 @@ def generate_complex_sql(user_query):
     elif "faculty and their departments" in query_lower:
         return "SELECT f.name, f.email, d.name as department FROM Faculty f JOIN Departments d ON f.department_id = d.id ORDER BY d.name, f.name"
     
-    elif "system usage statistics" in query_lower:
+    elif "system usage statistics" in query_lower or "database statistics" in query_lower:
         return "SELECT 'Total Students' as metric, COUNT(*) as count FROM Students UNION ALL SELECT 'Total Books', COUNT(*) FROM Books UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued"
     
     elif "overdue books by department" in query_lower:
@@ -217,8 +217,15 @@ def generate_complex_sql(user_query):
     elif "list students with current books" in query_lower or "students with current books" in query_lower:
         return "SELECT DISTINCT s.*, i.issue_date, i.due_date FROM Students s JOIN Issued i ON s.id = i.student_id WHERE i.return_date IS NULL"
     
+    elif "show books not issued" in query_lower or "books not issued" in query_lower or "books never issued" in query_lower:
         return "SELECT * FROM Books WHERE id NOT IN (SELECT DISTINCT book_id FROM Issued)"
-    
+
+    elif "show all books with title and author" in query_lower or "all books with title and author" in query_lower:
+        return "SELECT title, author FROM Books ORDER BY title"
+
+    elif "show books in library" in query_lower or "books in library" in query_lower or "show all books" in query_lower or "list all books" in query_lower or "display all books" in query_lower:
+        return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
+
     elif "display fine records" in query_lower or "show fine records" in query_lower:
         return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
     
