@@ -103,14 +103,38 @@
             <a class="navbar-brand" href="/librarian_dashboard">
                 <i class="fas fa-book-open me-2"></i>Speak2DB — Librarian Portal
             </a>
-            <div class="ms-auto d-flex align-items-center gap-3">
-                <span class="text-white">
-                    <i class="fas fa-user-tie me-1"></i>{{ user }} 
-                    <span class="badge bg-light text-primary ms-1">{{ role }}</span>
-                </span>
-                <a href="/logout" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </a>
+            <div class="navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-search me-1"></i>Query
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/students">
+                            <i class="fas fa-users me-1"></i>Students
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/issued_books">
+                            <i class="fas fa-book-reader me-1"></i>Issued Books
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/fine_management">
+                            <i class="fas fa-money-bill-wave me-1"></i>Fines
+                        </a>
+                    </li>
+                </ul>
+                <div class="ms-auto d-flex align-items-center gap-3">
+                    <span class="text-white">
+                        Logged in as:
+                        <span class="badge bg-success ms-1">{{ role|upper }}</span>
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </a>
+                </div>
             </div>
         </div>
     </nav>

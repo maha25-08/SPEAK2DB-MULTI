@@ -78,30 +78,50 @@
                 <a href="/logout" class="btn-logout">⏻ Sign Out</a>
             </div>
 
-            <!-- Modern Navigation -->
+            <!-- Role-Based Navigation -->
             <div class="nav-section">
                 <div class="section-title">📍 Navigation</div>
                 <nav class="modern-nav">
                     <a href="/" class="nav-link active">
-                        <span class="nav-icon">📊</span>
-                        <span class="nav-text">Dashboard</span>
-                    </a>
-                    <a href="/query" class="nav-link">
                         <span class="nav-icon">🔍</span>
                         <span class="nav-text">Query Console</span>
                     </a>
-                    <a href="/recommendations" class="nav-link">
-                        <span class="nav-icon">💡</span>
-                        <span class="nav-text">Recommendations</span>
+                    {% if role == 'Student' %}
+                    <a href="/student_dashboard#current-books" class="nav-link">
+                        <span class="nav-icon">📚</span>
+                        <span class="nav-text">My Books</span>
                     </a>
+                    <a href="/student_dashboard#unpaid-fines" class="nav-link">
+                        <span class="nav-icon">💰</span>
+                        <span class="nav-text">My Fines</span>
+                    </a>
+                    {% elif role in ('Librarian', 'Faculty') %}
+                    <a href="/students" class="nav-link">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">Students</span>
+                    </a>
+                    <a href="/issued_books" class="nav-link">
+                        <span class="nav-icon">📖</span>
+                        <span class="nav-text">Issued Books</span>
+                    </a>
+                    <a href="/fine_management" class="nav-link">
+                        <span class="nav-icon">💸</span>
+                        <span class="nav-text">Fines</span>
+                    </a>
+                    {% elif role == 'Administrator' %}
                     <a href="/analytics" class="nav-link">
                         <span class="nav-icon">📈</span>
                         <span class="nav-text">Analytics</span>
                     </a>
-                    <a href="/settings" class="nav-link">
-                        <span class="nav-icon">⚙</span>
-                        <span class="nav-text">Settings</span>
+                    <a href="/user_management" class="nav-link">
+                        <span class="nav-icon">👤</span>
+                        <span class="nav-text">User Management</span>
                     </a>
+                    <a href="/system_statistics" class="nav-link">
+                        <span class="nav-icon">🖥️</span>
+                        <span class="nav-text">System Statistics</span>
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
         </aside>
@@ -113,7 +133,9 @@
                 <div class="header-content">
                     <div>
                         <h1 class="page-title">Welcome back, {{ user }} 👋</h1>
-                        <p class="page-subtitle">Your NLP-powered database query assistant is ready</p>
+                        <p class="page-subtitle">
+                            {% if page_title %}{{ page_title }} — {% endif %}Your NLP-powered database query assistant is ready
+                        </p>
                     </div>
                     <div class="header-stats">
                         <div class="stat-item">
@@ -141,7 +163,7 @@
                         class="query-input search-input-enhanced" 
                         placeholder="Try: 'show my fines' or 'find books by author' or 'students with GPA above 3.5'"
                         rows="4"
-                    ></textarea>
+                    >{{ prefill_query or '' }}</textarea>
                     
                     <div class="query-actions">
                         <button id="queryBtn" class="btn-primary btn-interactive">

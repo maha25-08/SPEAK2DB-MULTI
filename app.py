@@ -889,15 +889,35 @@ def query_page():
 
 @app.route('/analytics')
 def analytics():
-    """Analytics view – renders the main dashboard with query console."""
+    """Analytics view – admin only."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user_id = session['user_id']
     user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+    user_id = session['user_id']
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        books_per_category = conn.execute(
+            "SELECT category, COUNT(*) as count FROM Books GROUP BY category ORDER BY count DESC"
+        ).fetchall()
+        issues_per_month = conn.execute(
+            "SELECT strftime('%Y-%m', issue_date) as month, COUNT(*) as count "
+            "FROM Issued GROUP BY month ORDER BY month DESC LIMIT 12"
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[analytics] DB error: {e}")
+        books_per_category = []
+        issues_per_month = []
+
     return render_template('index.html',
                            user=user_id,
                            role=user_role,
-                           user_info={'username': user_id, 'role': user_role, 'permissions': []})
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           books_per_category=[dict(r) for r in books_per_category],
+                           issues_per_month=[dict(r) for r in issues_per_month])
 
 
 @app.route('/recommendations')
@@ -911,6 +931,167 @@ def recommendations():
                            user=user_id,
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []})
+
+
+# ── Role-protected routes ────────────────────────────────────────────────────
+
+def _require_librarian_or_admin():
+    """Return an error redirect when the logged-in user is not at least Librarian."""
+    role = session.get('role', 'Student')
+    if role not in ('Librarian', 'Faculty', 'Administrator'):
+        return redirect(url_for('index'))
+    return None
+
+
+def _require_admin():
+    """Return an error redirect when the logged-in user is not an Administrator."""
+    if session.get('role') != 'Administrator':
+        return redirect(url_for('index'))
+    return None
+
+
+@app.route('/students')
+def students_view():
+    """All students – librarian/admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_librarian_or_admin()
+    if redir:
+        return redir
+
+    user_id = session['user_id']
+    user_role = session.get('role')
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        students = conn.execute(
+            "SELECT id, roll_number, name, branch, year, email, gpa FROM Students ORDER BY name"
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[students_view] DB error: {e}")
+        students = []
+
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           page_title='All Students',
+                           prefill_query='show all students')
+
+
+@app.route('/issued_books')
+def issued_books_view():
+    """Issued books overview – librarian/admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_librarian_or_admin()
+    if redir:
+        return redir
+
+    user_id = session['user_id']
+    user_role = session.get('role')
+
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           page_title='Issued Books',
+                           prefill_query='show all currently issued books')
+
+
+@app.route('/fine_management')
+def fine_management_view():
+    """Fine management – librarian/admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_librarian_or_admin()
+    if redir:
+        return redir
+
+    user_id = session['user_id']
+    user_role = session.get('role')
+
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           page_title='Fine Management',
+                           prefill_query='show all unpaid fines')
+
+
+@app.route('/user_management')
+def user_management_view():
+    """User management – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    user_id = session['user_id']
+    user_role = session.get('role')
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        students = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Students"
+        ).fetchone()['cnt']
+        faculty = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Faculty"
+        ).fetchone()['cnt']
+        conn.close()
+    except Exception as e:
+        print(f"[user_management] DB error: {e}")
+        students = faculty = 0
+
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           page_title='User Management',
+                           prefill_query='show all students with their details')
+
+
+@app.route('/system_statistics')
+def system_statistics_view():
+    """System statistics – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    user_id = session['user_id']
+    user_role = session.get('role')
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        total_fines = conn.execute(
+            "SELECT COALESCE(SUM(fine_amount), 0) as total FROM Fines WHERE status='Unpaid'"
+        ).fetchone()['total']
+        conn.close()
+        sys_stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'total_unpaid_fines': total_fines,
+        }
+    except Exception as e:
+        print(f"[system_statistics] DB error: {e}")
+        sys_stats = {}
+
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
+                           page_title='System Statistics',
+                           prefill_query='show database statistics')
 
 
 @app.route('/admin-dashboard')

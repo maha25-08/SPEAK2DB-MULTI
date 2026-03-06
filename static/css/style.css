@@ -106,6 +106,13 @@ body {
     font-weight: 500;
 }
 
+/* Role-specific badge colors */
+.role-student     { background: #1a5276; color: #fff; }
+.role-librarian   { background: #1e8449; color: #fff; }
+.role-faculty     { background: #1e8449; color: #fff; }
+.role-administrator { background: #922b21; color: #fff; }
+.role-admin       { background: #922b21; color: #fff; }
+
 .btn-logout {
     background: var(--accent);
     color: white;
