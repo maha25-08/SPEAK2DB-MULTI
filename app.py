@@ -18,6 +18,7 @@ from typing import Tuple
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
 from clarification import is_vague_query, get_clarification, apply_clarification_choice
+from query_context import detect_followup, rewrite_query
 
 # ── RBAC (row-level + access validation) ────────────────────────────────────
 try:
@@ -809,12 +810,13 @@ def query():
     NL-to-SQL query pipeline:
       1. Clarification detection (returns options if vague & no choice given)
       2. Apply clarification choice (if provided)
-      3. Vocabulary preprocessing (append schema hints)
-      4. SQL generation via Ollama
-      5. Student-specific SQL rewriting / row-level filtering
-      6. SQL safety gate (SELECT-only, no DDL/write keywords)
-      7. RBAC table-access validation
-      8. Execute & return results
+      3. Follow-up detection & context rewrite
+      4. Vocabulary preprocessing (append schema hints)
+      5. SQL generation via Ollama
+      6. Student-specific SQL rewriting / row-level filtering
+      7. SQL safety gate (SELECT-only, no DDL/write keywords)
+      8. RBAC table-access validation
+      9. Execute & return results
     """
     print("🔍 Query received - Processing request")
 
@@ -851,7 +853,15 @@ def query():
                     'clarification': clarif
                 })
 
-        # ── Step 3: Vocabulary preprocessing ─────────────────────────────
+        # ── Step 3: Follow-up detection & context rewrite ────────────────
+        prev_query = session.get("last_query")
+        print("[CONTEXT] Previous query:", prev_query)
+        if detect_followup(user_query) and prev_query:
+            print("[CONTEXT] Follow-up detected:", user_query)
+            user_query = rewrite_query(prev_query, user_query)
+            print("[CONTEXT] Rewritten query:", user_query)
+
+        # ── Step 4: Vocabulary preprocessing ─────────────────────────────
         augmented_query = preprocess_query(user_query, MAIN_DB)
         if augmented_query != user_query:
             print(f"📚 Vocabulary hints added: {augmented_query}")
@@ -913,6 +923,12 @@ def query():
         conn.close()
 
         rows = [dict(row) for row in results]
+
+        # Store context for follow-up queries.
+        # We store the (possibly rewritten) query so that chained follow-ups
+        # continue to reference the correct subject (e.g. "books").
+        session["last_query"] = user_query
+        session["last_sql"] = sql_query
 
         # Extract columns dynamically
         if rows:
