@@ -33,6 +33,13 @@ try:
 except ImportError:
     SECURITY_HEADERS_AVAILABLE = False
 
+# ── Database security layer (SQL validation + student isolation) ─────────────
+try:
+    from security_layer import validate_sql as security_validate_sql
+    SECURITY_LAYER_AVAILABLE = True
+except ImportError:
+    SECURITY_LAYER_AVAILABLE = False
+
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-in-production'
@@ -870,6 +877,18 @@ def query():
         print("Student Filter Applied:", session.get("student_id"))
         if user_role == 'Student' and student_id:
             sql_query = _apply_student_filters(user_query, sql_query, student_id)
+
+        # ── Step 4b: Security layer (injection check + table access + isolation)
+        if SECURITY_LAYER_AVAILABLE:
+            allowed, sql_query, sec_error = security_validate_sql(
+                sql_query, user_role, student_id
+            )
+            if not allowed:
+                print(f"🚫 Security layer blocked query: {sec_error}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Query blocked by security layer',
+                }), 400
 
         # ── Step 5: SQL safety gate ───────────────────────────────────────
         safe, reason = _is_safe_sql(sql_query)
