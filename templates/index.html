@@ -41,6 +41,40 @@
         .btn-clarification:hover {
             background: #357abd;
         }
+        /* ── Dashboard widgets ─────────────────────────────────────────── */
+        .dashboard-panel {
+            background: var(--card-bg, #1e2235);
+            border: 1px solid var(--border-color, #2d3250);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 1rem 0;
+        }
+        .widget-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0 0.5rem;
+        }
+        .widget-card {
+            flex: 1 1 140px;
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+            text-align: center;
+            min-width: 120px;
+        }
+        .widget-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
+        .widget-value { font-size: 1.8rem; font-weight: 700; color: #fff; }
+        .widget-label { font-size: 0.8rem; color: rgba(255,255,255,0.8); margin-top: 0.2rem; }
+        .widget-blue   { background: linear-gradient(135deg, #1a5276, #2980b9); }
+        .widget-green  { background: linear-gradient(135deg, #1e8449, #27ae60); }
+        .widget-orange { background: linear-gradient(135deg, #784212, #e67e22); }
+        .widget-red    { background: linear-gradient(135deg, #922b21, #e74c3c); }
+        .widget-purple { background: linear-gradient(135deg, #6c3483, #8e44ad); }
+        .widget-table-wrap { margin-top: 1rem; overflow-x: auto; }
+        .widget-table-title { color: #e0e6ff; font-size: 0.95rem; margin-bottom: 0.5rem; }
+        .widget-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .widget-table th { background: rgba(255,255,255,0.1); color: #cdd; padding: 0.4rem 0.7rem; text-align: left; }
+        .widget-table td { border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0.4rem 0.7rem; color: #bcc; }
         /* ── Result badges ─────────────────────────────────────────────── */
         .result-badges { display: flex; gap: 0.5rem; align-items: center; }
         .badge { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
@@ -127,6 +161,110 @@
                     </div>
                 </div>
             </header>
+
+            <!-- Role-specific Dashboard Panel -->
+            {% if role == 'Student' %}
+            <section class="dashboard-panel student-panel">
+                <div class="section-header">
+                    <h2 class="section-title">🎓 My Library Dashboard</h2>
+                    <a href="/student_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                </div>
+                <div class="widget-grid">
+                    <div class="widget-card widget-blue">
+                        <div class="widget-icon">📚</div>
+                        <div class="widget-value">{{ dashboard_data.get('current_books', [])|length }}</div>
+                        <div class="widget-label">Books Borrowed</div>
+                    </div>
+                    <div class="widget-card widget-red">
+                        <div class="widget-icon">⚠️</div>
+                        <div class="widget-value">{{ dashboard_data.get('overdue_count', 0) }}</div>
+                        <div class="widget-label">Overdue Books</div>
+                    </div>
+                    <div class="widget-card widget-orange">
+                        <div class="widget-icon">💸</div>
+                        <div class="widget-value">{{ dashboard_data.get('unpaid_fines', 0) }}</div>
+                        <div class="widget-label">Unpaid Fines</div>
+                    </div>
+                </div>
+                {% if dashboard_data.get('current_books') %}
+                <div class="widget-table-wrap">
+                    <p class="widget-table-title">📖 Currently Borrowed</p>
+                    <table class="widget-table">
+                        <thead><tr><th>Title</th><th>Author</th><th>Due Date</th></tr></thead>
+                        <tbody>
+                        {% for book in dashboard_data.get('current_books', []) %}
+                        <tr>
+                            <td>{{ book.get('title', '-') }}</td>
+                            <td>{{ book.get('author', '-') }}</td>
+                            <td>{{ book.get('due_date', '-') }}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </section>
+
+            {% elif role in ('Librarian', 'Faculty') %}
+            <section class="dashboard-panel librarian-panel">
+                <div class="section-header">
+                    <h2 class="section-title">📋 Library Management Overview</h2>
+                    <a href="/librarian_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                </div>
+                <div class="widget-grid">
+                    <div class="widget-card widget-blue">
+                        <div class="widget-icon">📚</div>
+                        <div class="widget-value">{{ dashboard_data.get('total_books', 0) }}</div>
+                        <div class="widget-label">Total Books</div>
+                    </div>
+                    <div class="widget-card widget-green">
+                        <div class="widget-icon">🎓</div>
+                        <div class="widget-value">{{ dashboard_data.get('total_students', 0) }}</div>
+                        <div class="widget-label">Students</div>
+                    </div>
+                    <div class="widget-card widget-purple">
+                        <div class="widget-icon">📤</div>
+                        <div class="widget-value">{{ dashboard_data.get('active_issues', 0) }}</div>
+                        <div class="widget-label">Active Issues</div>
+                    </div>
+                    <div class="widget-card widget-orange">
+                        <div class="widget-icon">💸</div>
+                        <div class="widget-value">{{ dashboard_data.get('unpaid_fines', 0) }}</div>
+                        <div class="widget-label">Unpaid Fines</div>
+                    </div>
+                </div>
+            </section>
+
+            {% elif role == 'Administrator' %}
+            <section class="dashboard-panel admin-panel">
+                <div class="section-header">
+                    <h2 class="section-title">🛡️ System Administration</h2>
+                    <a href="/admin_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                </div>
+                <div class="widget-grid">
+                    <div class="widget-card widget-blue">
+                        <div class="widget-icon">📚</div>
+                        <div class="widget-value">{{ dashboard_data.get('total_books', 0) }}</div>
+                        <div class="widget-label">Total Books</div>
+                    </div>
+                    <div class="widget-card widget-green">
+                        <div class="widget-icon">🎓</div>
+                        <div class="widget-value">{{ dashboard_data.get('total_students', 0) }}</div>
+                        <div class="widget-label">Students</div>
+                    </div>
+                    <div class="widget-card widget-purple">
+                        <div class="widget-icon">📤</div>
+                        <div class="widget-value">{{ dashboard_data.get('active_issues', 0) }}</div>
+                        <div class="widget-label">Active Issues</div>
+                    </div>
+                    <div class="widget-card widget-orange">
+                        <div class="widget-icon">💸</div>
+                        <div class="widget-value">{{ dashboard_data.get('unpaid_fines', 0) }}</div>
+                        <div class="widget-label">Unpaid Fines</div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
 
             <!-- Query Section -->
             <section class="query-section">

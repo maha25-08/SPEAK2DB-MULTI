@@ -4,9 +4,14 @@ Clarification chatbot module for Speak2DB.
 Detects vague / ambiguous natural-language queries and returns structured
 clarification options.  When the user selects an option the choice is applied
 to produce a specific NL query that feeds back into the SQL pipeline.
+
+Supports both exact pattern matching and fuzzy matching so that common
+spelling mistakes (e.g. "sho bokks", "show studnts") still trigger
+clarification.
 """
 
 import re
+from difflib import get_close_matches, SequenceMatcher
 from typing import Dict, List, Optional, Tuple
 
 # ── Patterns that mark a query as vague / generic ───────────────────────────
@@ -41,6 +46,19 @@ _ENTITY_ALIASES: Dict[str, List[str]] = {
     "issued":   ["issued", "issued books", "loan", "loans", "borrowed",
                  "borrowed books", "lending"],
 }
+
+# ── Vocabulary lists for fuzzy matching ────────────────────────────────────────────
+_VAGUE_VERBS: List[str] = [
+    "show", "list", "display", "get", "find", "fetch",
+    "give", "retrieve", "tell", "what",
+]
+
+# All single-word entity tokens (flattened from _ENTITY_ALIASES)
+_ENTITY_WORDS: List[str] = sorted(
+    {word for aliases in _ENTITY_ALIASES.values() for word in aliases if " " not in word},
+    key=len, reverse=True
+)
+
 
 # ── Per-entity clarification options ─────────────────────────────────────────
 # Each value must a dict: {"question": str, "options": [{"label": str, "value": str}]}
@@ -118,21 +136,85 @@ def _detect_entity(query_lower: str) -> Optional[str]:
     return None
 
 
+def _fuzzy_token_matches(word: str, candidates: List[str], cutoff: float = 0.75) -> bool:
+    """Return True if *word* is close enough to any entry in *candidates*."""
+    return bool(get_close_matches(word.lower(), candidates, n=1, cutoff=cutoff))
+
+
+def _fuzzy_detect_entity(query_lower: str) -> Optional[str]:
+    """
+    Fuzzy-match each token in the query against known entity words.
+
+    Returns the first canonical entity key whose aliases contain a word
+    similar (≥ 0.75 similarity) to any token in the query, or None.
+    """
+    tokens = re.findall(r"[a-z]+", query_lower)
+    for token in tokens:
+        if len(token) < 3:
+            continue
+        for entity, aliases in _ENTITY_ALIASES.items():
+            single_word_aliases = [a for a in aliases if " " not in a]
+            if _fuzzy_token_matches(token, single_word_aliases):
+                return entity
+    return None
+
+
+def _is_fuzzy_vague(query: str) -> Tuple[bool, Optional[str]]:
+    """
+    Fuzzy fallback: detect vague queries that contain spelling mistakes.
+
+    Strategy: a query is considered vague when it has 1–3 tokens, at least one
+    token fuzzy-matches a known *verb* (show / list / …), and at least one
+    other token fuzzy-matches a known *entity* word (book / student / …).
+    Short token limit (≤ 3) avoids false positives on specific queries such as
+    "find books by Dan Brown" or "show students with GPA above 3.5".
+    """
+    tokens = re.findall(r"[a-z]+", query.lower())
+    # Only consider very short queries; longer ones are likely specific
+    if len(tokens) == 0 or len(tokens) > 3:
+        return False, None
+
+    has_verb = any(_fuzzy_token_matches(t, _VAGUE_VERBS, cutoff=0.72) for t in tokens)
+    if not has_verb:
+        # Also accept bare entity-only queries (e.g. "bokks", "studdents")
+        entity = _fuzzy_detect_entity(query)
+        if entity and len(tokens) <= 2:
+            return True, entity
+        return False, None
+
+    entity = _fuzzy_detect_entity(query)
+    if entity is None:
+        return False, None
+    return True, entity
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def is_vague_query(query: str) -> Tuple[bool, Optional[str]]:
     """
     Determine whether *query* is too vague to execute without clarification.
 
+    Checks exact regex patterns first, then falls back to fuzzy token matching
+    so that misspelled queries (e.g. "sho bokks", "show studnts") are also
+    caught.
+
     Returns:
         (True, entity_key)  – vague; entity_key is one of the CLARIFICATION_MENU keys
         (False, None)       – specific enough to proceed
     """
     q = query.strip()
+
+    # ── Exact pattern check ───────────────────────────────────────────────
     for pattern in _VAGUE_PATTERNS:
         if pattern.match(q):
             entity = _detect_entity(q.lower())
             return True, entity
+
+    # ── Fuzzy fallback ────────────────────────────────────────────────────
+    fuzzy_vague, entity = _is_fuzzy_vague(q)
+    if fuzzy_vague and entity is not None:
+        return True, entity
+
     return False, None
 
 
