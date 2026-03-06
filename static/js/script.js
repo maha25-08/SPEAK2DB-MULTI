@@ -164,7 +164,7 @@ async function submitQuery() {
     }
 
     // Show loader
-    if (loader) loader.style.display = "block";
+    if (loader) loader.style.display = "flex";
     if (resultBox) resultBox.innerHTML = "";
 
     // Disable button
@@ -292,7 +292,7 @@ function renderClarification(clarif) {
  */
 async function submitWithClarification(choiceValue) {
     var loader = getEl('loadingOverlay');
-    if (loader) loader.style.display = "block";
+    if (loader) loader.style.display = "flex";
 
     hideEl('clarificationCard');
 
