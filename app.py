@@ -879,6 +879,158 @@ def api_vocabulary():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/query', methods=['GET'])
+def query_page():
+    """Redirect GET /query to main dashboard (query console is on the main page)."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return redirect(url_for('index'))
+
+
+@app.route('/analytics')
+def analytics():
+    """Analytics view – renders the main dashboard with query console."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_id = session['user_id']
+    user_role = session.get('role', 'Student')
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []})
+
+
+@app.route('/recommendations')
+def recommendations():
+    """Recommendations view – renders the main dashboard with query console."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_id = session['user_id']
+    user_role = session.get('role', 'Student')
+    return render_template('index.html',
+                           user=user_id,
+                           role=user_role,
+                           user_info={'username': user_id, 'role': user_role, 'permissions': []})
+
+
+@app.route('/admin-dashboard')
+def admin_dashboard():
+    """Administrator dashboard."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return redirect(url_for('index'))
+
+    user_id = session['user_id']
+
+    # Gather system stats for the admin view
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_users     = conn.execute("SELECT COUNT(*) FROM Users").fetchone()[0]
+        total_students  = conn.execute("SELECT COUNT(*) FROM Students").fetchone()[0]
+        total_faculty   = conn.execute("SELECT COUNT(*) FROM Faculty").fetchone()[0]
+        total_depts     = conn.execute("SELECT COUNT(*) FROM Departments").fetchone()[0]
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Admin dashboard stats error: {e}")
+        total_users = total_students = total_faculty = total_depts = 0
+
+    return render_template(
+        'dashboard_rbac.html',
+        user_info={'user_id': user_id, 'role': user_role},
+        role_badge_class='role-administrator',
+        menu_items=[
+            {'icon': '📊', 'label': 'Dashboard',     'url': '/admin-dashboard'},
+            {'icon': '🔍', 'label': 'Query Console', 'url': '/'},
+            {'icon': '📈', 'label': 'Analytics',     'url': '/analytics'},
+            {'icon': '💡', 'label': 'Recommendations','url': '/recommendations'},
+            {'icon': '⏻', 'label': 'Logout',        'url': '/logout'},
+        ],
+        permissions_summary={'permission_count': 50, 'table_count': 10, 'role_level': 3},
+        search_config={
+            'enabled': True,
+            'placeholder': 'Search users, reports...',
+            'suggestions': [
+                'List all students', 'Show overdue books',
+                'Faculty list', 'Show all fines',
+            ],
+        },
+        dashboard_widgets=[
+            {'type': 'system_overview', 'title': 'System Overview', 'icon': '🖥️'},
+        ],
+        data={
+            'system_stats': {
+                'total_users':       total_users,
+                'total_students':    total_students,
+                'total_faculty':     total_faculty,
+                'total_departments': total_depts,
+            }
+        },
+        theme_css='',
+    )
+
+
+@app.route('/librarian-dashboard')
+def librarian_dashboard():
+    """Librarian / Faculty dashboard."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id   = session['user_id']
+    user_role = session.get('role', 'Student')
+
+    # Gather library stats
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books     = conn.execute("SELECT COUNT(*) FROM Books").fetchone()[0]
+        available_books = conn.execute(
+            "SELECT COUNT(*) FROM Books WHERE available_copies > 0").fetchone()[0]
+        issued_books    = conn.execute(
+            "SELECT COUNT(*) FROM Issued WHERE return_date IS NULL").fetchone()[0]
+        overdue_books   = conn.execute(
+            "SELECT COUNT(*) FROM Issued WHERE return_date IS NULL "
+            "AND date(due_date) < date('now')").fetchone()[0]
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Librarian dashboard stats error: {e}")
+        total_books = available_books = issued_books = overdue_books = 0
+
+    return render_template(
+        'dashboard_rbac.html',
+        user_info={'user_id': user_id, 'role': user_role},
+        role_badge_class='role-librarian',
+        menu_items=[
+            {'icon': '📚', 'label': 'Dashboard',     'url': '/librarian-dashboard'},
+            {'icon': '🔍', 'label': 'Query Console', 'url': '/'},
+            {'icon': '📈', 'label': 'Analytics',     'url': '/analytics'},
+            {'icon': '💡', 'label': 'Recommendations','url': '/recommendations'},
+            {'icon': '⏻', 'label': 'Logout',        'url': '/logout'},
+        ],
+        permissions_summary={'permission_count': 30, 'table_count': 8, 'role_level': 2},
+        search_config={
+            'enabled': True,
+            'placeholder': 'Search books, students, fines...',
+            'suggestions': [
+                'Show overdue books', 'List all students',
+                'Unpaid fines', 'Available books',
+            ],
+        },
+        dashboard_widgets=[
+            {'type': 'library_stats', 'title': 'Library Statistics', 'icon': '📚'},
+        ],
+        data={
+            'library_stats': {
+                'total_books':     total_books,
+                'available_books': available_books,
+                'issued_books':    issued_books,
+                'overdue_books':   overdue_books,
+            }
+        },
+        theme_css='',
+    )
+
+
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):
