@@ -106,25 +106,12 @@ body {
     font-weight: 500;
 }
 
-.role-student {
-    background: #1a5276;
-    color: #fff;
-}
-
-.role-librarian {
-    background: #1d6a39;
-    color: #fff;
-}
-
-.role-faculty {
-    background: #1d6a39;
-    color: #fff;
-}
-
-.role-administrator {
-    background: #7b1a1a;
-    color: #fff;
-}
+/* Role-specific badge colors */
+.role-student     { background: #1a5276; color: #fff; }
+.role-librarian   { background: #1e8449; color: #fff; }
+.role-faculty     { background: #1e8449; color: #fff; }
+.role-administrator { background: #922b21; color: #fff; }
+.role-admin       { background: #922b21; color: #fff; }
 
 .btn-logout {
     background: var(--accent);

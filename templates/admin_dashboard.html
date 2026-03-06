@@ -92,13 +92,10 @@
             <a class="navbar-brand" href="/admin_dashboard">
                 <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="adminNav">
+            <div class="navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/admin_dashboard#query-section">
+                        <a class="nav-link" href="/">
                             <i class="fas fa-search me-1"></i>Query
                         </a>
                     </li>
@@ -114,16 +111,14 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/system_statistics">
-                            <i class="fas fa-database me-1"></i>System Statistics
+                            <i class="fas fa-server me-1"></i>System Statistics
                         </a>
                     </li>
                 </ul>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="text-white small">
-                        Logged in as: <span class="badge ms-1" style="background:#dc3545;font-size:.8rem;letter-spacing:.05em;">ADMIN</span>
-                    </span>
+                <div class="ms-auto d-flex align-items-center gap-3">
                     <span class="text-white">
-                        <i class="fas fa-user-shield me-1"></i>{{ user }}
+                        Logged in as:
+                        <span class="badge bg-danger ms-1">{{ role|upper }}</span>
                     </span>
                     <a href="/logout" class="btn btn-outline-light btn-sm">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
