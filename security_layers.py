@@ -355,7 +355,7 @@ class SecurityLayers:
                 "connect-src 'self'"
             ),
             'Referrer-Policy': 'strict-origin-when-cross-origin',
-            'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
+            'Permissions-Policy': 'geolocation=(), microphone=(self), camera=()'
         }
     
     def cleanup_expired_data(self):

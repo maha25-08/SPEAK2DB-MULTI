@@ -947,7 +947,6 @@ def analytics():
     user_role = session.get('role', 'Student')
     if user_role != 'Administrator':
         return render_template('403.html'), 403
-    user_id = session['user_id']
     return render_template('index.html',
                            user=user_id,
                            role=user_role,
@@ -1158,6 +1157,221 @@ def fine_management():
                            recent_issues=[],
                            fines=fines,
                            page='fine_management')
+
+
+@app.route('/user_management')
+def user_management():
+    """User management – admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role != 'Administrator':
+        return render_template('403.html'), 403
+
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        users = conn.execute(
+            "SELECT id, roll_number, name, branch, year, email, role FROM Students ORDER BY name"
+        ).fetchall()
+        total_users = len(users)
+        conn.close()
+    except Exception as e:
+        print(f"[user_management] DB error: {e}")
+        users = []
+        total_users = 0
+
+    return render_template(
+        'admin_dashboard.html',
+        role=user_role,
+        user=user_id,
+        stats={
+            'total_books': 0,
+            'total_students': total_users,
+            'active_issues': 0,
+            'unpaid_fines_amount': 0,
+        },
+        recent_activity=[
+            {'date': u['branch'], 'user': u['name'], 'detail': u['email'] or u['roll_number']}
+            for u in users[:10]
+        ],
+    )
+
+
+@app.route('/students')
+def students_route():
+    """Students list – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        recent_issues = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 10"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines,
+        }
+    except Exception as e:
+        print(f"[students_route] DB error: {e}")
+        recent_issues = []
+        stats = {}
+
+    template = 'librarian_dashboard.html' if user_role in ('Librarian', 'Faculty') else 'admin_dashboard.html'
+    if user_role == 'Administrator':
+        return render_template(
+            'admin_dashboard.html',
+            role=user_role, user=user_id,
+            stats={**stats, 'unpaid_fines_amount': 0},
+            recent_activity=[
+                {'date': r['issue_date'], 'user': r['student_name'], 'detail': r['title']}
+                for r in recent_issues
+            ],
+        )
+    return render_template(
+        'librarian_dashboard.html',
+        role=user_role, user=user_id,
+        stats=stats,
+        recent_issues=recent_issues,
+    )
+
+
+@app.route('/issued_books')
+def issued_books_route():
+    """Issued books – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        recent_issues = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               WHERE i.return_date IS NULL
+               ORDER BY i.issue_date DESC LIMIT 20"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines,
+        }
+    except Exception as e:
+        print(f"[issued_books_route] DB error: {e}")
+        recent_issues = []
+        stats = {}
+
+    if user_role == 'Administrator':
+        return render_template(
+            'admin_dashboard.html',
+            role=user_role, user=user_id,
+            stats={**stats, 'unpaid_fines_amount': 0},
+            recent_activity=[
+                {'date': r['issue_date'], 'user': r['student_name'], 'detail': r['title']}
+                for r in recent_issues
+            ],
+        )
+    return render_template(
+        'librarian_dashboard.html',
+        role=user_role, user=user_id,
+        stats=stats,
+        recent_issues=recent_issues,
+    )
+
+
+@app.route('/fine_management')
+def fine_management_route():
+    """Fine management – librarian or admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('role', 'Student')
+    if user_role not in ('Librarian', 'Faculty', 'Administrator'):
+        return render_template('403.html'), 403
+
+    user_id = session['user_id']
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        # Show fines as recent issues for display
+        recent_fines = conn.execute(
+            """SELECT f.issue_date, s.name as student_name,
+                      (f.fine_type || ' — ₹' || f.fine_amount) as title,
+                      '' as author
+               FROM Fines f
+               JOIN Students s ON f.student_id = s.id
+               WHERE f.status = 'Unpaid'
+               ORDER BY f.issue_date DESC LIMIT 20"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines_count,
+        }
+    except Exception as e:
+        print(f"[fine_management_route] DB error: {e}")
+        recent_fines = []
+        stats = {}
+
+    if user_role == 'Administrator':
+        return render_template(
+            'admin_dashboard.html',
+            role=user_role, user=user_id,
+            stats={**stats, 'unpaid_fines_amount': 0},
+            recent_activity=[
+                {'date': r['issue_date'], 'user': r['student_name'], 'detail': r['title']}
+                for r in recent_fines
+            ],
+        )
+    return render_template(
+        'librarian_dashboard.html',
+        role=user_role, user=user_id,
+        stats=stats,
+        recent_issues=recent_fines,
+    )
 
 
 @app.route('/admin-dashboard')
