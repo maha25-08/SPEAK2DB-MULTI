@@ -205,41 +205,16 @@
                 {% endif %}
             </section>
 
-            {% elif role in ('Librarian', 'Faculty') %}
-            <section class="dashboard-panel librarian-panel">
+            {% elif role in ('Librarian', 'Faculty', 'Administrator') %}
+            <section class="dashboard-panel {% if role == 'Administrator' %}admin-panel{% else %}librarian-panel{% endif %}">
                 <div class="section-header">
-                    <h2 class="section-title">📋 Library Management Overview</h2>
-                    <a href="/librarian_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
-                </div>
-                <div class="widget-grid">
-                    <div class="widget-card widget-blue">
-                        <div class="widget-icon">📚</div>
-                        <div class="widget-value">{{ dashboard_data.get('total_books', 0) }}</div>
-                        <div class="widget-label">Total Books</div>
-                    </div>
-                    <div class="widget-card widget-green">
-                        <div class="widget-icon">🎓</div>
-                        <div class="widget-value">{{ dashboard_data.get('total_students', 0) }}</div>
-                        <div class="widget-label">Students</div>
-                    </div>
-                    <div class="widget-card widget-purple">
-                        <div class="widget-icon">📤</div>
-                        <div class="widget-value">{{ dashboard_data.get('active_issues', 0) }}</div>
-                        <div class="widget-label">Active Issues</div>
-                    </div>
-                    <div class="widget-card widget-orange">
-                        <div class="widget-icon">💸</div>
-                        <div class="widget-value">{{ dashboard_data.get('unpaid_fines', 0) }}</div>
-                        <div class="widget-label">Unpaid Fines</div>
-                    </div>
-                </div>
-            </section>
-
-            {% elif role == 'Administrator' %}
-            <section class="dashboard-panel admin-panel">
-                <div class="section-header">
+                    {% if role == 'Administrator' %}
                     <h2 class="section-title">🛡️ System Administration</h2>
                     <a href="/admin_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                    {% else %}
+                    <h2 class="section-title">📋 Library Management Overview</h2>
+                    <a href="/librarian_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                    {% endif %}
                 </div>
                 <div class="widget-grid">
                     <div class="widget-card widget-blue">

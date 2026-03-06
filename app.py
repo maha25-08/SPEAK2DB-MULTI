@@ -361,23 +361,7 @@ def index():
                 'unpaid_fines': len(unpaid_fines),
             }
 
-        elif user_role in ('Librarian', 'Faculty'):
-            total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
-            total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
-            active_issues = conn.execute(
-                "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-            ).fetchone()['cnt']
-            unpaid_fines_count = conn.execute(
-                "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
-            ).fetchone()['cnt']
-            dashboard_data = {
-                'total_books': total_books,
-                'total_students': total_students,
-                'active_issues': active_issues,
-                'unpaid_fines': unpaid_fines_count,
-            }
-
-        elif user_role == 'Administrator':
+        elif user_role in ('Librarian', 'Faculty', 'Administrator'):
             total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
             total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
             active_issues = conn.execute(

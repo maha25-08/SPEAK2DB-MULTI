@@ -59,6 +59,9 @@ _ENTITY_WORDS: List[str] = sorted(
     key=len, reverse=True
 )
 
+# Similarity cutoff for fuzzy token matching (0–1; higher = stricter)
+_FUZZY_CUTOFF: float = 0.75
+
 
 # ── Per-entity clarification options ─────────────────────────────────────────
 # Each value must a dict: {"question": str, "options": [{"label": str, "value": str}]}
@@ -136,7 +139,7 @@ def _detect_entity(query_lower: str) -> Optional[str]:
     return None
 
 
-def _fuzzy_token_matches(word: str, candidates: List[str], cutoff: float = 0.75) -> bool:
+def _fuzzy_token_matches(word: str, candidates: List[str], cutoff: float = _FUZZY_CUTOFF) -> bool:
     """Return True if *word* is close enough to any entry in *candidates*."""
     return bool(get_close_matches(word.lower(), candidates, n=1, cutoff=cutoff))
 
@@ -174,7 +177,7 @@ def _is_fuzzy_vague(query: str) -> Tuple[bool, Optional[str]]:
     if len(tokens) == 0 or len(tokens) > 3:
         return False, None
 
-    has_verb = any(_fuzzy_token_matches(t, _VAGUE_VERBS, cutoff=0.72) for t in tokens)
+    has_verb = any(_fuzzy_token_matches(t, _VAGUE_VERBS, cutoff=_FUZZY_CUTOFF - 0.03) for t in tokens)
     if not has_verb:
         # Also accept bare entity-only queries (e.g. "bokks", "studdents")
         entity = _fuzzy_detect_entity(query)
