@@ -128,32 +128,60 @@ def _is_safe_sql(sql: str) -> Tuple[bool, str]:
     return True, ""
 
 
+def _inject_and_condition(sql_query: str, condition: str) -> str:
+    """Inject a filter condition into an existing SQL WHERE clause.
+
+    Inserts ``condition AND`` immediately after the WHERE keyword so the
+    student-ID restriction comes first without disturbing any trailing
+    ORDER BY / GROUP BY / LIMIT clauses.
+    """
+    match = re.search(r'\bWHERE\b', sql_query, re.IGNORECASE)
+    if match:
+        pos = match.end()
+        return sql_query[:pos] + f" {condition} AND" + sql_query[pos:]
+    # Fallback: no WHERE found – append one (shouldn't normally happen here)
+    return sql_query + f" WHERE {condition}"
+
+
 def _apply_student_filters(user_query: str, sql_query: str, student_id: int) -> str:
     """
     Apply student-specific SQL filters.
 
     Adds WHERE predicates so students only see their own data.
-    Only modifies the query when it touches personal tables without an
-    existing WHERE clause; otherwise leaves it unchanged.
+    For personal tables (Fines, Issued, Reservations) the student_id
+    restriction is **always** enforced, even when a WHERE clause already
+    exists, to prevent data-privacy leaks from generic queries such as
+    "show unpaid fines".
     """
     q_lower = user_query.lower()
     sq_lower = sql_query.lower()
     has_where = 'WHERE' in sql_query.upper()
 
-    # Pattern 1: table-level fallback for generic table queries
-    if not has_where:
-        if 'students' in sq_lower:
-            return sql_query + f" WHERE id = {student_id}"
-        if 'issued' in sq_lower:
-            return sql_query + f" WHERE student_id = {student_id}"
-        if 'fines' in sq_lower:
-            return sql_query + f" WHERE student_id = {student_id}"
+    # Ensure student_id is a plain integer to prevent SQL injection
+    sid = int(student_id)
+
+    # Pattern 1: table-level security – always restrict personal tables to the
+    # logged-in student, regardless of whether a WHERE clause already exists.
+    for tbl in ('fines', 'issued', 'reservations'):
+        if tbl in sq_lower:
+            # Only inject when the exact student_id filter is not already present
+            already_filtered = bool(
+                re.search(r'\bstudent_id\s*=\s*' + str(sid) + r'\b', sql_query, re.IGNORECASE)
+            )
+            if not already_filtered:
+                if has_where:
+                    return _inject_and_condition(sql_query, f"student_id = {sid}")
+                else:
+                    return sql_query + f" WHERE student_id = {sid}"
+            return sql_query
+
+    if 'students' in sq_lower and not has_where:
+        return sql_query + f" WHERE id = {sid}"
 
     # Pattern 2: "my …" queries – use safe, schema-correct SQL templates
     if 'my' not in q_lower:
         return sql_query
 
-    sid = student_id  # shorter alias
     _fines_base = (
         f"SELECT f.*, s.name as student_name FROM Fines f "
         f"JOIN Students s ON f.student_id = s.id "
@@ -838,6 +866,8 @@ def query():
             sql_query = sql_query.replace('[CURRENT_STUDENT_ID]', str(student_id))
 
         # ── Step 4: Student-specific SQL rewriting ────────────────────────
+        print("Role:", session.get("role"))
+        print("Student Filter Applied:", session.get("student_id"))
         if user_role == 'Student' and student_id:
             sql_query = _apply_student_filters(user_query, sql_query, student_id)
 
