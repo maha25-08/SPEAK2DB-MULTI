@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Speak2DB</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f8f9fa; color: #000000; }
+        .navbar-brand { font-weight: 700; font-size: 1.3rem; }
+        .page-banner {
+            background: linear-gradient(135deg, #4a148c 0%, #ab47bc 100%);
+            color: white;
+            border-radius: 14px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.1);
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-card h6 {
+            color: #4a148c;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.1);
+            transition: transform .2s;
+        }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-card .card-body { padding: 1.5rem; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#4a148c">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/admin_dashboard">
+                <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
+            </a>
+            <div class="navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin_dashboard">
+                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-search me-1"></i>Query
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/analytics">
+                            <i class="fas fa-chart-bar me-1"></i>Analytics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/user_management">
+                            <i class="fas fa-users-cog me-1"></i>User Management
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/system_statistics">
+                            <i class="fas fa-server me-1"></i>System Statistics
+                        </a>
+                    </li>
+                </ul>
+                <div class="ms-auto d-flex align-items-center gap-3">
+                    <span class="text-white">
+                        Logged in as:
+                        <span class="badge bg-danger ms-1">{{ role|upper }}</span>
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        <!-- Page Banner -->
+        <div class="page-banner">
+            <h3 class="mb-1"><i class="fas fa-chart-bar me-2"></i>Analytics Dashboard</h3>
+            <p class="mb-0 opacity-75">Library usage statistics, category breakdown, and circulation trends</p>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#1565c0,#42a5f5)">
+                    <div class="card-body text-center">
+                        <i class="fas fa-book fa-2x mb-2 opacity-75"></i>
+                        <h2 class="fw-bold">{{ books_per_category | length }}</h2>
+                        <p class="mb-0">Book Categories</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#2e7d32,#66bb6a)">
+                    <div class="card-body text-center">
+                        <i class="fas fa-calendar-alt fa-2x mb-2 opacity-75"></i>
+                        <h2 class="fw-bold">{{ issues_per_month | length }}</h2>
+                        <p class="mb-0">Months Tracked</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#e65100,#ffa726)">
+                    <div class="card-body text-center">
+                        <i class="fas fa-book-reader fa-2x mb-2 opacity-75"></i>
+                        <h2 class="fw-bold">{{ issues_per_month | sum(attribute='count') if issues_per_month else 0 }}</h2>
+                        <p class="mb-0">Total Issues (12 mo)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
+                    <div class="card-body text-center">
+                        <i class="fas fa-layer-group fa-2x mb-2 opacity-75"></i>
+                        <h2 class="fw-bold">{{ books_per_category | sum(attribute='count') if books_per_category else 0 }}</h2>
+                        <p class="mb-0">Total Books</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <h6><i class="fas fa-chart-pie me-2"></i>Books by Category</h6>
+                    <canvas id="categoryChart" height="260"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <h6><i class="fas fa-chart-line me-2"></i>Issues Per Month</h6>
+                    <canvas id="issuesChart" height="260"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Table -->
+        <div class="chart-card">
+            <h6><i class="fas fa-table me-2"></i>Books Per Category — Detail</h6>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0" style="font-size:.9rem">
+                    <thead>
+                        <tr style="background:#4a148c; color:white;">
+                            <th>Category</th>
+                            <th class="text-end">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in books_per_category %}
+                        <tr>
+                            <td>{{ row['category'] or '(None)' }}</td>
+                            <td class="text-end">{{ row['count'] }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="2" class="text-center text-muted py-3">No data available</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        // Books by Category — Pie chart
+        const catLabels  = {{ books_per_category | map(attribute='category') | list | tojson }};
+        const catCounts  = {{ books_per_category | map(attribute='count')    | list | tojson }};
+        const palette = [
+            '#4a148c','#7b1fa2','#9c27b0','#ce93d8',
+            '#1565c0','#1976d2','#42a5f5','#90caf9',
+            '#2e7d32','#388e3c','#66bb6a','#a5d6a7',
+            '#e65100','#ef6c00','#ffa726','#ffcc80',
+        ];
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'doughnut',
+            data: {
+                labels: catLabels.map(l => l || '(None)'),
+                datasets: [{ data: catCounts, backgroundColor: palette }]
+            },
+            options: { plugins: { legend: { position: 'right' } } }
+        });
+
+        // Issues per Month — Bar chart
+        const monthLabels  = {{ issues_per_month | map(attribute='month')  | list | tojson }};
+        const monthCounts  = {{ issues_per_month | map(attribute='count')  | list | tojson }};
+        new Chart(document.getElementById('issuesChart'), {
+            type: 'bar',
+            data: {
+                labels: monthLabels,
+                datasets: [{
+                    label: 'Issues',
+                    data: monthCounts,
+                    backgroundColor: '#7b1fa2',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
