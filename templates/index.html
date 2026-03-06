@@ -9,6 +9,45 @@
     <link rel="stylesheet" href="/static/css/style.css?v=14">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/js/script.js"></script>
+    <style>
+        /* ── Clarification card ────────────────────────────────────────── */
+        .clarification-card {
+            background: var(--card-bg, #1e2235);
+            border: 1px solid var(--border-color, #2d3250);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 1rem 0;
+        }
+        .clarification-question {
+            font-size: 1.1rem;
+            color: #e0e6ff;
+            margin-bottom: 1rem;
+        }
+        .clarification-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .btn-clarification {
+            background: #4a90e2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .btn-clarification:hover {
+            background: #357abd;
+        }
+        /* ── Result badges ─────────────────────────────────────────────── */
+        .result-badges { display: flex; gap: 0.5rem; align-items: center; }
+        .badge { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .badge-ai { background: #6c3483; color: #fff; }
+        .badge-main { background: #1a5276; color: #fff; }
+        .badge-archive { background: #784212; color: #fff; }
+    </style>
 </head>
 
 <body>
@@ -121,11 +160,23 @@
                 </div>
             </section>
 
+            <!-- Clarification Card (shown when backend asks for user choice) -->
+            <section class="clarification-card" id="clarificationCard" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">🤔 Clarify Your Query</h2>
+                </div>
+                <div class="clarification-body">
+                    <p id="clarificationQuestion" class="clarification-question"></p>
+                    <div id="clarificationOptions" class="clarification-options"></div>
+                </div>
+            </section>
+
             <!-- Results Section -->
             <section class="results-section" id="resultsSection" style="display: none;">
                 <div class="section-header">
                     <h2 class="section-title">📊 Query Results</h2>
                     <div class="result-actions">
+                        <div id="resultBadges" class="result-badges"></div>
                         <button id="exportBtn" class="btn-secondary">📥 Export</button>
                         <button id="visualizeBtn" class="btn-primary">📈 Visualize</button>
                     </div>
@@ -134,14 +185,16 @@
                 <div class="results-container">
                     <div class="query-info">
                         <span class="query-text" id="queryText"></span>
-                        <span class="query-sql" id="querySql"></span>
+                        <code class="query-sql" id="sqlCode"></code>
                     </div>
+                    <div id="noResults" style="display:none; padding: 1rem; color: #aaa;">No results found.</div>
                     <div class="table-container">
                         <table class="results-table" id="resultsTable">
                             <thead id="tableHead"></thead>
                             <tbody id="tableBody"></tbody>
                         </table>
                     </div>
+                    <div id="chartsGrid"></div>
                 </div>
             </section>
 
@@ -160,7 +213,7 @@
                     </div>
                 </div>
                 
-                <div class="chart-container">
+                <div class="chart-container" id="chartContainer">
                     <canvas id="dataChart"></canvas>
                 </div>
             </section>
