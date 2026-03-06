@@ -125,12 +125,11 @@
                         <span class="nav-icon">🔍</span>
                         <span class="nav-text">Query</span>
                     </a>
-                    {% else %}
-                    <a href="/admin_dashboard" class="nav-link">
+                    {% elif role in ('Librarian', 'Faculty') %}
+                    <a href="/librarian_dashboard" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    {% if role in ('Librarian', 'Faculty') %}
                     <a href="/students" class="nav-link">
                         <span class="nav-icon">👥</span>
                         <span class="nav-text">Students</span>
@@ -143,7 +142,27 @@
                         <span class="nav-icon">💸</span>
                         <span class="nav-text">Fines</span>
                     </a>
+                    <a href="/" class="nav-link active">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query</span>
+                    </a>
                     {% elif role == 'Administrator' %}
+                    <a href="/admin_dashboard" class="nav-link">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="/students" class="nav-link">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">Students</span>
+                    </a>
+                    <a href="/issued_books" class="nav-link">
+                        <span class="nav-icon">📖</span>
+                        <span class="nav-text">Issued Books</span>
+                    </a>
+                    <a href="/fine_management" class="nav-link">
+                        <span class="nav-icon">💸</span>
+                        <span class="nav-text">Fines</span>
+                    </a>
                     <a href="/analytics" class="nav-link">
                         <span class="nav-icon">📈</span>
                         <span class="nav-text">Analytics</span>
@@ -156,7 +175,10 @@
                         <span class="nav-icon">🖥️</span>
                         <span class="nav-text">System Statistics</span>
                     </a>
-                    {% endif %}
+                    <a href="/" class="nav-link active">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query</span>
+                    </a>
                     {% endif %}
                 </nav>
             </div>
