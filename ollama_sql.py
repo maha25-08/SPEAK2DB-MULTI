@@ -96,7 +96,7 @@ def generate_complex_sql(user_query):
     elif "faculty and their departments" in query_lower:
         return "SELECT f.name, f.email, d.name as department FROM Faculty f JOIN Departments d ON f.department_id = d.id ORDER BY d.name, f.name"
     
-    elif "system usage statistics" in query_lower:
+    elif "system usage statistics" in query_lower or "database statistics" in query_lower:
         return "SELECT 'Total Students' as metric, COUNT(*) as count FROM Students UNION ALL SELECT 'Total Books', COUNT(*) FROM Books UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued"
     
     elif "overdue books by department" in query_lower:
@@ -121,8 +121,15 @@ def generate_complex_sql(user_query):
     elif "list students with current books" in query_lower or "students with current books" in query_lower:
         return "SELECT DISTINCT s.*, i.issue_date, i.due_date FROM Students s JOIN Issued i ON s.id = i.student_id WHERE i.return_date IS NULL"
     
+    elif "show books not issued" in query_lower or "books not issued" in query_lower or "books never issued" in query_lower:
         return "SELECT * FROM Books WHERE id NOT IN (SELECT DISTINCT book_id FROM Issued)"
-    
+
+    elif "show all books with title and author" in query_lower or "all books with title and author" in query_lower:
+        return "SELECT title, author FROM Books ORDER BY title"
+
+    elif "show books in library" in query_lower or "books in library" in query_lower or "show all books" in query_lower or "list all books" in query_lower or "display all books" in query_lower:
+        return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
+
     elif "display fine records" in query_lower or "show fine records" in query_lower:
         return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
     
@@ -2621,5 +2628,37 @@ def generate_complex_sql(user_query):
     
     elif "display students by learning modality" in query_lower:
         return "SELECT learning_modality, COUNT(*) as count FROM Students GROUP BY learning_modality ORDER BY count DESC"
-    
+
+    # ── GENERAL KEYWORD FALLBACK ──────────────────────────────────────────────
+    # Handles common queries that did not match any specific pattern above.
+    # Uses broad keyword detection to produce a sensible SELECT statement.
+    if "student" in query_lower or "students" in query_lower:
+        if "fine" in query_lower or "fines" in query_lower:
+            return "SELECT s.name, s.roll_number, SUM(f.fine_amount) as total_fines FROM Students s LEFT JOIN Fines f ON s.id = f.student_id GROUP BY s.id, s.name, s.roll_number ORDER BY total_fines DESC"
+        elif "book" in query_lower or "issued" in query_lower or "borrow" in query_lower:
+            return "SELECT s.name, s.roll_number, COUNT(i.id) as books_borrowed FROM Students s LEFT JOIN Issued i ON s.id = i.student_id GROUP BY s.id, s.name, s.roll_number ORDER BY books_borrowed DESC"
+        return "SELECT id, name, roll_number, email, branch FROM Students ORDER BY name"
+
+    if "book" in query_lower or "books" in query_lower or "title" in query_lower or "catalog" in query_lower:
+        if "author" in query_lower:
+            return "SELECT title, author, category, publish_date FROM Books ORDER BY title"
+        elif "available" in query_lower:
+            return "SELECT id, title, author, category, available_copies FROM Books WHERE available_copies > 0 ORDER BY title"
+        return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
+
+    if "fine" in query_lower or "fines" in query_lower or "penalty" in query_lower:
+        return "SELECT f.id, s.name as student_name, f.fine_amount, f.status, f.issue_date FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
+
+    if "faculty" in query_lower or "professor" in query_lower or "teacher" in query_lower:
+        return "SELECT id, name, email, department_id FROM Faculty ORDER BY name"
+
+    if "issued" in query_lower or "borrowed" in query_lower or "lending" in query_lower or "loan" in query_lower:
+        return "SELECT i.id, s.name as student_name, b.title, i.issue_date, i.due_date, i.return_date FROM Issued i JOIN Students s ON i.student_id = s.id JOIN Books b ON i.book_id = b.id ORDER BY i.issue_date DESC"
+
+    if "department" in query_lower or "departments" in query_lower or "branch" in query_lower:
+        return "SELECT id, name FROM Departments ORDER BY name"
+
+    if "statistic" in query_lower or "statistics" in query_lower or "summary" in query_lower or "overview" in query_lower:
+        return "SELECT 'Total Students' as metric, COUNT(*) as count FROM Students UNION ALL SELECT 'Total Books', COUNT(*) FROM Books UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued"
+
     return ""  # Let the main app handle final fallback
