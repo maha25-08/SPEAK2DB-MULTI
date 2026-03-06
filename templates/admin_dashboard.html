@@ -91,30 +91,38 @@
             <a class="navbar-brand" href="/admin_dashboard">
                 <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-collapse" id="adminNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="/"><i class="fas fa-search me-1"></i>Query</a>
+                        <a class="nav-link" href="/admin_dashboard#query-section">
+                            <i class="fas fa-search me-1"></i>Query
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="/analytics"><i class="fas fa-chart-bar me-1"></i>Analytics</a>
+                        <a class="nav-link" href="/analytics">
+                            <i class="fas fa-chart-bar me-1"></i>Analytics
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="/user_management"><i class="fas fa-users-cog me-1"></i>User Management</a>
+                        <a class="nav-link" href="/user_management">
+                            <i class="fas fa-users-cog me-1"></i>User Management
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="/system_statistics"><i class="fas fa-server me-1"></i>System Statistics</a>
+                        <a class="nav-link" href="/system_statistics">
+                            <i class="fas fa-database me-1"></i>System Statistics
+                        </a>
                     </li>
                 </ul>
-                <div class="ms-auto d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="text-white small">
+                        Logged in as: <span class="badge ms-1" style="background:#dc3545;font-size:.8rem;letter-spacing:.05em;">ADMIN</span>
+                    </span>
                     <span class="text-white">
                         <i class="fas fa-user-shield me-1"></i>{{ user }}
-                    </span>
-                    <span class="badge" style="background:#dc3545;color:white;font-size:.85rem;padding:.4rem .75rem;">
-                        Logged in as: ADMIN
                     </span>
                     <a href="/logout" class="btn btn-outline-light btn-sm">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
@@ -172,7 +180,7 @@
         </div>
 
         <!-- NL Query Section -->
-        <div class="query-section">
+        <div class="query-section" id="query-section">
             <h5 class="mb-3"><i class="fas fa-search me-2" style="color:#4a148c"></i>Natural Language Query</h5>
             <div class="input-group mb-2">
                 <textarea id="queryInput" class="form-control" rows="2"
