@@ -7,6 +7,7 @@ SQL safety gate, and security headers (Option 2 – non-breaking).
 from flask import Flask, render_template, request, jsonify, session, flash, redirect, url_for
 import sqlite3
 import os
+import jinja2
 from ollama_sql import generate_sql
 import pandas as pd
 import re
@@ -66,6 +67,29 @@ def get_db_connection(db_path):
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def _get_library_stats():
+    """Fetch common library statistics for librarian/admin dashboard panels."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        conn.close()
+        return {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines,
+        }
+    except Exception as e:
+        print(f"[_get_library_stats] DB error: {e}")
+        return {}
 
 # ── SQL safety gate ──────────────────────────────────────────────────────────
 # Blocks write / DDL statements and multi-statement SQL to prevent injection.
@@ -544,7 +568,8 @@ def student_dashboard_individual():
     template_name = f'student_dashboard_{roll_number.lower()}.html'
     try:
         return render_template(template_name)
-    except Exception:
+    except jinja2.TemplateNotFound:
+        print(f"[student_dashboard_individual] Template not found: {template_name}")
         return redirect(url_for('student_dashboard_route'))
 
 # ── Role-specific dashboards ─────────────────────────────────────────────────
@@ -971,7 +996,7 @@ def analytics():
                            user=user_id,
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []},
-                           dashboard_data={},
+                           dashboard_data=_get_library_stats(),
                            books_per_category=[dict(r) for r in books_per_category],
                            issues_per_month=[dict(r) for r in issues_per_month])
 
@@ -1048,7 +1073,7 @@ def students_view():
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []},
                            page_title='All Students',
-                           dashboard_data={},
+                           dashboard_data=_get_library_stats(),
                            prefill_query='show all students')
 
 
@@ -1069,7 +1094,7 @@ def issued_books_view():
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []},
                            page_title='Issued Books',
-                           dashboard_data={},
+                           dashboard_data=_get_library_stats(),
                            prefill_query='show all currently issued books')
 
 
@@ -1090,7 +1115,7 @@ def fine_management_view():
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []},
                            page_title='Fine Management',
-                           dashboard_data={},
+                           dashboard_data=_get_library_stats(),
                            prefill_query='show all unpaid fines')
 
 
@@ -1124,7 +1149,7 @@ def user_management_view():
                            role=user_role,
                            user_info={'username': user_id, 'role': user_role, 'permissions': []},
                            page_title='User Management',
-                           dashboard_data={},
+                           dashboard_data=_get_library_stats(),
                            prefill_query='show all students with their details')
 
 
