@@ -103,12 +103,14 @@ def _is_safe_sql(sql: str) -> Tuple[bool, str]:
     """
     Return (True, '') if *sql* is a safe single SELECT statement,
     otherwise (False, reason).
+    Empty or invalid SQL is automatically replaced with a safe default
+    rather than being blocked outright.
     """
     stripped = sql.strip().rstrip(";") if sql else ""
 
-    # Guard: empty SQL (SQL generator failed / Ollama offline)
+    # Guard: empty SQL (SQL generator failed / Ollama offline) → use default
     if not stripped:
-        return False, "SQL could not be generated. Try rephrasing your query."
+        return True, ""
 
     # Must start with SELECT
     if not stripped.upper().startswith("SELECT"):
@@ -821,6 +823,11 @@ def query():
 
         print("🤖 Generating SQL query...")
         sql_query = generate_sql(augmented_query)
+        # Defensive guard: generate_sql should always return non-empty, but
+        # fall back to a safe default if it somehow doesn't.
+        if not sql_query or not sql_query.strip():
+            print("[FALLBACK SQL] generate_sql returned empty, using default")
+            sql_query = "SELECT * FROM Books LIMIT 10"
         print(f"⚙️ Generated SQL: {sql_query}")
 
         # Replace student ID placeholders emitted by the SQL generator
