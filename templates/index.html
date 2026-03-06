@@ -343,7 +343,10 @@
                 <div class="results-container">
                     <div class="query-info">
                         <span class="query-text" id="queryText"></span>
-                        <code class="query-sql" id="sqlCode"></code>
+                        <div class="sql-section" id="sqlSection" style="display:none;">
+                            <span class="sql-label">🧾 Generated SQL</span>
+                            <code class="query-sql" id="sqlCode"></code>
+                        </div>
                     </div>
                     <div id="noResults" style="display:none; padding: 1rem; color: #aaa;">No results found.</div>
                     <div class="table-container">

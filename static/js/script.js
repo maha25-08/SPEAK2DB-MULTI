@@ -464,8 +464,15 @@ function displayResults(result) {
     var rowBadge = getEl('rowCountBadge');
     if (rowBadge) rowBadge.textContent = (result.data ? result.data.length : 0) + ' rows';
 
+    console.log("SQL received:", result.sql);
     var sqlCode = getEl('sqlCode');
-    if (sqlCode) sqlCode.textContent = result.sql;
+    var sqlSection = getEl('sqlSection');
+    if (sqlCode && result.sql) {
+        sqlCode.textContent = result.sql;
+        if (sqlSection) sqlSection.style.display = 'block';
+    } else if (sqlSection) {
+        sqlSection.style.display = 'none';
+    }
 
     var thead = getEl('tableHead');
     var tbody = getEl('tableBody');
