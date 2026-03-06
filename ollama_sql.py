@@ -1,17 +1,315 @@
 import requests
 import re
+import socket
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "deepseek-coder:6.7b"  # Best free SQL model
+MODEL_NAME = "sqlcoder:latest"
+
+# Schema context injected into LLM prompts for accurate SQL generation
+SCHEMA_CONTEXT = (
+    "Books(id,title,author,category,publisher_id,total_copies,available_copies)\n"
+    "Students(id,name,roll_number,branch,year,email)\n"
+    "Issued(id,student_id,book_id,issue_date,due_date,return_date,status)\n"
+    "Fines(id,student_id,fine_amount,fine_type,status,issue_date)\n"
+    "Faculty(id,name,email,department,designation)\n"
+    "Reservations(id,student_id,book_id,reservation_date,status)\n"
+    "Departments(id,name)"
+)
+
+# Default fallback SQL returned when all generation layers fail
+FALLBACK_SQL = "SELECT * FROM Books LIMIT 10"
+
+# Blocked SQL keywords – non-SELECT operations must never appear in generated SQL
+_BLOCKED_SQL_RE = re.compile(
+    r"\b(DROP|DELETE|UPDATE|INSERT|CREATE|ALTER|TRUNCATE|REPLACE|MERGE"
+    r"|GRANT|REVOKE|EXECUTE|EXEC|CALL|PRAGMA)\b",
+    re.IGNORECASE,
+)
+
+# ── Layer 1: REGEX pattern-matching rules ─────────────────────────────────────
+# Evaluated in order; first match wins.  Handles simple / generic queries that
+# previously fell through to the LLM and produced bad SQL.
+_REGEX_RULES = [
+    # Books – simple/generic
+    (re.compile(r"^(show|list|display)\s+(all\s+)?books?\s*$", re.IGNORECASE),
+     "SELECT id,title,author FROM Books"),
+    (re.compile(r"^(show|list|display)\s+all\s+books\b", re.IGNORECASE),
+     "SELECT id,title,author FROM Books"),
+    # Students – simple/generic
+    (re.compile(r"^(show|list|display)\s+(all\s+)?students?\s*$", re.IGNORECASE),
+     "SELECT id,name,roll_number FROM Students"),
+    (re.compile(r"^(show|list|display)\s+all\s+students\b", re.IGNORECASE),
+     "SELECT id,name,roll_number FROM Students"),
+    # Fines – simple/generic
+    (re.compile(r"^(show|list|display)\s+(all\s+)?fines?\s*$", re.IGNORECASE),
+     "SELECT * FROM Fines"),
+    # Issued books
+    (re.compile(r"^(show|list|display)\s+(all\s+)?issued\s+books?\s*$", re.IGNORECASE),
+     "SELECT * FROM Issued"),
+    (re.compile(r"\bissued\s+books?\b", re.IGNORECASE),
+     "SELECT * FROM Issued"),
+    # Overdue books
+    (re.compile(r"\boverdue\s+books?\b", re.IGNORECASE),
+     "SELECT * FROM Issued WHERE return_date IS NULL AND due_date < date('now')"),
+    # Faculty – simple/generic
+    (re.compile(r"^(show|list|display)\s+(all\s+)?faculty\s*$", re.IGNORECASE),
+     "SELECT id,name,email FROM Faculty"),
+    # Reservations – simple/generic
+    (re.compile(r"^(show|list|display)\s+(all\s+)?reservations?\s*$", re.IGNORECASE),
+     "SELECT * FROM Reservations"),
+    # Library / database statistics
+    (re.compile(r"(library|database)\s+(statistics?|stats?|summary|info)", re.IGNORECASE),
+     ("SELECT 'Total Students' as metric, COUNT(*) as count FROM Students "
+      "UNION ALL SELECT 'Total Books', COUNT(*) FROM Books "
+      "UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines "
+      "UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued")),
+]
+
+# ── Layer 2: Rule-based dictionary (50+ rules) ────────────────────────────────
+# Each entry is a (substring, sql) tuple.  The substring is matched
+# (case-insensitively) against the cleaned query; first match wins.
+_RULE_DICT = [
+    # ── Books ──────────────────────────────────────────────────────────────
+    ("show all books with title and author",
+     "SELECT id,title,author FROM Books"),
+    ("list all books with title and author",
+     "SELECT id,title,author FROM Books"),
+    ("books with title and author",
+     "SELECT id,title,author FROM Books"),
+    ("show books that are available for borrowing",
+     "SELECT id,title,author FROM Books WHERE id NOT IN "
+     "(SELECT book_id FROM Issued WHERE return_date IS NULL)"),
+    ("show available books",
+     "SELECT id,title,author FROM Books WHERE id NOT IN "
+     "(SELECT book_id FROM Issued WHERE return_date IS NULL)"),
+    ("available books",
+     "SELECT id,title,author FROM Books WHERE id NOT IN "
+     "(SELECT book_id FROM Issued WHERE return_date IS NULL)"),
+    ("show books grouped by category",
+     "SELECT category, COUNT(*) as book_count FROM Books GROUP BY category ORDER BY book_count DESC"),
+    ("books grouped by category",
+     "SELECT category, COUNT(*) as book_count FROM Books GROUP BY category ORDER BY book_count DESC"),
+    ("books ordered by number of times",
+     "SELECT b.id,b.title,b.author,COUNT(i.id) as issue_count FROM Books b "
+     "LEFT JOIN Issued i ON b.id=i.book_id GROUP BY b.id,b.title,b.author "
+     "ORDER BY issue_count DESC"),
+    ("most borrowed books",
+     "SELECT b.id,b.title,b.author,COUNT(i.id) as issue_count FROM Books b "
+     "LEFT JOIN Issued i ON b.id=i.book_id GROUP BY b.id,b.title,b.author "
+     "ORDER BY issue_count DESC"),
+    # ── Students ────────────────────────────────────────────────────────────
+    ("show all students with name and roll number",
+     "SELECT id,name,roll_number FROM Students"),
+    ("list all students with name and roll number",
+     "SELECT id,name,roll_number FROM Students"),
+    ("students with name and roll number",
+     "SELECT id,name,roll_number FROM Students"),
+    ("show students who have unpaid fines",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id WHERE f.status='Unpaid' "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("students who have unpaid fines",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id WHERE f.status='Unpaid' "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("students with unpaid fines",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id WHERE f.status='Unpaid' "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("show students grouped by branch",
+     "SELECT branch, COUNT(*) as student_count FROM Students GROUP BY branch ORDER BY student_count DESC"),
+    ("students grouped by branch",
+     "SELECT branch, COUNT(*) as student_count FROM Students GROUP BY branch ORDER BY student_count DESC"),
+    ("show students grouped by department",
+     "SELECT branch, COUNT(*) as student_count FROM Students GROUP BY branch ORDER BY student_count DESC"),
+    ("show students who currently have books issued",
+     "SELECT DISTINCT s.id,s.name,s.roll_number FROM Students s "
+     "JOIN Issued i ON s.id=i.student_id WHERE i.return_date IS NULL"),
+    ("students who currently have books issued",
+     "SELECT DISTINCT s.id,s.name,s.roll_number FROM Students s "
+     "JOIN Issued i ON s.id=i.student_id WHERE i.return_date IS NULL"),
+    ("students currently borrowing",
+     "SELECT DISTINCT s.id,s.name,s.roll_number FROM Students s "
+     "JOIN Issued i ON s.id=i.student_id WHERE i.return_date IS NULL"),
+    # ── Fines ───────────────────────────────────────────────────────────────
+    ("show all fines with amount and status",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.fine_amount DESC"),
+    ("fines with amount and status",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.fine_amount DESC"),
+    ("show fines where status is unpaid",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id WHERE f.status='Unpaid' "
+     "ORDER BY f.fine_amount DESC"),
+    ("fines where status is unpaid",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id WHERE f.status='Unpaid' "
+     "ORDER BY f.fine_amount DESC"),
+    ("show total fine amount per student",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("total fine amount per student",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("fines per student",
+     "SELECT s.id,s.name,s.roll_number,SUM(f.fine_amount) as total_fines "
+     "FROM Students s JOIN Fines f ON s.id=f.student_id "
+     "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
+    ("show fines ordered by issue date",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.issue_date DESC"),
+    ("recent fines",
+     "SELECT f.id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
+     "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.issue_date DESC"),
+    # ── Issued / Lending ─────────────────────────────────────────────────────
+    ("show books currently issued that have not been returned",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id WHERE i.return_date IS NULL"),
+    ("currently issued not returned",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id WHERE i.return_date IS NULL"),
+    ("show overdue books that are past their due date",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id "
+     "WHERE i.return_date IS NULL AND i.due_date < date('now')"),
+    ("show all book lending history",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date,i.return_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id ORDER BY i.issue_date DESC"),
+    ("all book lending history",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date,i.return_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id ORDER BY i.issue_date DESC"),
+    ("book lending history",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date,i.return_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id ORDER BY i.issue_date DESC"),
+    ("not returned",
+     "SELECT i.id,b.title,s.name as student_name,i.issue_date,i.due_date "
+     "FROM Issued i JOIN Books b ON i.book_id=b.id "
+     "JOIN Students s ON i.student_id=s.id WHERE i.return_date IS NULL"),
+    # ── Faculty ──────────────────────────────────────────────────────────────
+    ("show all faculty with name and department",
+     "SELECT id,name,email,department FROM Faculty ORDER BY department,name"),
+    ("list all faculty with name and department",
+     "SELECT id,name,email,department FROM Faculty ORDER BY department,name"),
+    ("faculty with name and department",
+     "SELECT id,name,email,department FROM Faculty ORDER BY department,name"),
+    ("show faculty members grouped by department",
+     "SELECT department, COUNT(id) as faculty_count FROM Faculty GROUP BY department ORDER BY faculty_count DESC"),
+    ("faculty members grouped by department",
+     "SELECT department, COUNT(id) as faculty_count FROM Faculty GROUP BY department ORDER BY faculty_count DESC"),
+    ("faculty grouped by department",
+     "SELECT department, COUNT(id) as faculty_count FROM Faculty GROUP BY department ORDER BY faculty_count DESC"),
+    # ── Reservations ─────────────────────────────────────────────────────────
+    ("show pending reservations",
+     "SELECT r.id,b.title,s.name as student_name,r.reservation_date,r.status "
+     "FROM Reservations r JOIN Books b ON r.book_id=b.id "
+     "JOIN Students s ON r.student_id=s.id WHERE r.status='Pending' "
+     "ORDER BY r.reservation_date"),
+    ("pending reservations",
+     "SELECT r.id,b.title,s.name as student_name,r.reservation_date,r.status "
+     "FROM Reservations r JOIN Books b ON r.book_id=b.id "
+     "JOIN Students s ON r.student_id=s.id WHERE r.status='Pending' "
+     "ORDER BY r.reservation_date"),
+    ("show all reservations",
+     "SELECT r.id,b.title,s.name as student_name,r.reservation_date,r.status "
+     "FROM Reservations r JOIN Books b ON r.book_id=b.id "
+     "JOIN Students s ON r.student_id=s.id ORDER BY r.reservation_date"),
+    # ── Statistics / counts ──────────────────────────────────────────────────
+    ("total books",
+     "SELECT COUNT(*) as total_books FROM Books"),
+    ("total students",
+     "SELECT COUNT(*) as total_students FROM Students"),
+    ("total fines",
+     "SELECT COUNT(*) as total_fines, SUM(fine_amount) as total_amount FROM Fines"),
+    ("count books",
+     "SELECT COUNT(*) as total_books FROM Books"),
+    ("count students",
+     "SELECT COUNT(*) as total_students FROM Students"),
+    ("how many books",
+     "SELECT COUNT(*) as total_books FROM Books"),
+    ("how many students",
+     "SELECT COUNT(*) as total_students FROM Students"),
+    ("how many fines",
+     "SELECT COUNT(*) as total_fines FROM Fines"),
+    # ── Departments ──────────────────────────────────────────────────────────
+    ("show all departments",
+     "SELECT id,name FROM Departments"),
+    ("list all departments",
+     "SELECT id,name FROM Departments"),
+    ("show departments",
+     "SELECT id,name FROM Departments"),
+    ("list departments",
+     "SELECT id,name FROM Departments"),
+]
+
+
+def _strip_vocab_hints(query: str) -> str:
+    """Remove [TABLES: ...] and [HINT: ...] annotations added by preprocess_query."""
+    return re.sub(r"\s*\[(?:TABLES|HINT):[^\]]*\]", "", query).strip()
+
+
+def _match_regex_rules(query: str) -> str:
+    """Layer 1 – REGEX pattern matching.  Returns SQL or empty string."""
+    for pattern, sql in _REGEX_RULES:
+        if pattern.search(query):
+            print(f"[REGEX MATCH] {pattern.pattern[:60]} → {sql[:60]}...")
+            return sql
+    return ""
+
+
+def _match_rule_dict(query: str) -> str:
+    """Layer 2 – Rule-based dictionary lookup.  Returns SQL or empty string."""
+    q_lower = query.lower()
+    for phrase, sql in _RULE_DICT:
+        if phrase in q_lower:
+            print(f"[RULE MATCH] '{phrase}' → {sql[:60]}...")
+            return sql
+    return ""
+
+
+def _is_safe_generated_sql(sql: str) -> bool:
+    """Return True only if *sql* is a SELECT that contains no blocked keywords."""
+    stripped = sql.strip()
+    if not stripped.upper().startswith("SELECT"):
+        return False
+    if _BLOCKED_SQL_RE.search(stripped):
+        return False
+    return True
+
 
 def generate_sql(user_query):
     """
     Hybrid approach: LLM for simple queries, enhanced keyword for complex queries
     """
-    
+    # Strip vocabulary hint annotations before rule matching so that
+    # "show books  [TABLES: Books]" is treated the same as "show books".
+    clean_query = _strip_vocab_hints(user_query)
+
+    # ── Layer 1: REGEX patterns ────────────────────────────────────────────
+    sql = _match_regex_rules(clean_query)
+    if sql:
+        return sql
+
+    # ── Layer 2: Rule-based dictionary ────────────────────────────────────
+    sql = _match_rule_dict(clean_query)
+    if sql:
+        return sql
+
+    # ── Layer 3: Keyword-based generation (generate_complex_sql) ──────────
+    sql = generate_complex_sql(clean_query)
+    if sql:
+        return sql
+
+    # ── Layer 4: Ollama LLM ────────────────────────────────────────────────
     try:
-        query_lower = user_query.lower()
-        
         # Quick connectivity check to avoid long timeouts
         try:
             import socket
@@ -67,12 +365,12 @@ def generate_sql(user_query):
                     "repeat_penalty": 1.0,
                     "num_predict": 150,
                     "top_k": 10,
-                    "num_ctx": 2048
-                }
+                    "num_ctx": 2048,
+                },
             },
             timeout=3,
         )
-        
+
         if response.status_code == 200:
             raw_sql = response.json()["response"].strip()
             print(f"[LLM SQL GENERATED] {raw_sql}")
@@ -81,7 +379,7 @@ def generate_sql(user_query):
                 sql_match = re.search(r"SELECT\b.*?(?:;|$)", raw_sql, re.IGNORECASE | re.DOTALL)
                 if sql_match:
                     clean_sql = sql_match.group(0).strip()
-                    if clean_sql.endswith(';'):
+                    if clean_sql.endswith(";"):
                         clean_sql = clean_sql[:-1]
                     print(f"[SQL EXTRACTED] {clean_sql}")
                     return clean_sql
@@ -153,7 +451,7 @@ def generate_complex_sql(user_query):
     elif "faculty and their departments" in query_lower:
         return "SELECT f.name, f.email, d.name as department FROM Faculty f JOIN Departments d ON f.department_id = d.id ORDER BY d.name, f.name"
     
-    elif "system usage statistics" in query_lower:
+    elif "system usage statistics" in query_lower or "database statistics" in query_lower:
         return "SELECT 'Total Students' as metric, COUNT(*) as count FROM Students UNION ALL SELECT 'Total Books', COUNT(*) FROM Books UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued"
     
     elif "overdue books by department" in query_lower:
@@ -178,8 +476,15 @@ def generate_complex_sql(user_query):
     elif "list students with current books" in query_lower or "students with current books" in query_lower:
         return "SELECT DISTINCT s.*, i.issue_date, i.due_date FROM Students s JOIN Issued i ON s.id = i.student_id WHERE i.return_date IS NULL"
     
+    elif "show books not issued" in query_lower or "books not issued" in query_lower or "books never issued" in query_lower:
         return "SELECT * FROM Books WHERE id NOT IN (SELECT DISTINCT book_id FROM Issued)"
-    
+
+    elif "show all books with title and author" in query_lower or "all books with title and author" in query_lower:
+        return "SELECT title, author FROM Books ORDER BY title"
+
+    elif "show books in library" in query_lower or "books in library" in query_lower or "show all books" in query_lower or "list all books" in query_lower or "display all books" in query_lower:
+        return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
+
     elif "display fine records" in query_lower or "show fine records" in query_lower:
         return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
     
