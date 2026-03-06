@@ -8,6 +8,9 @@ var lastResult = null;
 var currentChartType = 'bar';
 var currentData = null;
 
+// Track the last original query for clarification resubmission
+var _pendingOriginalQuery = '';
+
 // Chart colors
 const CHART_COLORS = [
     'rgba(74, 144, 226, 0.8)',
@@ -203,11 +206,19 @@ async function submitQuery() {
         // Hide loader
         if (loader) loader.style.display = "none";
 
+        // ── Handle clarification request ──────────────────────────────────
+        if (data.needs_clarification) {
+            _pendingOriginalQuery = query;
+            renderClarification(data.clarification);
+            return;
+        }
+
         if (data.error) {
             showToast('❌ Error: ' + data.error, 'error');
             if (resultBox) resultBox.innerHTML = "Error: " + data.error;
         } else {
-            // Display results properly
+            // Hide clarification card and display results
+            hideEl('clarificationCard');
             displayResults(data);
             showToast('✅ ' + (data.data ? data.data.length : 0) + ' rows from ' + (data.database || 'library_main.db'), 'info');
         }
@@ -229,6 +240,115 @@ async function submitQuery() {
         // Always hide loader and re-enable button
         if (loader) loader.style.display = "none";
         
+        if (runBtn) {
+            runBtn.disabled = false;
+            runBtn.textContent = '▶ Run';
+        }
+    }
+}
+
+// ===== CLARIFICATION UI =====
+
+/**
+ * Render the clarification card with question and option buttons.
+ * @param {Object} clarif - { question, options: [{label, value}], original_query, entity }
+ */
+function renderClarification(clarif) {
+    var card = getEl('clarificationCard');
+    var questionEl = getEl('clarificationQuestion');
+    var optionsEl = getEl('clarificationOptions');
+
+    if (!card || !questionEl || !optionsEl) {
+        console.warn('[Clarification] Missing DOM elements');
+        return;
+    }
+
+    // Populate question text
+    if (questionEl) questionEl.textContent = clarif.question || 'Please choose an option:';
+
+    // Build option buttons
+    if (optionsEl) {
+        optionsEl.innerHTML = '';
+        (clarif.options || []).forEach(function(opt) {
+            var btn = document.createElement('button');
+            btn.className = 'btn-clarification';
+            btn.textContent = opt.label;
+            btn.onclick = function() {
+                submitWithClarification(opt.value);
+            };
+            optionsEl.appendChild(btn);
+        });
+    }
+
+    // Show card, hide other sections
+    hideEl('resultsSection');
+    hideEl('visualizationSection');
+    showEl('clarificationCard');
+}
+
+/**
+ * Re-submit the query to /query with the chosen clarification value.
+ * @param {string} choiceValue - The "value" field from the chosen option.
+ */
+async function submitWithClarification(choiceValue) {
+    var loader = getEl('loadingOverlay');
+    if (loader) loader.style.display = "block";
+
+    hideEl('clarificationCard');
+
+    var runBtn = getEl('queryBtn');
+    if (runBtn) {
+        runBtn.disabled = true;
+        runBtn.textContent = '⏳ Processing...';
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+        console.log("Submitting clarification choice:", choiceValue);
+
+        const response = await fetch("/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                query: _pendingOriginalQuery,
+                clarification_choice: choiceValue
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        let data;
+        const ct = response.headers.get("content-type");
+        if (ct && ct.includes("application/json")) {
+            data = await response.json();
+        } else {
+            throw new Error("Server did not return JSON");
+        }
+
+        if (loader) loader.style.display = "none";
+
+        if (data.error) {
+            showToast('❌ Error: ' + data.error, 'error');
+        } else {
+            // Update the input to reflect the chosen query
+            var inp = getEl('queryInput');
+            if (inp) inp.value = choiceValue;
+
+            displayResults(data);
+            showToast('✅ ' + (data.data ? data.data.length : 0) + ' rows from ' + (data.database || 'library_main.db'), 'info');
+        }
+
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (loader) loader.style.display = "none";
+        
+        var errorMsg = error.name === 'AbortError' ? "Request timed out." : "Server error.";
+        showToast('❌ ' + errorMsg, 'error');
+    } finally {
+        if (loader) loader.style.display = "none";
         if (runBtn) {
             runBtn.disabled = false;
             runBtn.textContent = '▶ Run';

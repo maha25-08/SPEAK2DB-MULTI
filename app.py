@@ -1,6 +1,7 @@
 """
-🗃️ SPEAK2DB - ORIGINAL WORKING SYSTEM
-Exactly as it was yesterday - with all features working
+🗃️ SPEAK2DB - NL-to-SQL Query Assistant
+Integrated with domain vocabulary, clarification chatbot, RBAC,
+SQL safety gate, and security headers (Option 2 – non-breaking).
 """
 
 from flask import Flask, render_template, request, jsonify, session, flash, redirect, url_for
@@ -8,10 +9,28 @@ import sqlite3
 import os
 from ollama_sql import generate_sql
 import pandas as pd
-import os
 import re
 from collections import Counter
 from datetime import datetime
+from typing import Tuple
+
+# ── New pipeline modules ────────────────────────────────────────────────────
+from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
+from clarification import is_vague_query, get_clarification, apply_clarification_choice
+
+# ── RBAC (row-level + access validation) ────────────────────────────────────
+try:
+    from rbac_system_fixed import rbac, apply_row_level_filter
+    RBAC_AVAILABLE = True
+except ImportError:
+    RBAC_AVAILABLE = False
+
+# ── Security headers (Option 2 – safe, non-breaking) ────────────────────────
+try:
+    from security_layers import apply_security_headers
+    SECURITY_HEADERS_AVAILABLE = True
+except ImportError:
+    SECURITY_HEADERS_AVAILABLE = False
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -21,11 +40,205 @@ app.secret_key = 'your-secret-key-change-in-production'
 MAIN_DB = "library_main.db"
 ARCHIVE_DB = "library_archive.db"
 
+# ── Option 2: Apply safe security headers to every response ─────────────────
+if SECURITY_HEADERS_AVAILABLE:
+    @app.after_request
+    def add_security_headers(response):
+        """Attach HTTP security headers without breaking voice / CSRF-free flow."""
+        return apply_security_headers(response)
+
 def get_db_connection(db_path):
     """Get database connection"""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ── SQL safety gate ──────────────────────────────────────────────────────────
+# Blocks write / DDL statements and multi-statement SQL to prevent injection.
+_BLOCKED_KEYWORDS = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE"
+    r"|GRANT|REVOKE|EXECUTE|EXEC|CALL|PRAGMA)\b",
+    re.IGNORECASE,
+)
+
+def _is_safe_sql(sql: str) -> Tuple[bool, str]:
+    """
+    Return (True, '') if *sql* is a safe single SELECT statement,
+    otherwise (False, reason).
+    """
+    stripped = sql.strip().rstrip(";") if sql else ""
+
+    # Guard: empty SQL (SQL generator failed / Ollama offline)
+    if not stripped:
+        return False, "SQL could not be generated. Try rephrasing your query."
+
+    # Must start with SELECT
+    if not stripped.upper().startswith("SELECT"):
+        return False, "Only SELECT queries are permitted."
+
+    # Block dangerous keywords
+    match = _BLOCKED_KEYWORDS.search(stripped)
+    if match:
+        return False, f"Keyword '{match.group()}' is not allowed."
+
+    # Block multiple statements (naive semicolon check)
+    if ";" in stripped:
+        return False, "Multi-statement SQL is not permitted."
+
+    return True, ""
+
+
+def _apply_student_filters(user_query: str, sql_query: str, student_id: int) -> str:
+    """
+    Apply student-specific SQL filters.
+
+    Adds WHERE predicates so students only see their own data.
+    Only modifies the query when it touches personal tables without an
+    existing WHERE clause; otherwise leaves it unchanged.
+    """
+    q_lower = user_query.lower()
+    sq_lower = sql_query.lower()
+    has_where = 'WHERE' in sql_query.upper()
+
+    # Pattern 1: table-level fallback for generic table queries
+    if not has_where:
+        if 'students' in sq_lower:
+            return sql_query + f" WHERE id = {student_id}"
+        if 'issued' in sq_lower:
+            return sql_query + f" WHERE student_id = {student_id}"
+        if 'fines' in sq_lower:
+            return sql_query + f" WHERE student_id = {student_id}"
+
+    # Pattern 2: "my …" queries – use safe, schema-correct SQL templates
+    if 'my' not in q_lower:
+        return sql_query
+
+    sid = student_id  # shorter alias
+    _fines_base = (
+        f"SELECT f.*, s.name as student_name FROM Fines f "
+        f"JOIN Students s ON f.student_id = s.id "
+        f"WHERE f.student_id = {sid}"
+    )
+    _books_base = (
+        f"SELECT i.*, b.title, b.author FROM Issued i "
+        f"JOIN Books b ON i.book_id = b.id "
+        f"WHERE i.student_id = {sid}"
+    )
+    # Departments join uses Students.branch = Departments.id (the PK column)
+    _profile_base = (
+        f"SELECT s.*, d.name as department_name FROM Students s "
+        f"JOIN Departments d ON s.branch = d.id "
+        f"WHERE s.id = {sid}"
+    )
+
+    # ── fine / payment patterns ────────────────────────────────────────────
+    if any(k in q_lower for k in ('my fines', 'my fine', 'my fine records',
+                                   'my payment history', 'my payment records')):
+        return _fines_base + " ORDER BY f.issue_date DESC"
+
+    if any(k in q_lower for k in ('my current fines', 'my unpaid fines',
+                                   'my outstanding fines')):
+        return _fines_base + " AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
+
+    if 'my outstanding balance' in q_lower or 'my library account balance' in q_lower:
+        return (
+            f"SELECT s.name, SUM(f.fine_amount) as total_balance "
+            f"FROM Students s LEFT JOIN Fines f ON s.id = f.student_id "
+            f"WHERE s.id = {sid} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
+        )
+    if 'my total fines' in q_lower:
+        return (
+            f"SELECT s.name, SUM(f.fine_amount) as total_balance "
+            f"FROM Students s LEFT JOIN Fines f ON s.id = f.student_id "
+            f"WHERE s.id = {sid} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
+        )
+
+    # ── book / borrowing patterns ──────────────────────────────────────────
+    if any(k in q_lower for k in ('my current books', 'books due')):
+        return _books_base + " AND i.return_date IS NULL ORDER BY i.due_date ASC"
+
+    if 'my overdue' in q_lower:
+        return (
+            _books_base
+            + " AND i.return_date IS NULL AND i.due_date < date('now')"
+        )
+
+    if any(k in q_lower for k in ('my books', 'my issued books', 'my borrowed books',
+                                   'my borrowing history', 'my reading history',
+                                   'my total books')):
+        return _books_base + " ORDER BY i.issue_date DESC"
+
+    # ── reservation patterns ───────────────────────────────────────────────
+    if any(k in q_lower for k in ('my reservations', 'my reserved books')):
+        return (
+            f"SELECT r.*, b.title, b.author FROM Reservations r "
+            f"JOIN Books b ON r.book_id = b.id "
+            f"WHERE r.student_id = {sid} ORDER BY r.reservation_date DESC"
+        )
+
+    # ── profile / account patterns ─────────────────────────────────────────
+    if any(k in q_lower for k in ('my profile', 'my student info', 'my account details',
+                                   'my student record', 'my personal information',
+                                   'my personal details', 'my enrollment')):
+        return _profile_base
+
+    if any(k in q_lower for k in ('my account', 'my library account', 'my library status',
+                                   'my library record', 'my library history',
+                                   'my personal data')):
+        return _profile_base
+
+    # ── academic patterns ──────────────────────────────────────────────────
+    if any(k in q_lower for k in ('my gpa', 'my attendance', 'my academic',
+                                   'my semester', 'my course', 'my grades',
+                                   'my current status', 'my current semester',
+                                   'my current year')):
+        return (
+            f"SELECT gpa, attendance, role, created_date "
+            f"FROM Students WHERE id = {sid}"
+        )
+
+    # ── generic "do i have …" / "what are my …" patterns ──────────────────
+    if 'do i have' in q_lower or 'what are my' in q_lower or 'am i' in q_lower:
+        if 'fine' in q_lower:
+            return _fines_base + " AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
+        if 'book' in q_lower:
+            return _books_base + " AND i.return_date IS NULL ORDER BY i.due_date ASC"
+        if 'reservat' in q_lower:
+            return (
+                f"SELECT r.*, b.title, b.author FROM Reservations r "
+                f"JOIN Books b ON r.book_id = b.id "
+                f"WHERE r.student_id = {sid} ORDER BY r.reservation_date DESC"
+            )
+
+    if 'how much do i owe' in q_lower:
+        return (
+            f"SELECT s.name, SUM(f.fine_amount) as total_balance "
+            f"FROM Students s LEFT JOIN Fines f ON s.id = f.student_id "
+            f"WHERE s.id = {sid} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
+        )
+
+    if 'when are my' in q_lower and 'due' in q_lower:
+        return _books_base + " AND i.return_date IS NULL ORDER BY i.due_date ASC"
+
+    return sql_query
+
+
+def _fallback_columns(sql_query: str) -> list:
+    """Return a sensible fallback column list when a query returns no rows."""
+    sq = sql_query.lower()
+    if 'books' in sq:
+        return ['id', 'title', 'author', 'category', 'total_copies', 'available_copies']
+    if 'students' in sq:
+        return ['id', 'roll_number', 'name', 'branch', 'year', 'email', 'gpa']
+    if 'faculty' in sq:
+        return ['id', 'name', 'department', 'designation', 'email']
+    if 'fines' in sq:
+        return ['id', 'student_id', 'fine_amount', 'fine_type', 'status', 'issue_date']
+    if 'issued' in sq:
+        return ['id', 'student_id', 'book_id', 'issue_date', 'due_date', 'return_date']
+    return ['id', 'name']
+
 
 # Authentication
 @app.route('/login', methods=['GET', 'POST'])
@@ -262,305 +475,114 @@ def student_dashboard_individual():
 
 @app.route('/query', methods=['POST'])
 def query():
-    """Query handling with row-based filtering for students"""
+    """
+    NL-to-SQL query pipeline:
+      1. Clarification detection (returns options if vague & no choice given)
+      2. Apply clarification choice (if provided)
+      3. Vocabulary preprocessing (append schema hints)
+      4. SQL generation via Ollama
+      5. Student-specific SQL rewriting / row-level filtering
+      6. SQL safety gate (SELECT-only, no DDL/write keywords)
+      7. RBAC table-access validation
+      8. Execute & return results
+    """
     print("🔍 Query received - Processing request")
-    
+
     if 'user_id' not in session:
         print("❌ User not logged in")
         return jsonify({'error': 'Not logged in'}), 401
-    
+
     try:
         data = request.get_json()
         user_query = data.get('query', '').strip()
+        # Optional: clarification choice sent back from the frontend
+        clarification_choice = data.get('clarification_choice', '').strip()
         print(f"📝 Query text: {user_query}")
-        
+
         user_role = session.get('role', 'Student')
-        student_id = session.get('student_id')  # Get student ID for filtering
+        student_id = session.get('student_id')
         print(f"👤 User role: {user_role}, Student ID: {student_id}")
-        
+
         if not user_query:
             print("❌ No query provided")
             return jsonify({'error': 'No query provided'}), 400
-        
+
+        # ── Step 1 & 2: Clarification chatbot ────────────────────────────
+        if clarification_choice:
+            # User selected an option – expand into specific NL query
+            user_query = apply_clarification_choice(user_query, clarification_choice)
+            print(f"🗣️ Clarification applied: {user_query}")
+        else:
+            clarif = get_clarification(user_query)
+            if clarif is not None:
+                print(f"❓ Ambiguous query – returning clarification options")
+                return jsonify({
+                    'needs_clarification': True,
+                    'clarification': clarif
+                })
+
+        # ── Step 3: Vocabulary preprocessing ─────────────────────────────
+        augmented_query = preprocess_query(user_query, MAIN_DB)
+        if augmented_query != user_query:
+            print(f"📚 Vocabulary hints added: {augmented_query}")
+
         print("🔗 Connecting to database...")
         conn = get_db_connection(MAIN_DB)
-        
+
         print("🤖 Generating SQL query...")
-        # Use AI-powered SQL generation
-        sql_query = generate_sql(user_query)
+        sql_query = generate_sql(augmented_query)
         print(f"⚙️ Generated SQL: {sql_query}")
-        
-        # Replace student ID placeholders in SQL
+
+        # Replace student ID placeholders emitted by the SQL generator
         if user_role == 'Student' and student_id:
             sql_query = sql_query.replace('[CURRENT_STUDENT_ID]', str(student_id))
-        
-        # Apply row-based filtering for students
+
+        # ── Step 4: Student-specific SQL rewriting ────────────────────────
         if user_role == 'Student' and student_id:
-            # Filter queries to show only student's own data
-            original_sql = sql_query
-            
-            # Comprehensive student-specific patterns
-            if 'students' in sql_query.lower() and 'WHERE' not in sql_query.upper():
-                sql_query += f" WHERE id = {student_id}"
-            elif 'issued' in sql_query.lower() and 'WHERE' not in sql_query.upper():
-                sql_query += f" WHERE student_id = {student_id}"
-            elif 'fines' in sql_query.lower() and 'WHERE' not in sql_query.upper():
-                sql_query += f" WHERE student_id = {student_id}"
-            elif 'my' in user_query.lower() or 'what books have i' in user_query.lower() or 'show me my' in user_query.lower() or 'display my' in user_query.lower() or 'what books do i' in user_query.lower() or 'books i have' in user_query.lower():
-                # Student-specific query patterns
-                if 'my fines' in user_query.lower():
-                    sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                elif 'my fine' in user_query.lower():
-                    sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                elif 'my fine records' in user_query.lower():
-                    sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                elif 'my current fines' in user_query.lower():
-                    sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
-                elif 'my unpaid fines' in user_query.lower():
-                    sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
-                elif 'my books' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'my issued books' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'my borrowed books' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'my current books' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author, i.due_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL ORDER BY i.due_date ASC"
-                elif 'my overdue books' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author, julianday(date('now') - julianday(i.due_date)) as days_overdue FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL AND i.due_date < date('now')"
-                elif 'my borrowing history' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'my reading history' in user_query.lower():
-                    sql_query = f"SELECT b.title, b.author, i.issue_date, i.return_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'my library account' in user_query.lower():
-                    sql_query = f"SELECT s.name, s.email, COUNT(f.id) as fine_count, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                elif 'my library account balance' in user_query.lower():
-                    sql_query = f"SELECT s.name, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                elif 'my profile' in user_query.lower():
-                    sql_query = f"SELECT s.*, d.name as department_name FROM Students s JOIN Departments d ON s.branch = d.id WHERE s.id = {student_id}"
-                elif 'my student info' in user_query.lower():
-                    sql_query = f"SELECT s.*, d.name as department_name FROM Students s JOIN Departments d ON s.branch = d.id WHERE s.id = {student_id}"
-                elif 'my account details' in user_query.lower():
-                    sql_query = f"SELECT s.*, d.name as department_name FROM Students s JOIN Departments d ON s.branch = d.id WHERE s.id = {student_id}"
-                elif 'my academic performance' in user_query.lower():
-                    sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                elif 'my gpa' in user_query.lower():
-                    sql_query = f"SELECT gpa FROM Students s WHERE s.id = {student_id}"
-                elif 'my attendance' in user_query.lower():
-                    sql_query = f"SELECT attendance FROM Students s WHERE s.id = {student_id}"
-                elif 'my reserved books' in user_query.lower():
-                    sql_query = f"SELECT r.*, b.title, b.author FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = {student_id} ORDER BY r.reservation_date DESC"
-                elif 'my reservations' in user_query.lower():
-                    sql_query = f"SELECT r.*, b.title, b.author FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = {student_id} ORDER BY r.reservation_date DESC"
-                elif 'my account' in user_query.lower():
-                    sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                # Handle the specific "what books have i borrowed" pattern
-                elif 'what books have i borrowed' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'what books have i taken' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'what books do i have' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'books i have borrowed' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                elif 'what books do i have' in user_query.lower():
-                    sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                
-                # Additional comprehensive patterns
-                elif 'show me my' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                    elif 'books' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'profile' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'account' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'display my' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                    elif 'books' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'profile' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'what are my' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                    elif 'books' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'grades' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                
-                elif 'how much do i' in user_query.lower():
-                    if 'owe' in user_query.lower():
-                        sql_query = f"SELECT s.name, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                    elif 'have' in user_query.lower():
-                        sql_query = f"SELECT COUNT(i.id) as book_count FROM Issued i WHERE i.student_id = {student_id} AND i.return_date IS NULL"
-                
-                elif 'what books have i' in user_query.lower():
-                    if 'borrowed' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'have' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL ORDER BY i.due_date ASC"
-                    elif 'borrow' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                
-                elif 'when are my' in user_query.lower():
-                    if 'books' in user_query.lower() and 'due' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author, i.due_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL ORDER BY i.due_date ASC"
-                
-                elif 'tell me about' in user_query.lower():
-                    if 'myself' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'my' in user_query.lower():
-                        if 'academic' in user_query.lower():
-                            sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                        elif 'profile' in user_query.lower():
-                            sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                        elif 'account' in user_query.lower():
-                            sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'do i have' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
-                    elif 'books' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL ORDER BY i.due_date ASC"
-                    elif 'reservations' in user_query.lower():
-                        sql_query = f"SELECT r.*, b.title, b.author FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = {student_id} ORDER BY r.reservation_date DESC"
-                
-                elif 'am i' in user_query.lower():
-                    if 'overdue' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author, julianday(date('now') - julianday(i.due_date)) as days_overdue FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} AND i.return_date IS NULL AND i.due_date < date('now')"
-                    elif 'eligible' in user_query.lower():
-                        sql_query = f"SELECT s.*, d.name as department_name FROM Students s JOIN Departments d ON s.branch = d.id WHERE s.id = {student_id}"
-                
-                elif 'my total' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT s.name, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                    elif 'books' in user_query.lower():
-                        sql_query = f"SELECT COUNT(i.id) as total_books FROM Issued i WHERE i.student_id = {student_id}"
-                
-                elif 'my outstanding' in user_query.lower():
-                    if 'fines' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
-                    elif 'balance' in user_query.lower():
-                        sql_query = f"SELECT s.name, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                
-                elif 'my payment' in user_query.lower():
-                    if 'history' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                    elif 'records' in user_query.lower():
-                        sql_query = f"SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = {student_id} ORDER BY f.issue_date DESC"
-                
-                elif 'my library' in user_query.lower():
-                    if 'status' in user_query.lower():
-                        sql_query = f"SELECT s.name, s.email, COUNT(f.id) as fine_count, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                    elif 'record' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'history' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                
-                elif 'my student' in user_query.lower():
-                    if 'record' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'information' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'details' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'my personal' in user_query.lower():
-                    if 'information' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'details' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'data' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'my current' in user_query.lower():
-                    if 'status' in user_query.lower():
-                        sql_query = f"SELECT s.name, s.email, COUNT(f.id) as fine_count, SUM(f.fine_amount) as total_balance FROM Students s LEFT JOIN Fines f ON s.id = f.student_id WHERE s.id = {student_id} AND f.status = 'Unpaid' GROUP BY s.id, s.name"
-                    elif 'semester' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                    elif 'year' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                
-                elif 'my academic' in user_query.lower():
-                    if 'record' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                    elif 'standing' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                    elif 'details' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                
-                elif 'my course' in user_query.lower():
-                    if 'materials' in user_query.lower():
-                        sql_query = f"SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = {student_id} ORDER BY i.issue_date DESC"
-                    elif 'information' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'my enrollment' in user_query.lower():
-                    if 'status' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'details' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'my class' in user_query.lower():
-                    if 'schedule' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                    elif 'information' in user_query.lower():
-                        sql_query = f"SELECT * FROM Students WHERE id = {student_id}"
-                
-                elif 'my semester' in user_query.lower():
-                    if 'results' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                    elif 'performance' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-                    elif 'grades' in user_query.lower():
-                        sql_query = f"SELECT gpa, attendance, role, created_date FROM Students s WHERE s.id = {student_id}"
-        
+            sql_query = _apply_student_filters(user_query, sql_query, student_id)
+
+        # ── Step 5: SQL safety gate ───────────────────────────────────────
+        safe, reason = _is_safe_sql(sql_query)
+        if not safe:
+            print(f"🚫 SQL blocked by safety gate: {reason}")
+            return jsonify({'error': f'Query not permitted: {reason}'}), 400
+
+        # ── Step 6: RBAC table-access validation ──────────────────────────
+        if RBAC_AVAILABLE:
+            user_id_for_rbac = session.get('user_id', '')
+            ok, msg = rbac.validate_query_access(user_id_for_rbac, sql_query)
+            if not ok:
+                print(f"🚫 RBAC denied: {msg}")
+                return jsonify({'error': f'Access denied: {msg}'}), 403
+
+            # Apply additional row-level filter for students via RBAC helper
+            if user_role == 'Student' and student_id:
+                sql_query = apply_row_level_filter(str(student_id), sql_query)
+
         print(f"[EXECUTING SQL] {sql_query}")
         results = conn.execute(sql_query).fetchall()
         conn.close()
-        
-        data = [dict(row) for row in results]
-        
+
+        rows = [dict(row) for row in results]
+
         # Extract columns dynamically
-        if data:
-            columns = list(data[0].keys())
+        if rows:
+            columns = list(rows[0].keys())
         else:
-            # Get columns from table info
-            if 'books' in sql_query.lower():
-                columns = ['id', 'title', 'author', 'isbn', 'genre', 'status', 'created_date']
-            elif 'users' in sql_query.lower():
-                columns = ['id', 'username', 'email', 'role', 'created_date']
-            elif 'students' in sql_query.lower():
-                columns = ['id', 'roll_number', 'name', 'branch', 'year', 'email', 'phone', 'role', 'gpa']
-            elif 'faculty' in sql_query.lower():
-                columns = ['id', 'name', 'email', 'department', 'created_date']
-            elif 'fines' in sql_query.lower():
-                columns = ['id', 'student_id', 'amount', 'status', 'due_date', 'created_date']
-            elif 'issued' in sql_query.lower():
-                columns = ['id', 'student_id', 'book_id', 'issue_date', 'due_date', 'return_date']
-            else:
-                columns = ['id', 'name', 'created_date']
-        
-        print(f"📊 Returning {len(data)} rows with columns: {columns}")
-        
-        response_data = {
-            'success': True,
-            'data': data,
-            'columns': columns,
-            'sql': sql_query,
-            'user_role': user_role,
-            'student_id': student_id
-        }
-        
-        print("✅ Query completed successfully")
-        return jsonify(response_data)
-        
+            columns = _fallback_columns(sql_query)
+
+        print(f"📊 Returning {len(rows)} rows with columns: {columns}")
+
+        return jsonify({
+            'success':    True,
+            'data':       rows,
+            'columns':    columns,
+            'sql':        sql_query,
+            'database':   MAIN_DB,
+            'user_role':  user_role,
+            'student_id': student_id,
+        })
+
     except Exception as e:
         print(f"❌ Query execution failed: {str(e)}")
         import traceback
@@ -570,14 +592,26 @@ def query():
 # API endpoints
 @app.route('/api/user-info')
 def api_user_info():
-    """Get user information"""
+    """Get user information – fixed to read from session (no NameError)."""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
-    
+
+    user_id_val = session.get('user_id', '')
+    user_role_val = session.get('role', 'Student')
+    permissions = []
+
+    if RBAC_AVAILABLE:
+        try:
+            perms = rbac.get_user_permissions(user_id_val)
+            permissions = list(perms)[:20]  # cap for JSON size
+        except Exception:
+            pass
+
     return jsonify({
-        'username': user_id,
-        'role': user_role,
-        'student_id': session.get('student_id')
+        'username':   user_id_val,
+        'role':       user_role_val,
+        'student_id': session.get('student_id'),
+        'permissions': permissions,
     })
 
 @app.route('/api/ui-config')
@@ -611,7 +645,28 @@ def api_dashboard_data():
         ]
     })
 
-# Error handlers
+
+@app.route('/api/vocabulary')
+def api_vocabulary():
+    """
+    Debug endpoint – returns vocabulary metadata and a sample.
+    GET /api/vocabulary?db=main|archive&rebuild=1
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    db_key = request.args.get('db', 'main')
+    db_path = ARCHIVE_DB if db_key == 'archive' else MAIN_DB
+    force = request.args.get('rebuild', '0') == '1'
+
+    try:
+        from domain_vocabulary import get_vocabulary_sample, invalidate_cache
+        if force:
+            invalidate_cache(db_path)
+        sample = get_vocabulary_sample(db_path)
+        return jsonify({'success': True, 'vocabulary': sample})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 @app.errorhandler(404)
 def not_found(error):
     return render_template('404.html'), 404
