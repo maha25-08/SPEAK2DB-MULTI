@@ -127,13 +127,16 @@ function initVoice() {
 function cleanSpeech(text){
 
     return text
-    .replace(/please/gi,"")
-    .replace(/can you/gi,"")
-    .replace(/could you/gi,"")
-    .replace(/uh/gi,"")
-    .replace(/um/gi,"")
-    .replace(/like/gi,"")
-    .replace(/just/gi,"")
+    .toLowerCase()
+    .replace(/\bcan you\b/gi,"")
+    .replace(/\bcould you\b/gi,"")
+    .replace(/\bplease\b/gi,"")
+    .replace(/\bshow me\b/gi,"")
+    .replace(/\btell me\b/gi,"")
+    .replace(/\buh\b/gi,"")
+    .replace(/\bum\b/gi,"")
+    .replace(/\bjust\b/gi,"")
+    .replace(/\s+/g," ")
     .trim();
 
 }

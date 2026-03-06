@@ -287,15 +287,7 @@ def _is_safe_generated_sql(sql: str) -> bool:
 
 def generate_sql(user_query):
     """
-    Hybrid SQL generation pipeline (5 layers):
-
-      1. REGEX pattern matching  – fast, handles simple/generic queries
-      2. Rule-based dictionary   – 50+ common query patterns
-      3. Keyword-based generation – existing generate_complex_sql rules
-      4. Ollama LLM              – MODEL_NAME = sqlcoder:latest with schema context
-      5. Fallback                – SELECT * FROM Books LIMIT 10
-
-    Only SELECT queries are returned; DROP/DELETE/UPDATE/INSERT are blocked.
+    Hybrid approach: LLM for simple queries, enhanced keyword for complex queries
     """
     # Strip vocabulary hint annotations before rule matching so that
     # "show books  [TABLES: Books]" is treated the same as "show books".
@@ -319,25 +311,48 @@ def generate_sql(user_query):
     # ── Layer 4: Ollama LLM ────────────────────────────────────────────────
     try:
         # Quick connectivity check to avoid long timeouts
-        import socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex(('localhost', 11434))
-        sock.close()
-        if result != 0:
-            print(f"[OLLAMA DOWN] Port 11434 not reachable, using fallback")
-            return FALLBACK_SQL
-
-        prompt = (
-            f"Generate a SQLite SELECT query for the following request.\n\n"
-            f"Database Schema:\n{SCHEMA_CONTEXT}\n\n"
-            f"Rules:\n"
-            f"- Only generate SELECT queries\n"
-            f"- Use exact table names from schema\n"
-            f"- Do not use DROP, DELETE, UPDATE, or INSERT\n\n"
-            f"Request: {user_query}\n\nSQL Query:"
+        try:
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex(('localhost', 11434))
+            sock.close()
+            if result != 0:
+                print(f"[OLLAMA DOWN] Port 11434 not reachable, using fallback")
+                return generate_complex_sql(user_query)
+        except:
+            print(f"[OLLAMA CHECK FAILED] Using fallback")
+            return generate_complex_sql(user_query)
+        
+        # Check if it's a complex query that the LLM struggles with
+        if any(word in query_lower for word in [
+            "count", "sum", "average", "more than", "less than",
+            "top", "highest", "lowest", "statistics"
+        ]):
+            # For complex queries, use enhanced keyword approach
+            print(f"[COMPLEX QUERY DETECTED] Using enhanced keyword approach")
+            return generate_complex_sql(user_query)
+        
+        # Database schema for the LLM prompt
+        schema = (
+            "Books(id, title, author, publisher, category)\n"
+            "Students(id, name, roll_number, branch)\n"
+            "Issued(id, book_id, student_id, issue_date, due_date, return_date)\n"
+            "Fines(id, student_id, fine_amount, status)"
         )
 
+        prompt = (
+            f"Convert the natural language query into SQLite SQL.\n\n"
+            f"Database schema:\n{schema}\n\n"
+            f"Rules:\n"
+            f"- Only generate SELECT queries\n"
+            f"- Do not generate INSERT, UPDATE, DELETE, DROP\n"
+            f"- Return only SQL\n"
+            f"- No explanations\n\n"
+            f"User Query: {user_query}\n\n"
+            f"SQL:"
+        )
+        
         response = requests.post(
             OLLAMA_URL,
             json={
@@ -348,7 +363,7 @@ def generate_sql(user_query):
                     "temperature": 0.0,
                     "top_p": 0.9,
                     "repeat_penalty": 1.0,
-                    "num_predict": 100,
+                    "num_predict": 150,
                     "top_k": 10,
                     "num_ctx": 2048,
                 },
@@ -358,30 +373,66 @@ def generate_sql(user_query):
 
         if response.status_code == 200:
             raw_sql = response.json()["response"].strip()
+            print(f"[LLM SQL GENERATED] {raw_sql}")
+            
             if raw_sql and len(raw_sql) > 10 and "SELECT" in raw_sql.upper():
-                sql_match = re.search(r"SELECT.*?(?:;|$)", raw_sql, re.IGNORECASE | re.DOTALL)
+                sql_match = re.search(r"SELECT\b.*?(?:;|$)", raw_sql, re.IGNORECASE | re.DOTALL)
                 if sql_match:
                     clean_sql = sql_match.group(0).strip()
                     if clean_sql.endswith(";"):
                         clean_sql = clean_sql[:-1]
-                    if _is_safe_generated_sql(clean_sql):
-                        print(f"[SQLCODER SUCCESS] {clean_sql}")
-                        return clean_sql
-
+                    print(f"[SQL EXTRACTED] {clean_sql}")
+                    return clean_sql
+        
     except Exception as e:
         print(f"[OLLAMA ERROR] {e}")
-
-    # ── Layer 5: Fallback ──────────────────────────────────────────────────
-    print(f"[FALLBACK] Using default query: {FALLBACK_SQL}")
-    return FALLBACK_SQL
+    
+    print(f"[LLM FAILED → USING RULE]")
+    return generate_complex_sql(user_query)
 
 def generate_complex_sql(user_query):
     """
     Enhanced keyword-based SQL generation for complex and nested queries
     """
     query_lower = user_query.lower()
-    
-    # ADMIN-SPECIFIC QUERIES
+
+    # ── COMMON / SIMPLE QUERIES ──────────────────────────────────────────────
+    if any(k in query_lower for k in ["show books", "list books", "display books", "all books", "get books"]):
+        return "SELECT * FROM Books"
+
+    elif any(k in query_lower for k in ["show students", "list students", "display students", "all students", "get students"]):
+        return "SELECT * FROM Students"
+
+    elif any(k in query_lower for k in ["show issued", "list issued", "issued books", "all issued", "show issued books", "list issued books"]):
+        return "SELECT i.*, b.title, s.name as student_name FROM Issued i JOIN Books b ON i.book_id = b.id JOIN Students s ON i.student_id = s.id"
+
+    elif any(k in query_lower for k in ["show fines", "list fines", "display fines", "all fines", "students with fines"]):
+        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.fine_amount DESC"
+
+    elif any(k in query_lower for k in ["overdue books", "show overdue", "list overdue"]):
+        return "SELECT i.*, b.title, s.name as student_name FROM Issued i JOIN Books b ON i.book_id = b.id JOIN Students s ON i.student_id = s.id WHERE i.return_date IS NULL AND i.due_date < date('now')"
+
+    elif any(k in query_lower for k in ["available books", "show available", "list available"]):
+        return "SELECT * FROM Books WHERE id NOT IN (SELECT book_id FROM Issued WHERE return_date IS NULL)"
+
+    elif any(k in query_lower for k in ["library statistics", "database statistics", "library stats", "db stats", "system statistics"]):
+        return (
+            "SELECT 'Total Books' as metric, COUNT(*) as value FROM Books "
+            "UNION ALL SELECT 'Total Students', COUNT(*) FROM Students "
+            "UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued "
+            "UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines"
+        )
+
+    elif any(k in query_lower for k in ["my borrowed books", "my books", "books i borrowed"]):
+        return "SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] ORDER BY i.issue_date DESC"
+
+    elif any(k in query_lower for k in ["my fines", "my unpaid fines", "my fine"]):
+        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = [CURRENT_STUDENT_ID]"
+
+    elif any(k in query_lower for k in ["my reservations", "my reserved books", "books i reserved"]):
+        return "SELECT r.*, b.title, b.author FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = [CURRENT_STUDENT_ID] ORDER BY r.reservation_date DESC"
+
+    # ── ADMIN-SPECIFIC QUERIES ───────────────────────────────────────────────
     if "users in system" in query_lower or "all users" in query_lower:
         return "SELECT * FROM Students UNION SELECT * FROM Faculty"
     
@@ -2933,4 +2984,4 @@ def generate_complex_sql(user_query):
     elif "display students by learning modality" in query_lower:
         return "SELECT learning_modality, COUNT(*) as count FROM Students GROUP BY learning_modality ORDER BY count DESC"
     
-    return ""  # Signal to generate_sql that no keyword rule matched
+    return "SELECT * FROM Books LIMIT 10"  # Final safety fallback
