@@ -713,16 +713,81 @@ def student_dashboard_route():
     )
 
 
+@app.route('/faculty_dashboard')
+def faculty_dashboard_route():
+    """Faculty dashboard – Faculty and Librarian roles."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    role = session.get('role')
+    print("Route accessed:", request.path)
+    print("User role:", role)
+
+    if role not in ('Faculty', 'Librarian', 'Administrator'):
+        return "Access Denied", 403
+
+    user_id = session['user_id']
+
+    # Try to look up faculty info (match by email == user_id or first faculty)
+    faculty_info = None
+    try:
+        conn = get_db_connection(MAIN_DB)
+        faculty_info = conn.execute(
+            "SELECT * FROM Faculty WHERE email = ? OR name = ? LIMIT 1",
+            (user_id, user_id)
+        ).fetchone()
+        if faculty_info is None:
+            faculty_info = conn.execute("SELECT * FROM Faculty LIMIT 1").fetchone()
+
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
+        active_issues = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()['cnt']
+        unpaid_fines_cnt = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
+        ).fetchone()['cnt']
+        recent_issues = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 10"""
+        ).fetchall()
+        conn.close()
+        stats = {
+            'total_books': total_books,
+            'total_students': total_students,
+            'active_issues': active_issues,
+            'unpaid_fines': unpaid_fines_cnt,
+        }
+    except Exception as e:
+        print(f"[faculty_dashboard] DB error: {e}")
+        recent_issues = []
+        stats = {}
+
+    return render_template(
+        'faculty_dashboard.html',
+        role=role,
+        user=user_id,
+        faculty_info=faculty_info,
+        stats=stats,
+        recent_issues=recent_issues,
+    )
+
+
 @app.route('/librarian_dashboard')
 def librarian_dashboard_route():
     """Librarian / Faculty dashboard"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    if session.get('role') != 'Librarian':
-        return "Access Denied", 403
+    role = session.get('role')
+    print("Route accessed:", request.path)
+    print("User role:", role)
 
-    user_role = session.get('role', 'Librarian')
+    if role not in ('Librarian', 'Faculty', 'Administrator'):
+        return "Access Denied", 403
 
     user_id = session['user_id']
 
@@ -761,7 +826,7 @@ def librarian_dashboard_route():
 
     return render_template(
         'librarian_dashboard.html',
-        role=user_role,
+        role=role,
         user=user_id,
         stats=stats,
         recent_issues=recent_issues,
@@ -1287,6 +1352,94 @@ def fine_management_view():
                            page_title='Fine Management',
                            dashboard_data=_get_library_stats(),
                            prefill_query='show all unpaid fines')
+
+
+@app.route('/fines')
+def fines_view():
+    """Fines – alias for fine_management, librarian/admin only."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_librarian_or_admin()
+    if redir:
+        return redir
+    print("Route accessed:", request.path)
+    print("User role:", session.get("role"))
+    return redirect(url_for('fine_management_view'))
+
+
+# ── JSON API endpoints ───────────────────────────────────────────────────────
+
+@app.route('/api/students')
+def api_students():
+    """Return all students as JSON – librarian/admin only."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
+        return jsonify({'error': 'Access denied'}), 403
+    print("Route accessed:", request.path)
+    print("User role:", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            "SELECT id, roll_number, name, branch, year, email, gpa FROM Students ORDER BY name"
+        ).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        print(f"[api_students] error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/issued_books')
+def api_issued_books():
+    """Return currently issued books as JSON – librarian/admin only."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
+        return jsonify({'error': 'Access denied'}), 403
+    print("Route accessed:", request.path)
+    print("User role:", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            """SELECT i.id, s.roll_number, s.name as student_name, b.title, b.author,
+                      i.issue_date, i.due_date, i.return_date, i.status
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               WHERE i.return_date IS NULL
+               ORDER BY i.issue_date DESC"""
+        ).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        print(f"[api_issued_books] error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/fines')
+def api_fines():
+    """Return fines as JSON – librarian/admin only."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
+        return jsonify({'error': 'Access denied'}), 403
+    print("Route accessed:", request.path)
+    print("User role:", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            """SELECT f.id, s.roll_number, s.name as student_name,
+                      f.fine_amount, f.fine_type, f.status, f.issue_date
+               FROM Fines f
+               JOIN Students s ON f.student_id = s.id
+               ORDER BY f.issue_date DESC"""
+        ).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        print(f"[api_fines] error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/user_management')
