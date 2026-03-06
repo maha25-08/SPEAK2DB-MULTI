@@ -1002,11 +1002,9 @@ def analytics():
         books_per_category = []
         issues_per_month = []
 
-    return render_template('index.html',
+    return render_template('analytics.html',
                            user=user_id,
                            role=user_role,
-                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
-                           dashboard_data=_get_library_stats(),
                            books_per_category=[dict(r) for r in books_per_category],
                            issues_per_month=[dict(r) for r in issues_per_month])
 
@@ -1143,24 +1141,27 @@ def user_management_view():
 
     try:
         conn = get_db_connection(MAIN_DB)
-        students = conn.execute(
+        student_count = conn.execute(
             "SELECT COUNT(*) as cnt FROM Students"
         ).fetchone()['cnt']
-        faculty = conn.execute(
+        faculty_count = conn.execute(
             "SELECT COUNT(*) as cnt FROM Faculty"
         ).fetchone()['cnt']
+        students = conn.execute(
+            "SELECT id, roll_number, name, branch, year, email, gpa FROM Students ORDER BY name"
+        ).fetchall()
         conn.close()
     except Exception as e:
         print(f"[user_management] DB error: {e}")
-        students = faculty = 0
+        student_count = faculty_count = 0
+        students = []
 
-    return render_template('index.html',
+    return render_template('user_management.html',
                            user=user_id,
                            role=user_role,
-                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
-                           page_title='User Management',
-                           dashboard_data=_get_library_stats(),
-                           prefill_query='show all students with their details')
+                           student_count=student_count,
+                           faculty_count=faculty_count,
+                           students=students)
 
 
 @app.route('/system_statistics')
@@ -1196,13 +1197,10 @@ def system_statistics_view():
         print(f"[system_statistics] DB error: {e}")
         sys_stats = {}
 
-    return render_template('index.html',
+    return render_template('system_statistics.html',
                            user=user_id,
                            role=user_role,
-                           user_info={'username': user_id, 'role': user_role, 'permissions': []},
-                           page_title='System Statistics',
-                           dashboard_data=sys_stats,
-                           prefill_query='show database statistics')
+                           sys_stats=sys_stats)
 
 
 @app.route('/admin-dashboard')
