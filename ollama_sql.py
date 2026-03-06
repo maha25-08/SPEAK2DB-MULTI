@@ -1,75 +1,171 @@
 import requests
 import re
+import socket
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "deepseek-coder:6.7b"  # Best free SQL model
+MODEL_NAME = "sqlcoder:latest"
 
-def generate_sql(user_query):
-    """
-    Hybrid approach: SQLCoder for simple queries, enhanced keyword for complex queries
-    """
-    
+# Default fallback SQL used when no query can be generated
+_DEFAULT_SQL = "SELECT * FROM Books LIMIT 10"
+
+# ── Blocked DML/DDL keywords ──────────────────────────────────────────────────
+_SAFETY_BLOCKED = re.compile(
+    r"\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE)\b",
+    re.IGNORECASE,
+)
+
+# ── Database schema context for LLM ──────────────────────────────────────────
+_DB_SCHEMA = """
+Books(id, title, author, publisher, category)
+Students(id, name, roll_number, branch)
+Issued(id, book_id, student_id, issue_date, due_date, return_date)
+Fines(id, student_id, fine_amount, status)
+Faculty(id, name, department_id, email)
+Reservations(id, book_id, student_id, reservation_date, status)
+"""
+
+# ── Tier 1: Regex pattern → predefined SQL ────────────────────────────────────
+_PATTERNS = [
+    # "My ..." patterns first (most specific - must precede generic patterns)
+    (re.compile(r"my\s+fines?", re.IGNORECASE),
+     "SELECT * FROM Fines WHERE student_id = [CURRENT_STUDENT_ID]"),
+    (re.compile(r"my\s+(history|borrowing\s+history|reading\s+history)", re.IGNORECASE),
+     "SELECT b.title, b.author, i.issue_date, i.return_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID]"),
+    (re.compile(r"my\s+(books?|issued|borrowed|current)", re.IGNORECASE),
+     "SELECT b.id, b.title, b.author, i.issue_date, i.due_date FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] AND i.return_date IS NULL"),
+    # Overdue (before generic issued/borrowed)
+    (re.compile(r"(overdue).*books?", re.IGNORECASE),
+     "SELECT * FROM Issued WHERE return_date IS NULL AND due_date < date('now')"),
+    # Issued / borrowed books
+    (re.compile(r"(issued|borrowed).*books?", re.IGNORECASE),
+     "SELECT * FROM Issued"),
+    # Available books
+    (re.compile(r"(available).*books?", re.IGNORECASE),
+     "SELECT id, title, author FROM Books WHERE id NOT IN (SELECT book_id FROM Issued WHERE return_date IS NULL)"),
+    # Books
+    (re.compile(r"(show|list|display).*books?", re.IGNORECASE),
+     "SELECT id, title, author FROM Books"),
+    # Students with fines (before generic students pattern)
+    (re.compile(r"students?.*with.*fines?", re.IGNORECASE),
+     "SELECT s.id, s.name, s.roll_number, f.fine_amount, f.status FROM Students s JOIN Fines f ON s.id = f.student_id"),
+    # Students
+    (re.compile(r"(show|list|display).*students?", re.IGNORECASE),
+     "SELECT id, name, roll_number FROM Students"),
+    # Fines
+    (re.compile(r"(show|list|display).*fines?", re.IGNORECASE),
+     "SELECT * FROM Fines"),
+    # Faculty
+    (re.compile(r"(show|list|display).*faculty", re.IGNORECASE),
+     "SELECT * FROM Faculty"),
+    # Reservations
+    (re.compile(r"(show|list|display).*reservations?", re.IGNORECASE),
+     "SELECT * FROM Reservations"),
+    # Library / database statistics
+    (re.compile(r"(library|database).*statistics?", re.IGNORECASE),
+     "SELECT (SELECT COUNT(*) FROM Books) AS books, (SELECT COUNT(*) FROM Students) AS students, (SELECT COUNT(*) FROM Issued) AS issued"),
+]
+
+
+def _pattern_match_sql(user_query):
+    """Tier 1: Try to match user_query against known regex patterns."""
+    for pattern, sql in _PATTERNS:
+        if pattern.search(user_query):
+            print(f"[PATTERN MATCH] pattern={pattern.pattern!r} -> {sql}")
+            return sql
+    return None
+
+
+def _is_ollama_up():
+    """Quick TCP port check to avoid long connection timeouts."""
     try:
-        query_lower = user_query.lower()
-        
-        # Quick connectivity check to avoid long timeouts
-        try:
-            import socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('localhost', 11434))
-            sock.close()
-            if result != 0:
-                print(f"[OLLAMA DOWN] Port 11434 not reachable, using fallback")
-                return generate_complex_sql(user_query)
-        except:
-            print(f"[OLLAMA CHECK FAILED] Using fallback")
-            return generate_complex_sql(user_query)
-        
-        # Check if it's a complex query that SQLCoder struggles with
-        if any(word in query_lower for word in ["count", "total", "sum", "average", "more than", "over", "last", "popular", "most", "fines", "unpaid", "GPA", "attendance", "published", "departments", "faculty", "librarians", "transactions", "borrowing", "overdue", "exam", "damage", "research", "scholarship", "weekend", "part-time", "decade", "patterns", "majors", "waiting", "payment", "hours", "volunteer", "condition", "inter-department", "probation", "seasonal", "language", "phd", "holidays", "copies", "queue", "courses", "achievements", "degradation", "semester", "comparison", "above", "below", "higher", "lower", "ratings", "expiration", "acquisitions", "warnings", "circulation", "funding", "requirements", "source", "budget", "privileges", "impact", "enrollment", "collections", "metrics", "grants", "honors", "usage", "demand", "limits", "restricted", "renewal", "preservation", "notifications", "monitoring", "digital", "adjustments", "priorities", "holds", "requests", "event", "attendance", "alerts", "loan", "statistics", "restrictions", "card", "condition", "account", "acquisition", "circulation", "library", "student", "book", "faculty", "department", "my", "current", "history", "account", "details", "preferences", "recommended", "status", "limits", "academic", "standing", "course", "materials", "major", "record", "grades", "assignments", "graduation", "progress", "years", "birthday", "author", "isbn", "total", "email", "phone", "office", "locations", "graduation", "publisher", "addresses", "contact", "descriptions", "balance", "reserved", "tomorrow", "performance", "reading", "favorite", "statistics", "breakdown", "today", "repair", "hold", "inventory", "missing", "expired", "schedules", "calendar", "risk", "trends", "ratings", "retention", "productivity", "indicators", "effectiveness", "cost", "dropout", "success", "institutional"]):
-            # For complex queries, use enhanced keyword approach
-            print(f"[COMPLEX QUERY DETECTED] Using enhanced keyword approach")
-            return generate_complex_sql(user_query)
-        
-        # Use SQLCoder for simple queries
-        prompt = f"Generate SQLite SELECT query for: {user_query}\n\nUse exact table names: Students for students, Books for books, Fines for fines, Issued for issued books.\n\nSQL Query:"
-        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(('localhost', 11434))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+def _llm_generate_sql(user_query):
+    """Tier 3: Ask the Ollama SQLCoder model to generate SQL."""
+    if not _is_ollama_up():
+        print("[OLLAMA DOWN] Port 11434 not reachable, skipping LLM")
+        return None
+
+    prompt = (
+        "### Task\n"
+        "Generate a valid SQLite SELECT query for the following request.\n"
+        "Rules:\n"
+        "- Use only SELECT; never generate INSERT, UPDATE, DELETE, DROP.\n"
+        "- Return ONLY the SQL query with no explanation.\n"
+        "- Use exact table/column names from the schema below.\n\n"
+        f"### Schema\n{_DB_SCHEMA}\n\n"
+        f"### Request\n{user_query}\n\n"
+        "### SQL\n"
+    )
+
+    try:
         response = requests.post(
             OLLAMA_URL,
             json={
-                "model": "sqlcoder:latest",
+                "model": MODEL_NAME,
                 "prompt": prompt,
                 "stream": False,
                 "options": {
                     "temperature": 0.0,
                     "top_p": 0.9,
                     "repeat_penalty": 1.0,
-                    "num_predict": 100,
+                    "num_predict": 150,
                     "top_k": 10,
-                    "num_ctx": 2048
-                }
+                    "num_ctx": 2048,
+                },
             },
-            timeout=3,
+            timeout=10,
         )
-        
         if response.status_code == 200:
-            raw_sql = response.json()["response"].strip()
-            
-            if raw_sql and len(raw_sql) > 10 and "SELECT" in raw_sql.upper():
-                sql_match = re.search(r"SELECT.*?(?:;|$)", raw_sql, re.IGNORECASE | re.DOTALL)
-                if sql_match:
-                    clean_sql = sql_match.group(0).strip()
-                    if clean_sql.endswith(';'):
-                        clean_sql = clean_sql[:-1]
-                    print(f"[SQLCODER SUCCESS] {clean_sql}")
-                    return clean_sql
-        
-    except Exception as e:
-        print(f"[OLLAMA ERROR] {e}")
-    
-    print(f"[FALLBACK] Using keyword approach")
-    return generate_complex_sql(user_query)
+            raw = response.json().get("response", "").strip()
+            if raw and "SELECT" in raw.upper():
+                match = re.search(r"SELECT.*?(?:;|$)", raw, re.IGNORECASE | re.DOTALL)
+                if match:
+                    clean = match.group(0).strip().rstrip(";")
+                    # Reject if it contains dangerous keywords
+                    if not _SAFETY_BLOCKED.search(clean):
+                        print(f"[LLM SQL] {clean}")
+                        return clean
+    except Exception as exc:
+        print(f"[OLLAMA ERROR] {exc}")
+
+    return None
+
+
+def generate_sql(user_query):
+    """
+    Hybrid 3-tier SQL generation:
+      1. Regex pattern matching (fastest, most reliable)
+      2. Rule-based keyword matching (generate_complex_sql)
+      3. LLM via Ollama SQLCoder model
+    Always returns a non-empty SELECT query.
+    """
+    # ── Tier 1: Pattern matching ──────────────────────────────────────────
+    sql = _pattern_match_sql(user_query)
+    if sql:
+        return sql
+
+    # ── Tier 2: Rule-based keyword matching ──────────────────────────────
+    sql = generate_complex_sql(user_query)
+    if sql:
+        print(f"[RULE MATCH] {sql}")
+        return sql
+
+    # ── Tier 3: LLM generation ────────────────────────────────────────────
+    sql = _llm_generate_sql(user_query)
+    if sql:
+        return sql
+
+    # ── Fallback: always return a valid query ─────────────────────────────
+    print(f"[FALLBACK SQL] Returning default query for: {user_query!r}")
+    return _DEFAULT_SQL
 
 def generate_complex_sql(user_query):
     """
@@ -2628,37 +2724,5 @@ def generate_complex_sql(user_query):
     
     elif "display students by learning modality" in query_lower:
         return "SELECT learning_modality, COUNT(*) as count FROM Students GROUP BY learning_modality ORDER BY count DESC"
-
-    # ── GENERAL KEYWORD FALLBACK ──────────────────────────────────────────────
-    # Handles common queries that did not match any specific pattern above.
-    # Uses broad keyword detection to produce a sensible SELECT statement.
-    if "student" in query_lower or "students" in query_lower:
-        if "fine" in query_lower or "fines" in query_lower:
-            return "SELECT s.name, s.roll_number, SUM(f.fine_amount) as total_fines FROM Students s LEFT JOIN Fines f ON s.id = f.student_id GROUP BY s.id, s.name, s.roll_number ORDER BY total_fines DESC"
-        elif "book" in query_lower or "issued" in query_lower or "borrow" in query_lower:
-            return "SELECT s.name, s.roll_number, COUNT(i.id) as books_borrowed FROM Students s LEFT JOIN Issued i ON s.id = i.student_id GROUP BY s.id, s.name, s.roll_number ORDER BY books_borrowed DESC"
-        return "SELECT id, name, roll_number, email, branch FROM Students ORDER BY name"
-
-    if "book" in query_lower or "books" in query_lower or "title" in query_lower or "catalog" in query_lower:
-        if "author" in query_lower:
-            return "SELECT title, author, category, publish_date FROM Books ORDER BY title"
-        elif "available" in query_lower:
-            return "SELECT id, title, author, category, available_copies FROM Books WHERE available_copies > 0 ORDER BY title"
-        return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
-
-    if "fine" in query_lower or "fines" in query_lower or "penalty" in query_lower:
-        return "SELECT f.id, s.name as student_name, f.fine_amount, f.status, f.issue_date FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
-
-    if "faculty" in query_lower or "professor" in query_lower or "teacher" in query_lower:
-        return "SELECT id, name, email, department_id FROM Faculty ORDER BY name"
-
-    if "issued" in query_lower or "borrowed" in query_lower or "lending" in query_lower or "loan" in query_lower:
-        return "SELECT i.id, s.name as student_name, b.title, i.issue_date, i.due_date, i.return_date FROM Issued i JOIN Students s ON i.student_id = s.id JOIN Books b ON i.book_id = b.id ORDER BY i.issue_date DESC"
-
-    if "department" in query_lower or "departments" in query_lower or "branch" in query_lower:
-        return "SELECT id, name FROM Departments ORDER BY name"
-
-    if "statistic" in query_lower or "statistics" in query_lower or "summary" in query_lower or "overview" in query_lower:
-        return "SELECT 'Total Students' as metric, COUNT(*) as count FROM Students UNION ALL SELECT 'Total Books', COUNT(*) FROM Books UNION ALL SELECT 'Total Fines', COUNT(*) FROM Fines UNION ALL SELECT 'Total Issued', COUNT(*) FROM Issued"
-
-    return ""  # Let the main app handle final fallback
+    
+    return ""  # Signal caller to try next tier
