@@ -893,7 +893,7 @@ if _SECURITY_HEADERS_AVAILABLE:
 # ---------------------------------------------------------------------------
 
 def _inject_and_condition(sql_query: str, condition: str) -> str:
-    """Inject *condition* immediately after the WHERE keyword."""
+    """Inject *condition* after WHERE and join it to existing predicates with AND."""
     match = re.search(r'\bWHERE\b', sql_query, re.IGNORECASE)
     if match:
         pos = match.end()
