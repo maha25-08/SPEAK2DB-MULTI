@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Register</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--gradient-bg);
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+        }
+        .register-card {
+            width: 100%;
+            max-width: 760px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,.3);
+        }
+        .register-card h1 {
+            font-size: 3rem;
+            margin-bottom: .5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .register-card p { color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: .4rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        input, select {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text);
+            padding: .9rem 1rem;
+            box-sizing: border-box;
+        }
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: .9rem 1.4rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fda4af;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+        .helper {
+            color: var(--text-muted);
+            font-size: .9rem;
+            margin-top: .3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-card">
+        <h1>📝 Register</h1>
+        <p>Create a new Speak2DB account with role-based access.</p>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert-error">{{ messages[0] }}</div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/register">
+            <div class="grid">
+                <div>
+                    <label for="username">Username</label>
+                    <input id="username" name="username" required>
+                </div>
+                <div>
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" required>
+                </div>
+                <div>
+                    <label for="role">Role</label>
+                    <select id="role" name="role">
+                        <option>Student</option>
+                        <option>Faculty</option>
+                        <option>Librarian</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="name">Full Name</label>
+                    <input id="name" name="name" placeholder="Optional but recommended">
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" required>
+                </div>
+                <div>
+                    <label for="phone">Phone</label>
+                    <input id="phone" name="phone">
+                </div>
+                <div>
+                    <label for="branch">Student Branch</label>
+                    <input id="branch" name="branch" placeholder="Required for students">
+                </div>
+                <div>
+                    <label for="year">Student Year</label>
+                    <input id="year" name="year" placeholder="Required for students">
+                </div>
+                <div>
+                    <label for="department">Faculty Department</label>
+                    <input id="department" name="department" placeholder="Required for faculty">
+                </div>
+                <div>
+                    <label for="designation">Faculty Designation</label>
+                    <input id="designation" name="designation" placeholder="Required for faculty">
+                </div>
+                <div>
+                    <label for="specialization">Faculty Specialization</label>
+                    <input id="specialization" name="specialization">
+                </div>
+            </div>
+            <div class="helper">
+                Students should provide branch/year; faculty users should provide department/designation.
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" type="submit">Create Account</button>
+                <a class="btn btn-secondary" href="/login">Back to Login</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

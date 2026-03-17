@@ -16,6 +16,7 @@ class RBACSystem:
         self.db_path = db_path
         self.roles = {
             'Student': 1,
+            'Faculty': 2,
             'Librarian': 2, 
             'Administrator': 3
         }
@@ -74,6 +75,32 @@ class RBACSystem:
                     'view_performance_metrics', 'export_reports'
                 },
                 # 🔧 System Operations
+                'system_operations': {
+                    'manage_interlibrary_loans', 'manage_book_repairs',
+                    'process_lost_books', 'manage_digital_resources'
+                }
+            },
+            'Faculty': {
+                # 👨‍🏫 Faculty access mirrors librarian-grade read/analytics access
+                'library_operations': {
+                    'manage_books', 'add_books', 'edit_books', 'delete_books',
+                    'manage_inventory', 'process_acquisitions', 'catalog_maintenance',
+                    'manage_weeding', 'manage_special_collections'
+                },
+                'circulation_management': {
+                    'checkout_books', 'checkin_books', 'manage_renewals',
+                    'manage_reservations', 'manage_overdue', 'calculate_fines',
+                    'process_payments'
+                },
+                'user_management': {
+                    'manage_student_accounts', 'manage_faculty_accounts',
+                    'manage_memberships', 'set_permissions', 'suspend_accounts'
+                },
+                'library_analytics': {
+                    'view_circulation_reports', 'view_popular_books',
+                    'view_user_statistics', 'view_inventory_reports',
+                    'view_performance_metrics', 'export_reports'
+                },
                 'system_operations': {
                     'manage_interlibrary_loans', 'manage_book_repairs',
                     'process_lost_books', 'manage_digital_resources'
@@ -161,8 +188,7 @@ class RBACSystem:
                 role_name = result[0]
                 # Map role names to standard format
                 role_mapping = {
-                    'Admin': 'Administrator',
-                    'Faculty': 'Librarian'  # Faculty users get Librarian role
+                    'Admin': 'Administrator'
                 }
                 return role_mapping.get(role_name, role_name)
             
@@ -174,8 +200,7 @@ class RBACSystem:
             if result:
                 role_name = result[0]
                 role_mapping = {
-                    'Admin': 'Administrator',
-                    'Faculty': 'Librarian'
+                    'Admin': 'Administrator'
                 }
                 return role_mapping.get(role_name, role_name)
             
@@ -209,27 +234,50 @@ class RBACSystem:
             return set()
         
         permissions = set()
+        db_permissions = self._get_db_role_permissions(role)
         
         # Add role-specific permissions
         if role in self.permissions:
             for category_perms in self.permissions[role].values():
                 permissions.update(category_perms)
         
-        # Add inherited permissions (Student < Librarian < Administrator)
-        if role == 'Librarian':
+        # Add inherited permissions (Student < Faculty/Librarian < Administrator)
+        if role in ('Librarian', 'Faculty'):
             # Inherit all Student permissions
             for category_perms in self.permissions['Student'].values():
                 permissions.update(category_perms)
         elif role == 'Administrator':
             # Inherit all Student and Librarian permissions
-            for base_role in ['Student', 'Librarian']:
+            for base_role in ['Student', 'Librarian', 'Faculty']:
                 for category_perms in self.permissions[base_role].values():
                     permissions.update(category_perms)
             # Add admin permissions
             for category_perms in self.permissions['Administrator'].values():
                 permissions.update(category_perms)
-        
+        permissions.update(db_permissions)
         return permissions
+
+    def _get_db_role_permissions(self, role: str) -> Set[str]:
+        """Read DB-backed permissions assigned to a role."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.name
+                FROM Permissions p
+                JOIN RolePermissions rp ON rp.permission_id = p.id
+                JOIN Roles r ON r.id = rp.role_id
+                WHERE r.name = ?
+            """, (role,))
+            rows = cursor.fetchall()
+            return {row[0] for row in rows}
+        except Exception:
+            return set()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def has_permission(self, user_id: str, permission: str) -> bool:
         """✅ Check if user has specific permission"""
@@ -268,6 +316,9 @@ class RBACSystem:
             'Student': {
                 'Books', 'Issued', 'Fines', 'Reservations', 'Students'
             },
+            'Faculty': {
+                'Books', 'Faculty', 'Departments', 'QueryHistory'
+            },
             'Librarian': {
                 'Books', 'Issued', 'Fines', 'Reservations', 'Students',
                 'Users', 'Publishers', 'Departments', 'QueryHistory',
@@ -280,7 +331,13 @@ class RBACSystem:
                 'SpecialPermissions', 'Faculty'
             }
         }
-        
+        db_table_access = {
+            permission.split(':', 1)[1]
+            for permission in self._get_db_role_permissions(role)
+            if permission.startswith('table_access:')
+        }
+        if db_table_access:
+            return table_access.get(role, set()) | db_table_access
         return table_access.get(role, set())
     
     def get_query_filter(self, user_id: str, table: str) -> Optional[str]:
@@ -321,6 +378,8 @@ class RBACSystem:
             
             # Additional validation based on role
             role = self.get_user_role(user_id)
+            if 'query:execute_select' not in self.get_user_permissions(user_id):
+                return False, "Query execution permission is disabled for this role"
             if role == 'Student':
                 # Students can only do SELECT queries
                 if not sql_query.strip().upper().startswith('SELECT'):
