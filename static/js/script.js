@@ -40,192 +40,197 @@ function showEl(id, display) {
 // ===== VOICE INPUT (Web Speech API) =====
 var recognition = null;
 var isListening = false;
+var voiceStopTimer = null;
+var voiceResultReceived = false;
+var lastRecognizedText = '';
+var VOICE_TIMEOUT_MS = 4000;
 
-// Priority keywords for query compression
-var VOICE_KEYWORDS = ["books","students","fines","issued","overdue","reservations"];
+function getVoiceButton() {
+    return getEl('voiceBtn') || getEl('micBtn');
+}
+
+function getVoiceStatusEl() {
+    return getEl('voiceStatus') || getEl('status');
+}
+
+function clearVoiceTimer() {
+    if (voiceStopTimer) {
+        clearTimeout(voiceStopTimer);
+        voiceStopTimer = null;
+    }
+}
+
+function resetVoiceButton() {
+    var btn = getVoiceButton();
+    if (!btn) return;
+
+    btn.classList.remove('recording');
+
+    if (btn.querySelector && btn.querySelector('.floating-icon')) {
+        btn.innerHTML = '<span class="floating-icon">🎤</span> Voice Input';
+    } else {
+        btn.innerHTML = '🎤 Voice Input';
+    }
+
+    btn.disabled = false;
+    btn.title = 'Push to talk';
+}
+
+function setVoiceStatus(message, cls, allowHtml) {
+    var statusEl = getVoiceStatusEl();
+    if (!statusEl) return;
+
+    statusEl.className = 'voice-status' + (cls ? ' ' + cls : '');
+    if (allowHtml) {
+        statusEl.innerHTML = message;
+    } else {
+        statusEl.textContent = message;
+    }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function updateVoiceInput(text) {
+    var input = getEl('queryInput');
+    if (input) {
+        input.value = text;
+        input.focus();
+    }
+}
+
+function showVoiceConfirmation(text) {
+    lastRecognizedText = text;
+    updateVoiceInput(text);
+    setVoiceStatus(
+        'You said: "<strong>' + escapeHtml(text) + '</strong>" ' +
+        '<button type="button" class="btn-clarification" onclick="submitQuery()">Confirm</button> ' +
+        '<button type="button" class="btn-clarification" onclick="retryVoice()">Retry</button>' +
+        '<span class="voice-status-note">Review or edit the text before confirming.</span>',
+        'status-info',
+        true
+    );
+}
 
 function initVoice() {
     var SR = window.SpeechRecognition ||
         window.webkitSpeechRecognition;
     if (!SR) {
         console.warn("Speech Recognition not supported");
-        var micBtn = getEl('micBtn');
-        if (micBtn) {
-            micBtn.title = "Voice not supported — Use Chrome";
-            micBtn.style.opacity = '0.4';
-            micBtn.style.cursor = 'not-allowed';
+        var voiceBtn = getVoiceButton();
+        if (voiceBtn) {
+            voiceBtn.title = "Voice not supported — type your query instead";
+            voiceBtn.style.opacity = '0.65';
         }
+        setVoiceStatus('Voice input is not supported in this browser. You can still type your query.', 'status-warning');
         return;
     }
 
     recognition = new SR();
     recognition.lang = 'en-US';
     recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 5;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
 
     recognition.onstart = function () {
         isListening = true;
-        var mb = getEl('micBtn');
-        if (mb) {
-            mb.classList.add('recording');
-            mb.innerHTML = '🔴';
-            mb.title = 'Listening...';
+        voiceResultReceived = false;
+        var btn = getVoiceButton();
+        if (btn) {
+            btn.classList.add('recording');
+            btn.innerHTML = '🔴 Listening...';
+            btn.title = 'Listening...';
         }
-        setStatus('🎤 Listening... speak now', 'status-listening');
+        setVoiceStatus('🎤 Listening... Speak clearly. Avoid background noise.', 'status-listening');
+        clearVoiceTimer();
+        voiceStopTimer = setTimeout(function () {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        }, VOICE_TIMEOUT_MS);
     };
 
-    recognition.onresult = function(event){
-        let finalTranscript = "";
-        let bestTranscript = "";
-        let hasFinal = false;
+    recognition.onresult = function (event) {
+        clearVoiceTimer();
+        var finalTranscript = '';
 
-        for(let i = event.resultIndex; i < event.results.length; i++){
-            if(event.results[i].isFinal){
-                hasFinal = true;
-
-                // Get the best alternative from all available alternatives
-                const alternatives = event.results[i];
-                let bestConfidence = 0;
-                
-                for(let j = 0; j < alternatives.length; j++){
-                    if(alternatives[j].confidence > bestConfidence){
-                        bestConfidence = alternatives[j].confidence;
-                        bestTranscript = alternatives[j].transcript;
-                    }
-                }
-                
-                finalTranscript = bestTranscript;
-                break;
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+                finalTranscript = event.results[i][0].transcript || '';
             }
         }
 
-        if(!hasFinal || !finalTranscript) return;
-
-        // Stop listening once final result is received for faster response
-        recognition.stop();
-
-        console.log("Raw speech:", finalTranscript);
-        console.log("[VOICE FINAL]", finalTranscript);
-
-        // Clean filler words first
-        finalTranscript = cleanSpeech(finalTranscript);
-
-        // Normalize accent misrecognitions on cleaned text
-        finalTranscript = normalizeAccent(finalTranscript);
-
-        // Correct domain-specific keyword plurals
-        finalTranscript = correctDomain(finalTranscript);
-
-        // Compress overly long queries to essential keywords
-        finalTranscript = compressQuery(finalTranscript);
-
-        console.log("Cleaned speech:", finalTranscript);
-
-        var inp = getEl('queryInput');
-        if (inp) {
-            inp.value = finalTranscript;
-            submitQuery();  // Auto-execute query after voice input
+        finalTranscript = finalTranscript.replace(/\s+/g, ' ').trim();
+        if (!finalTranscript) {
+            return;
         }
+
+        voiceResultReceived = true;
+        showVoiceConfirmation(finalTranscript);
+        recognition.stop();
     };
 
     recognition.onerror = function (event) {
+        clearVoiceTimer();
         isListening = false;
-        var mb = getEl('micBtn');
-        if (mb) {
-            mb.classList.remove('recording');
-            mb.innerHTML = '🎤';
-            mb.title = '';
+        resetVoiceButton();
+
+        if (event.error === 'aborted') {
+            return;
         }
-        setStatus('❌ Error: ' + event.error, 'status-error');
+
+        setVoiceStatus(
+            'Voice recognition failed. Please try again or type manually.',
+            'status-error'
+        );
     };
 
     recognition.onend = function () {
+        clearVoiceTimer();
         isListening = false;
-        var mb = getEl('micBtn');
-        if (mb) {
-            mb.classList.remove('recording');
-            mb.innerHTML = '🎤';
-            mb.title = '';
+        resetVoiceButton();
+
+        if (!voiceResultReceived) {
+            setVoiceStatus(
+                'No clear speech was captured. Retry or type your query manually.',
+                'status-warning'
+            );
         }
     };
 }
 
-function cleanSpeech(text){
-
-    return text
-    .toLowerCase()
-    .replace(/\bcan you\b/gi,"")
-    .replace(/\bcould you\b/gi,"")
-    .replace(/\bi want\b/gi,"")
-    .replace(/\bgive me\b/gi,"")
-    .replace(/\bplease\b/gi,"")
-    .replace(/\bshow me\b/gi,"")
-    .replace(/\btell me\b/gi,"")
-    .replace(/\buh\b/gi,"")
-    .replace(/\bum\b/gi,"")
-    .replace(/\bah\b/gi,"")
-    .replace(/\byou know\b/gi,"")
-    .replace(/\bokay\b/gi,"")
-    .replace(/\balright\b/gi,"")
-    .replace(/\bjust\b/gi,"")
-    .replace(/\s+/g," ")
-    .trim();
-
-}
-
-function normalizeAccent(text){
-    const accentMap = {
-        "bok": "book",
-        "buk": "book",
-        "studant": "student",
-        "studen": "student",
-        "fin": "fine"
-    };
-    for(const key in accentMap){
-        text = text.replace(new RegExp("\\b" + key + "\\b","gi"), accentMap[key]);
-    }
-    return text;
-}
-
-function correctDomain(text){
-    if(text.includes("book") && !text.includes("books")) text = text.replace(/\bbook\b/g,"books");
-    if(text.includes("fine") && !text.includes("fines")) text = text.replace(/\bfine\b/g,"fines");
-    if(text.includes("student") && !text.includes("students")) text = text.replace(/\bstudent\b/g,"students");
-    return text;
-}
-
-function compressQuery(text){
-    const words = text.split(/\s+/);
-    if(words.length <= 6) return text;
-
-    // Extract keywords that appear in the text, preserving their original order
-    let result = [];
-    VOICE_KEYWORDS.forEach(function(k){
-        if(new RegExp("\\b" + k + "\\b","i").test(text)) result.push(k);
-    });
-    return result.length > 0 ? result.join(" ") : text;
-}
-
 function setStatus(msg, cls) {
-    var st = getEl('status');
-    if (st) {
-        st.textContent = msg;
-        st.className = 'status ' + (cls || '');
-    }
+    setVoiceStatus(msg, cls);
 }
 
 function toggleMic() {
     if (!recognition) {
         initVoice();
-        return;
+        if (!recognition) return;
     }
 
     if (isListening) {
         recognition.stop();
-    } else {
-        recognition.start();
+        return;
     }
+
+    try {
+        recognition.start();
+    } catch (error) {
+        console.warn('[Voice] Unable to start recognition', error);
+        setVoiceStatus('Voice recognition failed to start. Please try again or type manually.', 'status-error');
+    }
+}
+
+function retryVoice() {
+    setVoiceStatus('Retrying... Speak clearly. Avoid background noise.', 'status-listening');
+    toggleMic();
 }
 
 // ===== QUERY EXECUTION =====
@@ -327,8 +332,7 @@ async function submitQuery() {
 // ===== CLARIFICATION UI =====
 
 /**
- * Render the clarification card with question and option buttons.
- * @param {Object} clarif - { question, options: [{label, value}], original_query, entity }
+ * Render the clarification card with question/message and option buttons.
  */
 function renderClarification(clarif) {
     var card = getEl('clarificationCard');
@@ -341,17 +345,19 @@ function renderClarification(clarif) {
     }
 
     // Populate question text
-    if (questionEl) questionEl.textContent = clarif.question || 'Please choose an option:';
+    if (questionEl) questionEl.textContent = clarif.message || clarif.question || 'Please choose an option:';
 
     // Build option buttons
     if (optionsEl) {
         optionsEl.innerHTML = '';
         (clarif.options || []).forEach(function(opt) {
+            var optionLabel = typeof opt === 'string' ? opt : opt.label;
+            var optionValue = typeof opt === 'string' ? opt : opt.value;
             var btn = document.createElement('button');
             btn.className = 'btn-clarification';
-            btn.textContent = opt.label;
+            btn.textContent = optionLabel;
             btn.onclick = function() {
-                submitWithClarification(opt.value);
+                submitWithClarification(optionValue);
             };
             optionsEl.appendChild(btn);
         });
@@ -410,9 +416,9 @@ async function submitWithClarification(choiceValue) {
         if (data.error) {
             showToast('❌ Error: ' + data.error, 'error');
         } else {
-            // Update the input to reflect the chosen query
+            // Update the input to reflect the clarified query
             var inp = getEl('queryInput');
-            if (inp) inp.value = choiceValue;
+            if (inp) inp.value = (String(choiceValue).toLowerCase() + ' ' + _pendingOriginalQuery).trim();
 
             displayResults(data);
             showToast('✅ ' + (data.data ? data.data.length : 0) + ' rows from ' + (data.database || 'library_main.db'), 'info');
@@ -439,6 +445,8 @@ function clearQuery() {
         input.value = '';
         input.focus();
     }
+    lastRecognizedText = '';
+    setVoiceStatus('💡 Speak clearly. Avoid background noise. Review text before confirming.', 'status-info');
     hideEl('resultsSection');
     hideEl('visualizationSection');
 }
@@ -842,7 +850,7 @@ function initializeApp() {
     var cBtn = getEl('clearBtn');
     if (cBtn) cBtn.addEventListener('click', clearQuery);
 
-    var mBtn = getEl('micBtn');
+    var mBtn = getVoiceButton();
     if (mBtn) mBtn.addEventListener('click', toggleMic);
 
     var eBtn = getEl('exportBtn');
@@ -866,6 +874,10 @@ function initializeApp() {
         qInput.focus();
     }
 
-    // Initialize voice only when mic button is present
-    if (getEl('micBtn')) initVoice();
+    if (getVoiceStatusEl()) {
+        setVoiceStatus('💡 Speak clearly. Avoid background noise. Review text before confirming.', 'status-info');
+    }
+
+    // Initialize voice only when a voice button is present
+    if (getVoiceButton()) initVoice();
 }
