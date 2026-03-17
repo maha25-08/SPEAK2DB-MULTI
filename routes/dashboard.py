@@ -280,17 +280,17 @@ def librarian_dashboard_kebab():
     # Gather library stats for the RBAC dashboard template
     try:
         conn = get_db_connection(MAIN_DB)
-        total_books = conn.execute("SELECT COUNT(*) FROM Books").fetchone()[0]
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
         available_books = conn.execute(
-            "SELECT COUNT(*) FROM Books WHERE available_copies > 0"
-        ).fetchone()[0]
+            "SELECT COUNT(*) as cnt FROM Books WHERE available_copies > 0"
+        ).fetchone()["cnt"]
         issued_books = conn.execute(
-            "SELECT COUNT(*) FROM Issued WHERE return_date IS NULL"
-        ).fetchone()[0]
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()["cnt"]
         overdue_books = conn.execute(
-            "SELECT COUNT(*) FROM Issued WHERE return_date IS NULL "
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL "
             "AND date(due_date) < date('now')"
-        ).fetchone()[0]
+        ).fetchone()["cnt"]
         conn.close()
     except Exception as exc:
         logger.error("librarian_dashboard_kebab stats error: %s", exc)
@@ -402,10 +402,10 @@ def admin_dashboard_kebab():
 
     try:
         conn = get_db_connection(MAIN_DB)
-        total_users = conn.execute("SELECT COUNT(*) FROM Users").fetchone()[0]
-        total_students = conn.execute("SELECT COUNT(*) FROM Students").fetchone()[0]
-        total_faculty = conn.execute("SELECT COUNT(*) FROM Faculty").fetchone()[0]
-        total_depts = conn.execute("SELECT COUNT(*) FROM Departments").fetchone()[0]
+        total_users = conn.execute("SELECT COUNT(*) as cnt FROM Users").fetchone()["cnt"]
+        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()["cnt"]
+        total_faculty = conn.execute("SELECT COUNT(*) as cnt FROM Faculty").fetchone()["cnt"]
+        total_depts = conn.execute("SELECT COUNT(*) as cnt FROM Departments").fetchone()["cnt"]
         conn.close()
     except Exception as exc:
         logger.error("admin_dashboard_kebab stats error: %s", exc)

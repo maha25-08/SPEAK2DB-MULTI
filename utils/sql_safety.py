@@ -64,12 +64,16 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
     Ensures students can only see their own data in personal tables
     (Fines, Issued, Reservations) even when the generated SQL omits filtering.
     """
+    # Validate student_id early to avoid downstream issues.
+    try:
+        sid = int(student_id)
+    except (TypeError, ValueError):
+        logger.error("apply_student_filters: invalid student_id=%r", student_id)
+        return sql_query
+
     q_lower = user_query.lower()
     sq_lower = sql_query.lower()
     has_where = "WHERE" in sql_query.upper()
-
-    # Validate student_id to prevent SQL injection via integer coercion
-    sid = int(student_id)
 
     # ── Always restrict personal tables ─────────────────────────────────────
     for tbl in ("fines", "issued", "reservations"):

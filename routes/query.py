@@ -140,12 +140,19 @@ def query():
 
         if not sql_query or not sql_query.strip():
             logger.warning("[FALLBACK SQL] generate_sql returned empty; using default")
+            # This fallback is intentionally safe: student-specific filters
+            # (Step 7) are applied below, so student users will not see
+            # unrestricted data even via this default query.
             sql_query = "SELECT * FROM Books LIMIT 10"
         logger.info("Generated SQL: %s", sql_query)
 
-        # Replace student ID placeholders emitted by the SQL generator
+        # Replace student ID placeholders emitted by the SQL generator.
+        # Convert to int first to prevent injection via malformed session data.
         if user_role == "Student" and student_id:
-            sql_query = sql_query.replace("[CURRENT_STUDENT_ID]", str(int(student_id)))
+            try:
+                sql_query = sql_query.replace("[CURRENT_STUDENT_ID]", str(int(student_id)))
+            except (TypeError, ValueError):
+                logger.error("Invalid student_id in session: %r", student_id)
 
         # ── Step 7: Student-specific SQL rewriting ───────────────────────────
         logger.debug("Role: %s | Student filter applied: %s", user_role, student_id)

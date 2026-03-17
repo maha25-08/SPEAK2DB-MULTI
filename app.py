@@ -42,7 +42,16 @@ from routes.views import views_bp
 app = Flask(__name__)
 # Secret key: read from environment for production; fall back to a random key
 # for development (note: random key means sessions are lost on restart).
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+_secret_key_env = os.environ.get("SECRET_KEY")
+if _secret_key_env:
+    app.secret_key = _secret_key_env
+else:
+    app.secret_key = os.urandom(24)
+    logger.warning(
+        "SECRET_KEY environment variable is not set. "
+        "A random key has been generated — all sessions will be lost on restart. "
+        "Set SECRET_KEY in production."
+    )
 
 # ── Register Blueprints ──────────────────────────────────────────────────────
 app.register_blueprint(auth_bp)
@@ -214,4 +223,5 @@ def inject_user():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
+    app.run(debug=debug_mode, host="0.0.0.0", port=5000)
