@@ -245,7 +245,7 @@
                         <div class="d-flex gap-2 flex-wrap">
                             <button id="queryBtn" class="btn btn-primary" onclick="submitQuery()"><i class="fas fa-play me-1"></i>Run Query</button>
                             <button class="btn btn-outline-secondary" onclick="document.getElementById('queryInput').value=''">Clear</button>
-                            <button id="micBtn" type="button" class="btn btn-outline-info" onclick="toggleMic()"><i class="fas fa-microphone me-1"></i>Voice</button>
+                            <button id="micBtn" type="button" class="btn btn-outline-info" onclick="toggleMic()" aria-label="Activate voice input for natural language queries"><i class="fas fa-microphone me-1"></i>Voice</button>
                         </div>
                         <div id="clarificationCard" class="mt-3" style="display:none; background:#eef2ff; border:1px solid #c7d2fe; border-radius:12px; padding:1rem;">
                             <p class="fw-semibold mb-2 text-primary"><i class="fas fa-circle-question me-1"></i><span id="clarificationQuestion"></span></p>

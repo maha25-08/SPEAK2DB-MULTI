@@ -188,3 +188,23 @@ def test_role_permission_update_can_block_student_queries(client):
     ).fetchone()
     conn.close()
     assert security_event is not None
+
+
+def test_ai_disable_setting_blocks_queries(client):
+    test_client, _ = client
+    login_as_admin(test_client)
+
+    update_response = test_client.post(
+        '/admin/update_settings',
+        data={
+            'max_query_result_limit': '10',
+            'voice_input_enabled': 'on',
+            'ollama_sql_enabled': 'on',
+        },
+        follow_redirects=False,
+    )
+    assert update_response.status_code == 302
+
+    blocked_response = test_client.post('/query', json={'query': 'show all books with title and author'})
+    assert blocked_response.status_code == 403
+    assert 'disabled by the administrator' in blocked_response.get_json()['error'].lower()

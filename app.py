@@ -236,8 +236,19 @@ def _get_bool_setting(name: str, default: bool = False) -> bool:
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
+def _get_int_setting(name: str, default: int) -> int:
+    """Read an integer setting with a safe fallback."""
+    raw_value = _get_setting(name, str(default))
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        print(f"[settings] Invalid integer for {name}: {raw_value!r}; using {default}")
+        return default
+
+
 def _set_setting(name: str, value: str, updated_by: str = None, description: str = None):
     """Insert or update a setting value."""
+    updated_by = updated_by or session.get('user_id', 'system')
     conn = sqlite3.connect(MAIN_DB)
     cursor = conn.cursor()
     existing = cursor.execute(
@@ -690,7 +701,7 @@ def _build_admin_dashboard_context(active_section: str = 'overview') -> dict:
             'managed_users': _fetch_managed_users(conn),
             'role_permissions': _fetch_role_permission_matrix(conn),
             'settings': {
-                'max_query_result_limit': _get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)),
+                'max_query_result_limit': _get_int_setting('max_query_result_limit', DEFAULT_QUERY_LIMIT),
                 'voice_input_enabled': _get_bool_setting('voice_input_enabled', True),
                 'ai_query_enabled': _get_bool_setting('ai_query_enabled', True),
                 'ollama_sql_enabled': _get_bool_setting('ollama_sql_enabled', True),
@@ -1802,7 +1813,7 @@ def query():
             _log_query_history(session['user_id'], user_role, user_query, sql_query, False, round(time.time() - _query_start, 4))
             return jsonify({'error': table_message}), 403
 
-        max_rows = int(_get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)) or DEFAULT_QUERY_LIMIT)
+        max_rows = _get_int_setting('max_query_result_limit', DEFAULT_QUERY_LIMIT)
         sql_query = _apply_result_limit(sql_query, max_rows)
 
         # ── Step 10: RBAC table-access validation ─────────────────────────
@@ -1931,14 +1942,14 @@ def api_ui_config():
     if _get_bool_setting('ai_query_enabled', True):
         features.append('ai_query')
 
-    return jsonify({
+        return jsonify({
         'role': session.get('role', 'Student'),
         'features': features,
         'settings': {
             'voice_input_enabled': _get_bool_setting('voice_input_enabled', True),
             'ai_query_enabled': _get_bool_setting('ai_query_enabled', True),
             'ollama_sql_enabled': _get_bool_setting('ollama_sql_enabled', True),
-            'max_query_result_limit': int(_get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)) or DEFAULT_QUERY_LIMIT),
+            'max_query_result_limit': _get_int_setting('max_query_result_limit', DEFAULT_QUERY_LIMIT),
         }
     })
 
@@ -1951,6 +1962,11 @@ def api_dashboard_data():
     try:
         conn = get_db_connection(MAIN_DB)
         today = datetime.now().strftime('%Y-%m-%d')
+        try:
+            database_size = f"{round(os.path.getsize(MAIN_DB) / 1024 / 1024, 2)} MB"
+        except OSError:
+            database_size = 'Unavailable'
+
         stats = {
             'queries_today': conn.execute(
                 "SELECT COUNT(*) AS cnt FROM QueryHistory WHERE timestamp LIKE ?",
@@ -1959,7 +1975,7 @@ def api_dashboard_data():
             'active_users': conn.execute(
                 "SELECT COUNT(*) AS cnt FROM SessionLog WHERE status = 'Active' AND logout_time IS NULL"
             ).fetchone()['cnt'],
-            'database_size': f"{round(os.path.getsize(MAIN_DB) / 1024 / 1024, 2)} MB",
+            'database_size': database_size,
             'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         }
         recent_queries = [

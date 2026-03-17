@@ -345,11 +345,11 @@ class RBACSystem:
                 ''',
                 (role_scope,),
             )
-            table_permissions = {
-                row[0].split(':', 1)[1]
-                for row in cursor.fetchall()
-                if ':' in row[0]
-            }
+            table_permissions = set()
+            for row in cursor.fetchall():
+                permission_name = row[0]
+                if ':' in permission_name:
+                    table_permissions.add(permission_name.split(':', 1)[1])
             if table_permissions:
                 accessible = table_permissions
             elif role_permission_count:

@@ -878,7 +878,7 @@ async function loadUiConfig() {
         const config = await response.json();
         const settings = config.settings || {};
         const micBtn = getEl('micBtn');
-        if (micBtn && settings.voice_input_enabled === false) {
+        if (micBtn && !settings.voice_input_enabled) {
             micBtn.disabled = true;
             micBtn.style.opacity = '0.5';
             micBtn.title = 'Voice input disabled by administrator';
