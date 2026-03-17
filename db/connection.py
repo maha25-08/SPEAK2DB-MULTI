@@ -1,20 +1,23 @@
 """
 Database connection and schema management for SPEAK2DB.
 """
-import sqlite3
 import logging
+import os
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
 # Database paths
-MAIN_DB = "library_main.db"
-ARCHIVE_DB = "library_archive.db"
+MAIN_DB = os.getenv("MAIN_DB", "library_main.db")
+ARCHIVE_DB = os.getenv("ARCHIVE_DB", "library_archive.db")
+SQLITE_BUSY_TIMEOUT_MS = int(os.getenv("SQLITE_BUSY_TIMEOUT_MS", "3000"))
 
 
 def get_db_connection(db_path: str) -> sqlite3.Connection:
     """Return a SQLite connection with row_factory set."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     return conn
 
 
