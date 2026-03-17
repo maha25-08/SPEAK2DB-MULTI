@@ -889,8 +889,30 @@ if _SECURITY_HEADERS_AVAILABLE:
 
 
 # ---------------------------------------------------------------------------
-# Main dashboard (index) – kept here so url_for('index') resolves correctly
+# Student-specific SQL helpers
 # ---------------------------------------------------------------------------
+
+def _inject_and_condition(sql_query: str, condition: str) -> str:
+    """Inject *condition* immediately after the WHERE keyword."""
+    match = re.search(r'\bWHERE\b', sql_query, re.IGNORECASE)
+    if match:
+        pos = match.end()
+        return sql_query[:pos] + f" {condition} AND" + sql_query[pos:]
+    return sql_query + f" WHERE {condition}"
+
+
+def _apply_student_filters(
+    sql_query: str,
+    sid: int,
+    has_where: bool,
+    sq_lower: str,
+    q_lower: str,
+) -> str:
+    """Apply student-specific SQL rewriting for student-only queries."""
+    try:
+        sid = int(sid)
+    except (TypeError, ValueError):
+        return sql_query
 
     # Pattern 1: table-level security – always restrict personal tables to the
     # logged-in student, regardless of whether a WHERE clause already exists.
@@ -903,8 +925,7 @@ if _SECURITY_HEADERS_AVAILABLE:
             if not already_filtered:
                 if has_where:
                     return _inject_and_condition(sql_query, f"student_id = {sid}")
-                else:
-                    return sql_query + f" WHERE student_id = {sid}"
+                return sql_query + f" WHERE student_id = {sid}"
             return sql_query
 
     if 'students' in sq_lower and not has_where:
@@ -1205,7 +1226,6 @@ def index():
         "index.html",
         user=user_info.get("username", user_id),
         role=user_role,
-        user=user_id,
     )
 
 @app.route('/query', methods=['POST'])
@@ -1318,7 +1338,13 @@ def query():
         print("Role:", session.get("role"))
         print("Student Filter Applied:", session.get("student_id"))
         if user_role == 'Student' and student_id:
-            sql_query = _apply_student_filters(user_query, sql_query, student_id)
+            sql_query = _apply_student_filters(
+                sql_query,
+                student_id,
+                'WHERE' in sql_query.upper(),
+                sql_query.lower(),
+                user_query.lower(),
+            )
 
         # ── Step 8: Security layer (injection check + table access + isolation)
         if SECURITY_LAYER_AVAILABLE:
@@ -2358,7 +2384,13 @@ def query():
         print("Role:", session.get("role"))
         print("Student Filter Applied:", session.get("student_id"))
         if user_role == 'Student' and student_id:
-            sql_query = _apply_student_filters(user_query, sql_query, student_id)
+            sql_query = _apply_student_filters(
+                sql_query,
+                student_id,
+                'WHERE' in sql_query.upper(),
+                sql_query.lower(),
+                user_query.lower(),
+            )
 
         # ── Step 8: Security layer (injection check + table access + isolation)
         if SECURITY_LAYER_AVAILABLE:
