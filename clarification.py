@@ -7,7 +7,7 @@ plus the presence or absence of known domain entities.
 """
 
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 KNOWN_ENTITIES: List[str] = [
     "book", "books",
@@ -69,7 +69,7 @@ def is_ambiguous_query(query: str) -> bool:
     return not _contains_known_entity(query_lower)
 
 
-def is_vague_query(query: str):
+def is_vague_query(query: str) -> Tuple[bool, Optional[str]]:
     """
     Backward-compatible wrapper for older callers.
 

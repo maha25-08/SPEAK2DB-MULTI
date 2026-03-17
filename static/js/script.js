@@ -43,6 +43,7 @@ var isListening = false;
 var voiceStopTimer = null;
 var voiceResultReceived = false;
 var lastRecognizedText = '';
+var VOICE_TIMEOUT_MS = 4000;
 
 function getVoiceButton() {
     return getEl('voiceBtn') || getEl('micBtn');
@@ -152,7 +153,7 @@ function initVoice() {
             if (recognition && isListening) {
                 recognition.stop();
             }
-        }, 4000);
+        }, VOICE_TIMEOUT_MS);
     };
 
     recognition.onresult = function (event) {
@@ -417,7 +418,7 @@ async function submitWithClarification(choiceValue) {
         } else {
             // Update the input to reflect the clarified query
             var inp = getEl('queryInput');
-            if (inp) inp.value = (choiceValue + ' ' + _pendingOriginalQuery).trim();
+            if (inp) inp.value = (String(choiceValue).toLowerCase() + ' ' + _pendingOriginalQuery).trim();
 
             displayResults(data);
             showToast('✅ ' + (data.data ? data.data.length : 0) + ' rows from ' + (data.database || 'library_main.db'), 'info');
