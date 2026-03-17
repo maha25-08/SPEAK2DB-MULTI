@@ -236,15 +236,6 @@ class RBACSystem:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             role_scope = 'Librarian' if role == 'Faculty' else role
-            role_permission_count = cursor.execute(
-                '''
-                SELECT COUNT(*)
-                FROM Roles r
-                JOIN RolePermissions rp ON rp.role_id = r.id
-                WHERE r.name = ?
-                ''',
-                (role_scope,),
-            ).fetchone()[0]
             cursor.execute(
                 '''
                 SELECT p.name
@@ -335,6 +326,15 @@ class RBACSystem:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             role_scope = 'Librarian' if role == 'Faculty' else role
+            role_permission_count = cursor.execute(
+                '''
+                SELECT COUNT(*)
+                FROM Roles r
+                JOIN RolePermissions rp ON rp.role_id = r.id
+                WHERE r.name = ?
+                ''',
+                (role_scope,),
+            ).fetchone()[0]
             cursor.execute(
                 '''
                 SELECT p.name

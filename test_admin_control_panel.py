@@ -8,7 +8,7 @@ import app as app_module
 from rbac_system_fixed import rbac
 
 
-REPO_ROOT = Path('/home/runner/work/SPEAK2DB-MULTI/SPEAK2DB-MULTI')
+REPO_ROOT = Path(__file__).resolve().parent
 
 
 @pytest.fixture()
