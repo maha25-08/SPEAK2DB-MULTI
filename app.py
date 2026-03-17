@@ -7,18 +7,25 @@ SQL safety gate, and security headers.
 import logging
 import os
 import jinja2
+import sqlite3
 import time
 from ollama_sql import generate_sql, generate_complex_sql
 import re
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Tuple
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
 from clarification import is_ambiguous_query, get_clarification, apply_clarification_choice
 from query_correction import correct_query
 from query_context import save_context, is_followup, rewrite_followup, get_last_query
+from routes.api import api_bp
+from routes.auth import auth_bp
+from routes.dashboard import dashboard_bp
+from routes.query import query_bp
+from routes.views import views_bp
 
 # ── Logging setup ────────────────────────────────────────────────────────────
 logging.basicConfig(
