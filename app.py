@@ -1574,7 +1574,6 @@ register_query_routes(
     log_audit_event=_log_audit_event,
     log_query_history=_log_query_history,
     log_security_event=_log_security_event,
-    normalize_role=_normalize_role,
 )
 register_admin_routes(
     app,

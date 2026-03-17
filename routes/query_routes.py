@@ -19,7 +19,6 @@ def register_query_routes(
     log_audit_event,
     log_query_history,
     log_security_event,
-    normalize_role,
 ):
     """Register query routes on the Flask app."""
 
@@ -37,7 +36,6 @@ def register_query_routes(
             log_audit_event=log_audit_event,
             log_query_history=log_query_history,
             log_security_event=log_security_event,
-            normalize_role=normalize_role,
         )
         return jsonify(body), status
 

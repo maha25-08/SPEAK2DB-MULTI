@@ -1,5 +1,6 @@
 """Security and settings helpers for SPEAK2DB."""
 import logging
+import os
 import sqlite3
 from datetime import datetime
 
@@ -171,7 +172,7 @@ def record_failed_login(username: str, reason: str):
 def start_user_session_log(user_id: str, role: str):
     """Create a session log entry for the current login."""
     try:
-        session['audit_session_id'] = session.get('audit_session_id') or __import__('os').urandom(16).hex()
+        session['audit_session_id'] = session.get('audit_session_id') or os.urandom(16).hex()
         conn = sqlite3.connect(MAIN_DB)
         conn.execute(
             '''

@@ -59,7 +59,6 @@ def execute_query_request(
     log_audit_event,
     log_query_history,
     log_security_event,
-    normalize_role,
 ):
     """Process a /query POST request payload and return ``(body, status)``."""
     user_session = user_session or session
