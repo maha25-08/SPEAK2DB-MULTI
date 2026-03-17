@@ -874,10 +874,24 @@ function initializeApp() {
         qInput.focus();
     }
 
-    if (getVoiceStatusEl()) {
-        setVoiceStatus('💡 Speak clearly. Avoid background noise. Review text before confirming.', 'status-info');
-    }
+    // Initialize voice only when mic button is present
+    if (getEl('micBtn')) initVoice();
+    loadUiConfig();
+}
 
-    // Initialize voice only when a voice button is present
-    if (getVoiceButton()) initVoice();
+async function loadUiConfig() {
+    try {
+        const response = await fetch('/api/ui-config');
+        if (!response.ok) return;
+        const config = await response.json();
+        const settings = config.settings || {};
+        const micBtn = getEl('micBtn');
+        if (micBtn && !settings.voice_input_enabled) {
+            micBtn.disabled = true;
+            micBtn.style.opacity = '0.5';
+            micBtn.title = 'Voice input disabled by administrator';
+        }
+    } catch (error) {
+        console.warn('UI config unavailable', error);
+    }
 }

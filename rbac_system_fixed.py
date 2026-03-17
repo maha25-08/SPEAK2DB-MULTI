@@ -241,7 +241,7 @@ class RBACSystem:
             for category_perms in self.permissions[role].values():
                 permissions.update(category_perms)
         
-        # Add inherited permissions (Student < Faculty/Librarian < Administrator)
+        # Add inherited permissions (Student < Librarian/Faculty < Administrator)
         if role in ('Librarian', 'Faculty'):
             # Inherit all Student permissions
             for category_perms in self.permissions['Student'].values():
@@ -254,7 +254,32 @@ class RBACSystem:
             # Add admin permissions
             for category_perms in self.permissions['Administrator'].values():
                 permissions.update(category_perms)
-        permissions.update(db_permissions)
+
+        # Merge DB-backed role permissions for admin-managed overrides/extensions
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            role_scope = 'Librarian' if role == 'Faculty' else role
+            cursor.execute(
+                '''
+                SELECT p.name
+                FROM Roles r
+                JOIN RolePermissions rp ON rp.role_id = r.id
+                JOIN Permissions p ON p.id = rp.permission_id
+                WHERE r.name = ?
+                ''',
+                (role_scope,),
+            )
+            permissions.update(row[0] for row in cursor.fetchall())
+        except Exception as e:
+            print(f"❌ Error getting DB permissions: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        
         return permissions
 
     def _get_db_role_permissions(self, role: str) -> Set[str]:
@@ -317,28 +342,74 @@ class RBACSystem:
                 'Books', 'Issued', 'Fines', 'Reservations', 'Students'
             },
             'Faculty': {
-                'Books', 'Faculty', 'Departments', 'QueryHistory'
+                'Books', 'Issued', 'Fines', 'Reservations', 'Students',
+                'Users', 'Publishers', 'Departments', 'QueryHistory',
+                'SpecialPermissions', 'Faculty'
             },
             'Librarian': {
                 'Books', 'Issued', 'Fines', 'Reservations', 'Students',
                 'Users', 'Publishers', 'Departments', 'QueryHistory',
-                'SpecialPermissions'
+                'SpecialPermissions', 'Faculty'
             },
             'Administrator': {
-                # All tables
+                # Administration and monitoring tables
                 'Books', 'Issued', 'Fines', 'Reservations', 'Students',
                 'Users', 'Publishers', 'Departments', 'QueryHistory',
-                'SpecialPermissions', 'Faculty'
+                'SpecialPermissions', 'Faculty', 'ActivityLogs', 'AuditLog',
+                'AuditTrail', 'DataAccessLog', 'FailedLoginAttempts',
+                'PermissionCache', 'Permissions', 'ResourceAccess',
+                'RolePermissions', 'Roles', 'SecurityAlerts', 'SecurityLog',
+                'SecuritySettings', 'SessionLog', 'SessionSecurity',
+                'SpecialPermissions', 'TwoFactorAuth', 'UserRoles',
+                'PasswordResetTokens', 'IPReputation'
             }
         }
-        db_table_access = {
-            permission.split(':', 1)[1]
-            for permission in self._get_db_role_permissions(role)
-            if permission.startswith('table_access:')
-        }
-        if db_table_access:
-            return table_access.get(role, set()) | db_table_access
-        return table_access.get(role, set())
+
+        accessible = set(table_access.get(role, set()))
+
+        # If DB-managed table permissions exist, use them as the effective list.
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            role_scope = 'Librarian' if role == 'Faculty' else role
+            role_permission_count = cursor.execute(
+                '''
+                SELECT COUNT(*)
+                FROM Roles r
+                JOIN RolePermissions rp ON rp.role_id = r.id
+                WHERE r.name = ?
+                ''',
+                (role_scope,),
+            ).fetchone()[0]
+            cursor.execute(
+                '''
+                SELECT p.name
+                FROM Roles r
+                JOIN RolePermissions rp ON rp.role_id = r.id
+                JOIN Permissions p ON p.id = rp.permission_id
+                WHERE r.name = ? AND p.category = 'table_access'
+                ''',
+                (role_scope,),
+            )
+            table_permissions = set()
+            for row in cursor.fetchall():
+                permission_name = row[0]
+                if ':' in permission_name:
+                    table_permissions.add(permission_name.split(':', 1)[1])
+            if table_permissions:
+                accessible = table_permissions
+            elif role_permission_count:
+                accessible = set()
+        except Exception as e:
+            print(f"❌ Error getting table permissions: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        return accessible
     
     def get_query_filter(self, user_id: str, table: str) -> Optional[str]:
         """🔍 Get row-level security filter for queries"""
@@ -378,8 +449,8 @@ class RBACSystem:
             
             # Additional validation based on role
             role = self.get_user_role(user_id)
-            if 'query:execute_select' not in self.get_user_permissions(user_id):
-                return False, "Query execution permission is disabled for this role"
+            if not self.has_permission(user_id, 'execute_queries'):
+                return False, "Role does not have execute_queries permission"
             if role == 'Student':
                 # Students can only do SELECT queries
                 if not sql_query.strip().upper().startswith('SELECT'):
