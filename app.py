@@ -18,7 +18,7 @@ from typing import Tuple
 
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
-from clarification import is_vague_query, get_clarification, apply_clarification_choice
+from clarification import is_ambiguous_query, get_clarification, apply_clarification_choice
 from query_correction import correct_query
 from query_context import save_context, is_followup, rewrite_followup, get_last_query
 
@@ -946,8 +946,8 @@ def query():
             user_query = apply_clarification_choice(user_query, clarification_choice)
             print(f"🗣️ Clarification applied: {user_query}")
         else:
-            clarif = get_clarification(user_query)
-            if clarif is not None:
+            if is_ambiguous_query(user_query):
+                clarif = get_clarification(user_query)
                 print(f"❓ Ambiguous query – returning clarification options")
                 return jsonify({
                     'needs_clarification': True,
