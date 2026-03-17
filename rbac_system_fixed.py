@@ -80,6 +80,32 @@ class RBACSystem:
                     'process_lost_books', 'manage_digital_resources'
                 }
             },
+            'Faculty': {
+                # 👨‍🏫 Faculty access mirrors librarian-grade read/analytics access
+                'library_operations': {
+                    'manage_books', 'add_books', 'edit_books', 'delete_books',
+                    'manage_inventory', 'process_acquisitions', 'catalog_maintenance',
+                    'manage_weeding', 'manage_special_collections'
+                },
+                'circulation_management': {
+                    'checkout_books', 'checkin_books', 'manage_renewals',
+                    'manage_reservations', 'manage_overdue', 'calculate_fines',
+                    'process_payments'
+                },
+                'user_management': {
+                    'manage_student_accounts', 'manage_faculty_accounts',
+                    'manage_memberships', 'set_permissions', 'suspend_accounts'
+                },
+                'library_analytics': {
+                    'view_circulation_reports', 'view_popular_books',
+                    'view_user_statistics', 'view_inventory_reports',
+                    'view_performance_metrics', 'export_reports'
+                },
+                'system_operations': {
+                    'manage_interlibrary_loans', 'manage_book_repairs',
+                    'process_lost_books', 'manage_digital_resources'
+                }
+            },
             'Administrator': {
                 # 🔐 System Administration (inherits all Librarian permissions)
                 'system_administration': {
@@ -162,8 +188,7 @@ class RBACSystem:
                 role_name = result[0]
                 # Map role names to standard format
                 role_mapping = {
-                    'Admin': 'Administrator',
-                    'Faculty': 'Librarian'  # Faculty users get Librarian role
+                    'Admin': 'Administrator'
                 }
                 return role_mapping.get(role_name, role_name)
             
@@ -175,8 +200,7 @@ class RBACSystem:
             if result:
                 role_name = result[0]
                 role_mapping = {
-                    'Admin': 'Administrator',
-                    'Faculty': 'Librarian'
+                    'Admin': 'Administrator'
                 }
                 return role_mapping.get(role_name, role_name)
             
@@ -210,6 +234,7 @@ class RBACSystem:
             return set()
         
         permissions = set()
+        db_permissions = self._get_db_role_permissions(role)
         
         # Add role-specific permissions
         if role in self.permissions:
@@ -223,7 +248,7 @@ class RBACSystem:
                 permissions.update(category_perms)
         elif role == 'Administrator':
             # Inherit all Student and Librarian permissions
-            for base_role in ['Student', 'Librarian']:
+            for base_role in ['Student', 'Librarian', 'Faculty']:
                 for category_perms in self.permissions[base_role].values():
                     permissions.update(category_perms)
             # Add admin permissions
@@ -256,6 +281,28 @@ class RBACSystem:
                 pass
         
         return permissions
+
+    def _get_db_role_permissions(self, role: str) -> Set[str]:
+        """Read DB-backed permissions assigned to a role."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.name
+                FROM Permissions p
+                JOIN RolePermissions rp ON rp.permission_id = p.id
+                JOIN Roles r ON r.id = rp.role_id
+                WHERE r.name = ?
+            """, (role,))
+            rows = cursor.fetchall()
+            return {row[0] for row in rows}
+        except Exception:
+            return set()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def has_permission(self, user_id: str, permission: str) -> bool:
         """✅ Check if user has specific permission"""
