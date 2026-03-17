@@ -81,6 +81,40 @@
         .badge-ai { background: #6c3483; color: #fff; }
         .badge-main { background: #1a5276; color: #fff; }
         .badge-archive { background: #784212; color: #fff; }
+        .voice-status {
+            margin-top: 0.85rem;
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+            background: #eef4ff;
+            border: 1px solid #c5d8f5;
+            color: #1a3a6b;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .voice-status.status-listening {
+            background: #fff7e6;
+            border-color: #ffd38a;
+            color: #7a4b00;
+        }
+        .voice-status.status-error {
+            background: #fff1f0;
+            border-color: #ffb3b3;
+            color: #a61d24;
+        }
+        .voice-status.status-warning {
+            background: #fff8e1;
+            border-color: #f1d48b;
+            color: #7a5a00;
+        }
+        .voice-status .btn-clarification {
+            margin-left: 0.6rem;
+        }
+        .voice-status-note {
+            display: block;
+            margin-top: 0.6rem;
+            font-size: 0.88rem;
+            color: #4a5d7a;
+        }
     </style>
 </head>
 
@@ -320,11 +354,12 @@
                             <span class="floating-icon">🗑️</span>
                             Clear
                         </button>
-                        <button id="micBtn" class="btn-secondary btn-interactive">
+                        <button id="voiceBtn" class="btn-secondary btn-interactive" type="button" title="Push to talk">
                             <span class="floating-icon">🎤</span>
                             Voice Input
                         </button>
                     </div>
+                    <div id="voiceStatus" class="voice-status" aria-live="polite"></div>
                 </div>
             </section>
 
