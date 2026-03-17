@@ -1,6 +1,7 @@
 """Security and settings helpers for SPEAK2DB."""
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime
 
@@ -56,7 +57,7 @@ def get_int_setting(name: str, default: int) -> int:
 
 
 def set_setting(name: str, value: str, updated_by: str = None, description: str = None):
-    """Insert or update a setting value."""
+    """Insert or update a setting value in ``SecuritySettings``."""
     updated_by = updated_by or session.get('user_id', 'system')
     conn = sqlite3.connect(MAIN_DB)
     cursor = conn.cursor()
@@ -244,7 +245,6 @@ def apply_result_limit(sql_query: str, max_rows: int) -> str:
     """Cap query results with a configurable LIMIT."""
     if not sql_query or max_rows <= 0:
         return sql_query
-    import re
     limit_match = re.search(r'\bLIMIT\s+(\d+)\b', sql_query, re.IGNORECASE)
     if not limit_match:
         return sql_query.rstrip().rstrip(';') + f' LIMIT {max_rows}'

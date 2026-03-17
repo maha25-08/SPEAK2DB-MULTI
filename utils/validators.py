@@ -46,3 +46,11 @@ def validate_managed_user_form(form_data, existing_user: dict = None) -> Tuple[d
     if existing_user is not None and not normalized['password']:
         normalized['password'] = ''
     return normalized, ''
+
+
+def validate_query_result_limit(raw_value: str, default_limit: int) -> Tuple[str, str]:
+    """Normalize and validate the admin-configurable max query result limit."""
+    normalized = (raw_value or str(default_limit)).strip() or str(default_limit)
+    if not normalized.isdigit() or int(normalized) <= 0:
+        return normalized, 'Max query result limit must be a positive number greater than zero.'
+    return normalized, ''

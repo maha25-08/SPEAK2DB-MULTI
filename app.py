@@ -28,7 +28,10 @@ from routes.dashboard import dashboard_bp
 from routes.query_routes import register_query_routes
 from routes.views import views_bp
 from utils.helpers import is_staff
-from utils.validators import validate_managed_user_form as validate_managed_user_form_service
+from utils.validators import (
+    validate_managed_user_form as validate_managed_user_form_service,
+    validate_query_result_limit as validate_query_result_limit_service,
+)
 
 # ── Logging setup ────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -49,8 +52,8 @@ except ImportError:
     _SECURITY_HEADERS_AVAILABLE = False
 
 # Database paths
-MAIN_DB = os.getenv("MAIN_DB", MAIN_DB)
-ARCHIVE_DB = os.getenv("ARCHIVE_DB", ARCHIVE_DB)
+MAIN_DB = os.getenv("MAIN_DB", "library_main.db")
+ARCHIVE_DB = os.getenv("ARCHIVE_DB", "library_archive.db")
 SUPPORTED_ROLES = ('Student', 'Faculty', 'Librarian', 'Administrator')
 REGISTRATION_ROLES = ('Student', 'Faculty', 'Librarian')
 DEFAULT_QUERY_PERMISSION = 'query:execute_select'
@@ -1590,6 +1593,7 @@ register_admin_routes(
     set_setting=_set_setting,
     sync_role_profile_tables=_sync_role_profile_tables,
     validate_managed_user_form=validate_managed_user_form_service,
+    validate_query_result_limit=validate_query_result_limit_service,
     log_activity=_log_activity,
     log_audit_event=_log_audit_event,
 )

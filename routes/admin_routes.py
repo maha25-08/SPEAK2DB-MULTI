@@ -23,6 +23,7 @@ def register_admin_routes(
     set_setting,
     sync_role_profile_tables,
     validate_managed_user_form,
+    validate_query_result_limit,
     log_activity,
     log_audit_event,
 ):
@@ -217,9 +218,12 @@ def register_admin_routes(
         redir = _require_admin_session()
         if redir:
             return redir
-        max_limit = request.form.get('max_query_result_limit', str(default_query_limit)).strip() or str(default_query_limit)
-        if not max_limit.isdigit() or int(max_limit) <= 0:
-            flash('Max query result limit must be a positive number.', 'error')
+        max_limit, error = validate_query_result_limit(
+            request.form.get('max_query_result_limit'),
+            default_query_limit,
+        )
+        if error:
+            flash(error, 'error')
             return redirect(url_for('admin_dashboard_route'))
         settings_payload = {
             'max_query_result_limit': max_limit,
