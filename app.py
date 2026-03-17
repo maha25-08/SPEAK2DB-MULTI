@@ -9,8 +9,7 @@ import sqlite3
 import os
 import jinja2
 import time
-from ollama_sql import generate_sql
-import pandas as pd
+from ollama_sql import generate_sql, generate_complex_sql
 import re
 from collections import Counter
 from datetime import datetime, timezone
@@ -51,6 +50,15 @@ app.secret_key = 'your-secret-key-change-in-production'
 MAIN_DB = "library_main.db"
 ARCHIVE_DB = "library_archive.db"
 
+ROLE_CHOICES = ('Student', 'Faculty', 'Librarian', 'Administrator')
+ROLE_PERMISSION_SCOPE = {
+    'Student': 'Student',
+    'Faculty': 'Librarian',
+    'Librarian': 'Librarian',
+    'Administrator': 'Administrator',
+}
+DEFAULT_QUERY_LIMIT = 100
+
 
 def _ensure_query_history_schema():
     """Add the ``role`` column to QueryHistory if it was created without it."""
@@ -66,6 +74,768 @@ def _ensure_query_history_schema():
 
 
 _ensure_query_history_schema()
+
+
+def _normalize_role(role: str) -> str:
+    """Normalize database and session role names."""
+    role = (role or '').strip()
+    mapping = {
+        'Admin': 'Administrator',
+        'Administrator': 'Administrator',
+        'Faculty': 'Faculty',
+        'Librarian': 'Librarian',
+        'Student': 'Student',
+    }
+    return mapping.get(role, role or 'Student')
+
+
+def _role_permission_scope(role: str) -> str:
+    """Return the RBAC/permission scope used for a UI role."""
+    return ROLE_PERMISSION_SCOPE.get(_normalize_role(role), 'Student')
+
+
+def _request_ip() -> str:
+    """Best-effort request IP address."""
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _request_user_agent() -> str:
+    """Best-effort request user agent."""
+    return request.headers.get('User-Agent', 'unknown')
+
+
+def _ensure_admin_support_schema():
+    """Create lightweight admin-control tables and seed settings/permissions."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS ActivityLogs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                action TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+        )
+
+        default_settings = {
+            'max_query_result_limit': ('100', 'Maximum rows returned by query console'),
+            'voice_input_enabled': ('true', 'Enable voice input in supported UIs'),
+            'ai_query_enabled': ('true', 'Enable AI-driven natural language query processing'),
+            'ollama_sql_enabled': ('true', 'Enable Ollama-assisted SQL generation when available'),
+        }
+        for setting_name, (setting_value, description) in default_settings.items():
+            cursor.execute(
+                '''
+                INSERT INTO SecuritySettings (setting_name, setting_value, description)
+                SELECT ?, ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM SecuritySettings WHERE setting_name = ?
+                )
+                ''',
+                (setting_name, setting_value, description, setting_name),
+            )
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'")
+        table_names = sorted(row[0] for row in cursor.fetchall())
+
+        required_permissions = {
+            'execute_queries': ('query_control', 'Allow natural language query execution'),
+            'use_ai_queries': ('query_control', 'Allow AI-assisted SQL generation'),
+        }
+        for table_name in table_names:
+            required_permissions[f'table_access:{table_name}'] = (
+                'table_access',
+                f'Allow access to the {table_name} table',
+            )
+
+        for perm_name, (category, description) in required_permissions.items():
+            cursor.execute(
+                '''
+                INSERT INTO Permissions (name, category, description)
+                SELECT ?, ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM Permissions WHERE name = ?
+                )
+                ''',
+                (perm_name, category, description, perm_name),
+            )
+
+        role_defaults = {
+            'Student': {'Books', 'Issued', 'Fines', 'Reservations', 'Students'},
+            'Librarian': {
+                'Books', 'Issued', 'Fines', 'Reservations', 'Students',
+                'Users', 'Publishers', 'Departments', 'QueryHistory',
+                'SpecialPermissions', 'Faculty'
+            },
+            'Administrator': set(table_names),
+        }
+
+        role_ids = {
+            row[1]: row[0]
+            for row in cursor.execute("SELECT id, name FROM Roles WHERE name IN ('Student', 'Librarian', 'Administrator')")
+        }
+        permission_lookup = {
+            row[1]: row[0]
+            for row in cursor.execute("SELECT id, name FROM Permissions")
+        }
+
+        for role_name, default_tables in role_defaults.items():
+            role_id = role_ids.get(role_name)
+            if not role_id:
+                continue
+
+            default_perm_names = {'execute_queries', 'use_ai_queries'}
+            default_perm_names.update(f'table_access:{table_name}' for table_name in default_tables)
+            for perm_name in sorted(default_perm_names):
+                perm_id = permission_lookup.get(perm_name)
+                if not perm_id:
+                    continue
+                existing_assignment = cursor.execute(
+                    "SELECT 1 FROM RolePermissions WHERE role_id = ? AND permission_id = ?",
+                    (role_id, perm_id),
+                ).fetchone()
+                if existing_assignment:
+                    continue
+                cursor.execute(
+                    '''
+                    INSERT INTO RolePermissions (role_id, permission_id)
+                    VALUES (?, ?)
+                    ''',
+                    (role_id, perm_id),
+                )
+
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[schema-init] Admin support migration skipped: {exc}")
+
+
+def _get_setting(name: str, default: str = '') -> str:
+    """Read a system setting from SecuritySettings."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        row = conn.execute(
+            "SELECT setting_value FROM SecuritySettings WHERE setting_name = ?",
+            (name,),
+        ).fetchone()
+        conn.close()
+        return row['setting_value'] if row else default
+    except Exception:
+        return default
+
+
+def _get_bool_setting(name: str, default: bool = False) -> bool:
+    """Read a boolean system setting."""
+    value = _get_setting(name, 'true' if default else 'false')
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _set_setting(name: str, value: str, updated_by: str = None, description: str = None):
+    """Insert or update a setting value."""
+    conn = sqlite3.connect(MAIN_DB)
+    cursor = conn.cursor()
+    existing = cursor.execute(
+        "SELECT id FROM SecuritySettings WHERE setting_name = ?",
+        (name,),
+    ).fetchone()
+    if existing:
+        cursor.execute(
+            '''
+            UPDATE SecuritySettings
+            SET setting_value = ?, description = COALESCE(?, description), updated_by = ?, updated_date = CURRENT_TIMESTAMP
+            WHERE id = ?
+            ''',
+            (str(value), description, updated_by, existing[0]),
+        )
+    else:
+        cursor.execute(
+            '''
+            INSERT INTO SecuritySettings (setting_name, setting_value, description, updated_by, updated_date)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''',
+            (name, str(value), description, updated_by),
+        )
+    conn.commit()
+    conn.close()
+
+
+def _log_activity(user_id: str, action: str):
+    """Write a compact activity log entry."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            "INSERT INTO ActivityLogs (user_id, action, timestamp) VALUES (?, ?, ?)",
+            (user_id, action, datetime.now().isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[activity-log] {exc}")
+
+
+def _log_audit_event(user_id: str, role: str, action: str, resource_type: str, details: str, success: bool = True):
+    """Write a detailed audit log entry when the table is available."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            INSERT INTO AuditLog (user_id, user_role, action, resource_type, details, ip_address, user_agent, timestamp, success)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                user_id,
+                _normalize_role(role),
+                action,
+                resource_type,
+                details,
+                _request_ip(),
+                _request_user_agent(),
+                datetime.now().isoformat(),
+                1 if success else 0,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[audit-log] {exc}")
+
+
+def _log_security_event(event_type: str, details: str, severity: str = 'medium', user_id: str = None):
+    """Write a security monitoring record."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            INSERT INTO SecurityLog (event_type, details, ip_address, user_agent, user_id, session_id, timestamp, severity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                event_type,
+                details,
+                _request_ip(),
+                _request_user_agent(),
+                user_id,
+                session.get('audit_session_id'),
+                datetime.now().isoformat(),
+                severity,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[security-log] {exc}")
+
+
+def _record_failed_login(username: str, reason: str):
+    """Persist a failed login attempt for admin monitoring."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            INSERT INTO FailedLoginAttempts (username, ip_address, user_agent, attempt_time, failure_reason, blocked)
+            VALUES (?, ?, ?, ?, ?, 0)
+            ''',
+            (username, _request_ip(), _request_user_agent(), datetime.now().isoformat(), reason),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[failed-login] {exc}")
+
+
+def _start_user_session_log(user_id: str, role: str):
+    """Create a session log entry for the current login."""
+    try:
+        session['audit_session_id'] = session.get('audit_session_id') or os.urandom(16).hex()
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            INSERT INTO SessionLog (user_id, user_role, session_id, login_time, ip_address, user_agent, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'Active')
+            ''',
+            (
+                user_id,
+                _normalize_role(role),
+                session['audit_session_id'],
+                datetime.now().isoformat(),
+                _request_ip(),
+                _request_user_agent(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[session-log] {exc}")
+
+
+def _end_user_session_log():
+    """Mark the current login session as logged out."""
+    audit_session_id = session.get('audit_session_id')
+    if not audit_session_id:
+        return
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            UPDATE SessionLog
+            SET logout_time = ?, status = 'LoggedOut'
+            WHERE session_id = ? AND logout_time IS NULL
+            ''',
+            (datetime.now().isoformat(), audit_session_id),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[session-log] logout update failed: {exc}")
+
+
+def _extract_tables_from_sql(sql_query: str) -> set:
+    """Return tables referenced by FROM/JOIN clauses."""
+    tables = set()
+    if not sql_query:
+        return tables
+    tables.update(re.findall(r'\bFROM\s+(\w+)', sql_query, re.IGNORECASE))
+    tables.update(re.findall(r'\bJOIN\s+(\w+)', sql_query, re.IGNORECASE))
+    return tables
+
+
+def _get_role_permission_config(conn, role_name: str) -> dict:
+    """Fetch DB-backed permissions for a role scope."""
+    role_scope = _role_permission_scope(role_name)
+    permissions = [
+        dict(row)
+        for row in conn.execute(
+            '''
+            SELECT p.id, p.name, p.category, p.description
+            FROM Roles r
+            JOIN RolePermissions rp ON rp.role_id = r.id
+            JOIN Permissions p ON p.id = rp.permission_id
+            WHERE r.name = ?
+            ORDER BY p.category, p.name
+            ''',
+            (role_scope,),
+        ).fetchall()
+    ]
+    return {
+        'permissions': permissions,
+        'permission_names': {perm['name'] for perm in permissions},
+        'table_access': {
+            perm['name'].split(':', 1)[1]
+            for perm in permissions
+            if perm['category'] == 'table_access' and ':' in perm['name']
+        },
+    }
+
+
+def _role_can_execute_queries(conn, role_name: str) -> bool:
+    """Check role-level query permission."""
+    config = _get_role_permission_config(conn, role_name)
+    if _role_permission_scope(role_name) in {'Student', 'Librarian', 'Administrator'}:
+        return 'execute_queries' in config['permission_names']
+    return True
+
+
+def _role_can_use_ai_queries(conn, role_name: str) -> bool:
+    """Check whether a role may use AI-assisted query generation."""
+    config = _get_role_permission_config(conn, role_name)
+    if _role_permission_scope(role_name) in {'Student', 'Librarian', 'Administrator'}:
+        return 'use_ai_queries' in config['permission_names']
+    return True
+
+
+def _role_allows_tables(conn, role_name: str, sql_query: str) -> Tuple[bool, str]:
+    """Enforce DB-configured table access rules for a role when configured."""
+    config = _get_role_permission_config(conn, role_name)
+    allowed_tables = config['table_access']
+    query_tables = _extract_tables_from_sql(sql_query)
+    if not allowed_tables:
+        if config['permissions'] and query_tables:
+            return False, f"Role {_normalize_role(role_name)} has no table access permissions configured"
+        return True, ""
+    for table in query_tables:
+        if table not in allowed_tables:
+            return False, f"Role {_normalize_role(role_name)} cannot access table {table}"
+    return True, ""
+
+
+def _apply_result_limit(sql_query: str, max_rows: int) -> str:
+    """Cap query results with a configurable LIMIT."""
+    if not sql_query or max_rows <= 0:
+        return sql_query
+
+    limit_match = re.search(r'\bLIMIT\s+(\d+)\b', sql_query, re.IGNORECASE)
+    if not limit_match:
+        return sql_query.rstrip().rstrip(';') + f" LIMIT {max_rows}"
+
+    current_limit = int(limit_match.group(1))
+    if current_limit <= max_rows:
+        return sql_query
+
+    return re.sub(r'\bLIMIT\s+\d+\b', f'LIMIT {max_rows}', sql_query, count=1, flags=re.IGNORECASE)
+
+
+def _generate_sql_for_query(user_query: str, conn, role_name: str) -> Tuple[str, str]:
+    """Generate SQL while respecting admin AI/Ollama controls."""
+    if not _get_bool_setting('ai_query_enabled', True):
+        raise PermissionError('AI query processing is disabled by the administrator.')
+
+    if not _role_can_execute_queries(conn, role_name):
+        raise PermissionError(f'{_normalize_role(role_name)} queries are disabled for this role.')
+
+    ollama_enabled = _get_bool_setting('ollama_sql_enabled', True)
+    role_ai_enabled = _role_can_use_ai_queries(conn, role_name)
+
+    if not ollama_enabled or not role_ai_enabled:
+        return generate_complex_sql(user_query), 'rule-based'
+
+    try:
+        return generate_sql(user_query), 'hybrid'
+    except Exception as exc:
+        _log_activity(session.get('user_id', 'system'), f"LLM fallback triggered: {str(exc)[:80]}")
+        return generate_complex_sql(user_query), 'rule-based-fallback'
+
+
+def _log_query_history(user_id: str, role: str, user_query: str, sql_query: str, success: bool, response_time: float = None):
+    """Persist query analytics/history."""
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        conn.execute(
+            '''
+            INSERT INTO QueryHistory (user_id, query, sql_query, response_time, timestamp, success, role)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                user_id,
+                user_query,
+                sql_query,
+                response_time,
+                datetime.now().isoformat(),
+                1 if success else 0,
+                _normalize_role(role),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[query-history] {exc}")
+
+
+def _fetch_managed_users(conn):
+    """Return a unified list of users for the admin control panel."""
+    rows = conn.execute(
+        '''
+        SELECT
+            u.id,
+            u.username,
+            u.role,
+            u.email,
+            u.created_date,
+            COALESCE(
+                (SELECT s.name FROM Students s
+                 WHERE s.roll_number = u.username OR lower(s.email) = lower(u.email)
+                 LIMIT 1),
+                (SELECT f.name FROM Faculty f
+                 WHERE lower(f.email) = lower(u.email)
+                 LIMIT 1),
+                u.username
+            ) AS name,
+            (SELECT s.roll_number FROM Students s
+             WHERE s.roll_number = u.username OR lower(s.email) = lower(u.email)
+             LIMIT 1) AS roll_number,
+            (SELECT s.branch FROM Students s
+             WHERE s.roll_number = u.username OR lower(s.email) = lower(u.email)
+             LIMIT 1) AS branch,
+            (SELECT s.year FROM Students s
+             WHERE s.roll_number = u.username OR lower(s.email) = lower(u.email)
+             LIMIT 1) AS year,
+            (SELECT s.phone FROM Students s
+             WHERE s.roll_number = u.username OR lower(s.email) = lower(u.email)
+             LIMIT 1) AS student_phone,
+            (SELECT f.department FROM Faculty f WHERE lower(f.email) = lower(u.email) LIMIT 1) AS department,
+            (SELECT f.designation FROM Faculty f WHERE lower(f.email) = lower(u.email) LIMIT 1) AS designation,
+            (SELECT f.phone FROM Faculty f WHERE lower(f.email) = lower(u.email) LIMIT 1) AS faculty_phone
+        FROM Users u
+        ORDER BY datetime(u.created_date) DESC, u.username ASC
+        '''
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _fetch_activity_logs(conn, limit: int = 100):
+    """Return recent activity log entries."""
+    rows = conn.execute(
+        "SELECT id, user_id, action, timestamp FROM ActivityLogs ORDER BY datetime(timestamp) DESC, id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _fetch_role_permission_matrix(conn):
+    """Return permissions grouped by role for admin editing."""
+    role_rows = conn.execute(
+        "SELECT id, name, level FROM Roles WHERE name IN ('Student', 'Librarian', 'Administrator') ORDER BY level"
+    ).fetchall()
+    permission_rows = conn.execute(
+        "SELECT id, name, category, description FROM Permissions ORDER BY category, name"
+    ).fetchall()
+    assigned_lookup = {}
+    for row in conn.execute("SELECT role_id, permission_id FROM RolePermissions").fetchall():
+        assigned_lookup.setdefault(row['role_id'], set()).add(row['permission_id'])
+
+    matrix = []
+    for role_row in role_rows:
+        role_data = dict(role_row)
+        grouped_permissions = {}
+        for perm in permission_rows:
+            grouped_permissions.setdefault(perm['category'], []).append({
+                'id': perm['id'],
+                'name': perm['name'],
+                'description': perm['description'],
+                'assigned': perm['id'] in assigned_lookup.get(role_row['id'], set()),
+            })
+        matrix.append({
+            'id': role_row['id'],
+            'name': role_row['name'],
+            'label': 'Faculty / Librarian' if role_row['name'] == 'Librarian' else role_row['name'],
+            'permissions_by_category': grouped_permissions,
+        })
+    return matrix
+
+
+def _build_admin_dashboard_context(active_section: str = 'overview') -> dict:
+    """Collect control-panel data for the admin dashboard."""
+    conn = get_db_connection(MAIN_DB)
+    try:
+        stats = {
+            'total_books': conn.execute("SELECT COUNT(*) AS cnt FROM Books").fetchone()['cnt'],
+            'total_users': conn.execute("SELECT COUNT(*) AS cnt FROM Users").fetchone()['cnt'],
+            'total_students': conn.execute("SELECT COUNT(*) AS cnt FROM Students").fetchone()['cnt'],
+            'total_faculty': conn.execute("SELECT COUNT(*) AS cnt FROM Faculty").fetchone()['cnt'],
+            'active_sessions': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM SessionLog WHERE status = 'Active' AND logout_time IS NULL"
+            ).fetchone()['cnt'],
+            'failed_queries': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM QueryHistory WHERE success = 0"
+            ).fetchone()['cnt'],
+            'blocked_queries': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM SecurityLog WHERE event_type LIKE '%blocked%'"
+            ).fetchone()['cnt'],
+            'unauthorized_attempts': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM SecurityLog WHERE event_type = 'unauthorized_access'"
+            ).fetchone()['cnt'],
+        }
+
+        most_active_users = [
+            dict(row)
+            for row in conn.execute(
+                '''
+                SELECT user_id, COUNT(*) AS query_count
+                FROM QueryHistory
+                GROUP BY user_id
+                ORDER BY query_count DESC, user_id ASC
+                LIMIT 5
+                '''
+            ).fetchall()
+        ]
+
+        security_events = [
+            dict(row)
+            for row in conn.execute(
+                '''
+                SELECT event_type, details, timestamp, severity, user_id
+                FROM SecurityLog
+                ORDER BY datetime(timestamp) DESC, id DESC
+                LIMIT 20
+                '''
+            ).fetchall()
+        ]
+
+        failed_logins = [
+            dict(row)
+            for row in conn.execute(
+                '''
+                SELECT username, ip_address, attempt_time, failure_reason, blocked
+                FROM FailedLoginAttempts
+                ORDER BY datetime(attempt_time) DESC, id DESC
+                LIMIT 10
+                '''
+            ).fetchall()
+        ]
+
+        llm_usage = {
+            'ai_enabled': _get_bool_setting('ai_query_enabled', True),
+            'ollama_enabled': _get_bool_setting('ollama_sql_enabled', True),
+            'hybrid_queries': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM ActivityLogs WHERE action LIKE 'Query executed (hybrid)%'"
+            ).fetchone()['cnt'],
+            'rule_based_queries': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM ActivityLogs WHERE action LIKE 'Query executed (rule-based)%'"
+            ).fetchone()['cnt'],
+            'llm_failures': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM ActivityLogs WHERE action LIKE 'LLM fallback%'"
+            ).fetchone()['cnt'],
+        }
+
+        context = {
+            'role': session.get('role', 'Administrator'),
+            'user': session.get('user_id', 'admin'),
+            'stats': stats,
+            'recent_activity': _fetch_activity_logs(conn, limit=25),
+            'managed_users': _fetch_managed_users(conn),
+            'role_permissions': _fetch_role_permission_matrix(conn),
+            'settings': {
+                'max_query_result_limit': _get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)),
+                'voice_input_enabled': _get_bool_setting('voice_input_enabled', True),
+                'ai_query_enabled': _get_bool_setting('ai_query_enabled', True),
+                'ollama_sql_enabled': _get_bool_setting('ollama_sql_enabled', True),
+            },
+            'security_events': security_events,
+            'failed_logins': failed_logins,
+            'most_active_users': most_active_users,
+            'llm_usage': llm_usage,
+            'active_section': active_section,
+        }
+        return context
+    finally:
+        conn.close()
+
+
+def _get_user_with_details(conn, user_id: int):
+    """Get a managed user row and derived profile details."""
+    for user in _fetch_managed_users(conn):
+        if int(user['id']) == int(user_id):
+            return user
+    return None
+
+
+def _sync_role_profile_tables(conn, user_record: dict):
+    """Keep Users/Students/Faculty aligned for the current role."""
+    role = _normalize_role(user_record.get('role'))
+    username = user_record.get('username', '').strip()
+    email = user_record.get('email', '').strip().lower()
+    name = user_record.get('name', '').strip() or username
+    phone = (user_record.get('phone') or '').strip() or 'N/A'
+    branch = (user_record.get('branch') or '').strip() or 'GEN'
+    year = (user_record.get('year') or '').strip() or '1'
+    department = (user_record.get('department') or '').strip() or 'General'
+    designation = (user_record.get('designation') or '').strip() or ('Librarian' if role == 'Librarian' else 'Faculty')
+
+    if role == 'Student':
+        existing = conn.execute(
+            "SELECT id FROM Students WHERE roll_number = ? OR lower(email) = lower(?)",
+            (username, email),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                '''
+                UPDATE Students
+                SET roll_number = ?, name = ?, branch = ?, year = ?, email = ?, phone = ?, role = 'Student'
+                WHERE id = ?
+                ''',
+                (username, name, branch, year, email, phone, existing['id']),
+            )
+        else:
+            conn.execute(
+                '''
+                INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                VALUES (?, ?, ?, ?, ?, ?, 'Student')
+                ''',
+                (username, name, branch, year, email, phone),
+            )
+        conn.execute(
+            "DELETE FROM Faculty WHERE lower(email) = lower(?)",
+            (email,),
+        )
+    elif role in ('Faculty', 'Librarian'):
+        existing = conn.execute(
+            "SELECT id FROM Faculty WHERE lower(email) = lower(?)",
+            (email,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                '''
+                UPDATE Faculty
+                SET name = ?, department = ?, designation = ?, email = ?, phone = ?, specialization = ?
+                WHERE id = ?
+                ''',
+                (name, department, designation, email, phone, designation, existing['id']),
+            )
+        else:
+            conn.execute(
+                '''
+                INSERT INTO Faculty (name, department, designation, email, phone, specialization)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                (name, department, designation, email, phone, designation),
+            )
+        conn.execute(
+            "DELETE FROM Students WHERE roll_number = ? OR lower(email) = lower(?)",
+            (username, email),
+        )
+    else:
+        conn.execute(
+            "DELETE FROM Students WHERE roll_number = ? OR lower(email) = lower(?)",
+            (username, email),
+        )
+        conn.execute(
+            "DELETE FROM Faculty WHERE lower(email) = lower(?)",
+            (email,),
+        )
+
+
+def _validate_managed_user_form(form_data, existing_user: dict = None) -> Tuple[dict, str]:
+    """Validate and normalize admin user-management payloads."""
+    username = form_data.get('username', '').strip()
+    name = form_data.get('name', '').strip()
+    email = form_data.get('email', '').strip().lower()
+    password = form_data.get('password', '').strip()
+    role = _normalize_role(form_data.get('role', '').strip())
+
+    normalized = {
+        'username': username,
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+        'branch': form_data.get('branch', '').strip(),
+        'year': form_data.get('year', '').strip(),
+        'phone': form_data.get('phone', '').strip(),
+        'department': form_data.get('department', '').strip(),
+        'designation': form_data.get('designation', '').strip(),
+    }
+
+    if not username:
+        return normalized, 'Username is required.'
+    if not name:
+        return normalized, 'Name is required.'
+    if not email or '@' not in email:
+        return normalized, 'A valid email address is required.'
+    if role not in ROLE_CHOICES:
+        return normalized, 'Please choose a supported role.'
+    if existing_user is None and not password:
+        normalized['password'] = 'pass'
+    if role == 'Student' and not normalized['year']:
+        normalized['year'] = '1'
+    if role == 'Student' and not normalized['branch']:
+        normalized['branch'] = 'GEN'
+    if role in ('Faculty', 'Librarian') and not normalized['department']:
+        normalized['department'] = 'General'
+    if role in ('Faculty', 'Librarian') and not normalized['designation']:
+        normalized['designation'] = 'Librarian' if role == 'Librarian' else 'Faculty'
+
+    if existing_user is not None and not normalized['password']:
+        normalized['password'] = ''
+
+    return normalized, ''
+
+
+_ensure_admin_support_schema()
 
 # ── Jinja2 custom filters ────────────────────────────────────────────────────
 @app.template_filter('days_overdue')
@@ -346,39 +1116,70 @@ def login():
     if not username or not password:
         flash('Please enter username and password', 'error')
         return render_template('login.html')
-    
-    # Dynamic student authentication for all 100 students
-    if username == 'admin' and password == 'pass':
-        session['user_id'] = 'admin'
-        session['role'] = 'Administrator'
-        session['student_id'] = None
-    elif username == 'librarian' and password == 'pass':
-        session['user_id'] = 'librarian'
-        session['role'] = 'Librarian'
-        session['student_id'] = None
-    elif username == 'faculty_email' and password == 'pass':
-        session['user_id'] = 'faculty_email'
-        session['role'] = 'Faculty'
-        session['student_id'] = None
-    else:
-        # Check if username is a valid student roll number
-        try:
-            conn = get_db_connection(MAIN_DB)
-            student_query = "SELECT id, roll_number FROM Students WHERE roll_number = ?"
-            student = conn.execute(student_query, (username,)).fetchone()
-            conn.close()
-            
-            if student and password == 'pass':
-                session['user_id'] = username
-                session['role'] = 'Student'
-                session['student_id'] = student['id']
+
+    authenticated = False
+    try:
+        conn = get_db_connection(MAIN_DB)
+        user_row = conn.execute(
+            "SELECT username, password, role, email FROM Users WHERE username = ? OR lower(email) = lower(?)",
+            (username, username),
+        ).fetchone()
+
+        if user_row and user_row['password'] == password:
+            normalized_role = _normalize_role(user_row['role'])
+            session['user_id'] = user_row['username']
+            session['role'] = normalized_role
+            session['student_id'] = None
+
+            if normalized_role == 'Student':
+                student_row = conn.execute(
+                    "SELECT id FROM Students WHERE roll_number = ? OR lower(email) = lower(?)",
+                    (user_row['username'], user_row['email']),
+                ).fetchone()
+                session['student_id'] = student_row['id'] if student_row else None
+            authenticated = True
+        else:
+            # Compatibility fallback for legacy demo credentials
+            if username == 'admin' and password == 'pass':
+                session['user_id'] = 'admin'
+                session['role'] = 'Administrator'
+                session['student_id'] = None
+                authenticated = True
+            elif username == 'librarian' and password == 'pass':
+                session['user_id'] = 'librarian'
+                session['role'] = 'Librarian'
+                session['student_id'] = None
+                authenticated = True
+            elif username == 'faculty_email' and password == 'pass':
+                session['user_id'] = 'faculty_email'
+                session['role'] = 'Faculty'
+                session['student_id'] = None
+                authenticated = True
             else:
-                flash('Invalid username or password', 'error')
-                return render_template('login.html')
-        except Exception as e:
-            flash('Invalid username or password', 'error')
-            return render_template('login.html')
-    
+                student = conn.execute(
+                    "SELECT id, roll_number FROM Students WHERE roll_number = ? OR lower(email) = lower(?)",
+                    (username, username),
+                ).fetchone()
+                if student and password == 'pass':
+                    session['user_id'] = student['roll_number']
+                    session['role'] = 'Student'
+                    session['student_id'] = student['id']
+                    authenticated = True
+
+        conn.close()
+    except Exception as exc:
+        print(f"[login] authentication error: {exc}")
+
+    if not authenticated:
+        _record_failed_login(username, 'Invalid username or password')
+        _log_activity(username, 'Login failed')
+        _log_security_event('failed_login', f'Login failed for {username}', severity='high', user_id=username)
+        flash('Invalid username or password', 'error')
+        return render_template('login.html')
+
+    _start_user_session_log(session['user_id'], session['role'])
+    _log_activity(session['user_id'], 'Login')
+    _log_audit_event(session['user_id'], session['role'], 'LOGIN', 'SESSION', 'User logged in', success=True)
     flash(f'Welcome, {session["role"]}!', 'success')
     # All roles land on the main query interface; role-specific dashboards are
     # accessible as separate sections from within the query interface.
@@ -387,6 +1188,10 @@ def login():
 @app.route('/logout')
 def logout():
     """Logout user"""
+    if 'user_id' in session:
+        _end_user_session_log()
+        _log_activity(session['user_id'], 'Logout')
+        _log_audit_event(session['user_id'], session.get('role', 'Student'), 'LOGOUT', 'SESSION', 'User logged out', success=True)
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -838,54 +1643,11 @@ def admin_dashboard_route():
     """Administrator dashboard"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
 
-    if session.get('role') != 'Administrator':
-        return "Access Denied", 403
-
-    user_role = session.get('role', 'Administrator')
-
-    user_id = session['user_id']
-
-    try:
-        conn = get_db_connection(MAIN_DB)
-        total_books = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Books"
-        ).fetchone()['cnt']
-        total_students = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Students"
-        ).fetchone()['cnt']
-        active_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-        ).fetchone()['cnt']
-        unpaid_fines_amount = conn.execute(
-            "SELECT COALESCE(SUM(fine_amount), 0) as total FROM Fines WHERE status = 'Unpaid'"
-        ).fetchone()['total']
-        recent_activity = conn.execute(
-            """SELECT i.issue_date as date, s.name as user, b.title as detail
-               FROM Issued i
-               JOIN Books b ON i.book_id = b.id
-               JOIN Students s ON i.student_id = s.id
-               ORDER BY i.issue_date DESC LIMIT 10"""
-        ).fetchall()
-        conn.close()
-        stats = {
-            'total_books': total_books,
-            'total_students': total_students,
-            'active_issues': active_issues,
-            'unpaid_fines_amount': unpaid_fines_amount,
-        }
-    except Exception as e:
-        print(f"[admin_dashboard] DB error: {e}")
-        recent_activity = []
-        stats = {}
-
-    return render_template(
-        'admin_dashboard.html',
-        role=user_role,
-        user=user_id,
-        stats=stats,
-        recent_activity=recent_activity,
-    )
+    return render_template('admin_dashboard.html', **_build_admin_dashboard_context('overview'))
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -908,17 +1670,21 @@ def query():
         print("❌ User not logged in")
         return jsonify({'error': 'Not logged in'}), 401
 
+    conn = None
+    user_query = ''
+    sql_query = ''
+    user_role = session.get('role', 'Student')
+    student_id = session.get('student_id')
+    query_engine = 'unknown'
     try:
         _query_start = time.time()
 
-        data = request.get_json()
+        data = request.get_json() or {}
         user_query = data.get('query', '').strip()
         # Optional: clarification choice sent back from the frontend
         clarification_choice = data.get('clarification_choice', '').strip()
         print(f"📝 Query text: {user_query}")
 
-        user_role = session.get('role', 'Student')
-        student_id = session.get('student_id')
         print(f"👤 User role: {user_role}, Student ID: {student_id}")
 
         if not user_query:
@@ -962,8 +1728,24 @@ def query():
         print("🔗 Connecting to database...")
         conn = get_db_connection(MAIN_DB)
 
+        if not _get_bool_setting('ai_query_enabled', True):
+            _log_activity(session['user_id'], 'Blocked query (AI disabled)')
+            _log_query_history(session['user_id'], user_role, user_query, '', False, round(time.time() - _query_start, 4))
+            return jsonify({'error': 'AI query processing is currently disabled by the administrator.'}), 403
+
+        if not _role_can_execute_queries(conn, user_role):
+            _log_activity(session['user_id'], f'Blocked query (role control): {user_query[:60]}')
+            _log_security_event(
+                'blocked_query',
+                f"Role {_normalize_role(user_role)} attempted query without execute permission: {user_query[:120]}",
+                severity='medium',
+                user_id=session.get('user_id'),
+            )
+            _log_query_history(session['user_id'], user_role, user_query, '', False, round(time.time() - _query_start, 4))
+            return jsonify({'error': 'This role is not allowed to execute queries.'}), 403
+
         print("🤖 Generating SQL query...")
-        sql_query = generate_sql(augmented_query)
+        sql_query, query_engine = _generate_sql_for_query(augmented_query, conn, user_role)
         # Defensive guard: generate_sql should always return non-empty, but
         # fall back to a safe default if it somehow doesn't.
         if not sql_query or not sql_query.strip():
@@ -997,7 +1779,31 @@ def query():
         safe, reason = _is_safe_sql(sql_query)
         if not safe:
             print(f"🚫 SQL blocked by safety gate: {reason}")
+            _log_activity(session['user_id'], f'Blocked query (safety gate): {reason}')
+            _log_security_event(
+                'blocked_query',
+                f"Safety gate blocked query for {session['user_id']}: {reason} | SQL={sql_query[:160]}",
+                severity='high',
+                user_id=session.get('user_id'),
+            )
+            _log_query_history(session['user_id'], user_role, user_query, sql_query, False, round(time.time() - _query_start, 4))
             return jsonify({'error': f'Query not permitted: {reason}'}), 400
+
+        allowed_tables, table_message = _role_allows_tables(conn, user_role, sql_query)
+        if not allowed_tables:
+            print(f"🚫 Role table access denied: {table_message}")
+            _log_activity(session['user_id'], f'Blocked query (table access): {table_message}')
+            _log_security_event(
+                'blocked_query',
+                table_message,
+                severity='high',
+                user_id=session.get('user_id'),
+            )
+            _log_query_history(session['user_id'], user_role, user_query, sql_query, False, round(time.time() - _query_start, 4))
+            return jsonify({'error': table_message}), 403
+
+        max_rows = int(_get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)) or DEFAULT_QUERY_LIMIT)
+        sql_query = _apply_result_limit(sql_query, max_rows)
 
         # ── Step 10: RBAC table-access validation ─────────────────────────
         if RBAC_AVAILABLE:
@@ -1005,6 +1811,14 @@ def query():
             ok, msg = rbac.validate_query_access(user_id_for_rbac, sql_query)
             if not ok:
                 print(f"🚫 RBAC denied: {msg}")
+                _log_activity(session['user_id'], f'Blocked query (RBAC): {msg}')
+                _log_security_event(
+                    'blocked_query',
+                    f"RBAC denied query for {session['user_id']}: {msg}",
+                    severity='high',
+                    user_id=session.get('user_id'),
+                )
+                _log_query_history(session['user_id'], user_role, user_query, sql_query, False, round(time.time() - _query_start, 4))
                 return jsonify({'error': f'Access denied: {msg}'}), 403
 
             # Apply additional row-level filter for students via RBAC helper
@@ -1033,6 +1847,17 @@ def query():
 
         # ── Save context for follow-up queries ────────────────────────────
         save_context(session, user_query, sql_query)
+        response_time = round(time.time() - _query_start, 4)
+        _log_query_history(session['user_id'], user_role, user_query, sql_query, True, response_time)
+        _log_activity(session['user_id'], f'Query executed ({query_engine})')
+        _log_audit_event(
+            session['user_id'],
+            user_role,
+            'QUERY_EXECUTION',
+            'SQL',
+            f"Query: {user_query[:120]} | SQL: {sql_query[:180]}",
+            success=True,
+        )
 
         return jsonify({
             'success':    True,
@@ -1042,13 +1867,32 @@ def query():
             'database':   MAIN_DB,
             'user_role':  user_role,
             'student_id': student_id,
+            'generator':  query_engine,
         })
 
     except Exception as e:
         print(f"❌ Query execution failed: {str(e)}")
         import traceback
         traceback.print_exc()
+        if 'user_id' in session and user_query:
+            elapsed = round(time.time() - _query_start, 4) if '_query_start' in locals() else None
+            _log_query_history(session['user_id'], user_role, user_query, sql_query, False, elapsed)
+            _log_activity(session['user_id'], f'Query failed: {str(e)[:90]}')
+            _log_audit_event(
+                session['user_id'],
+                user_role,
+                'QUERY_FAILED',
+                'SQL',
+                f"Query: {user_query[:120]} | Error: {str(e)[:180]}",
+                success=False,
+            )
         return jsonify({'error': f'Query execution failed: {str(e)}'}), 500
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 # API endpoints
 @app.route('/api/user-info')
@@ -1080,10 +1924,22 @@ def api_ui_config():
     """Get UI configuration"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
-    
+
+    features = ['text_to_sql', 'multi_db']
+    if _get_bool_setting('voice_input_enabled', True):
+        features.append('voice_input')
+    if _get_bool_setting('ai_query_enabled', True):
+        features.append('ai_query')
+
     return jsonify({
         'role': session.get('role', 'Student'),
-        'features': ['text_to_sql', 'voice_input', 'multi_db']
+        'features': features,
+        'settings': {
+            'voice_input_enabled': _get_bool_setting('voice_input_enabled', True),
+            'ai_query_enabled': _get_bool_setting('ai_query_enabled', True),
+            'ollama_sql_enabled': _get_bool_setting('ollama_sql_enabled', True),
+            'max_query_result_limit': int(_get_setting('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)) or DEFAULT_QUERY_LIMIT),
+        }
     })
 
 @app.route('/api/dashboard-data')
@@ -1091,20 +1947,31 @@ def api_dashboard_data():
     """Get dashboard data"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
-    
-    return jsonify({
-        'stats': {
-            'queries_today': 12,
-            'active_users': 3,
-            'database_size': '2.4GB',
-            'last_update': '2024-02-27 19:30:00'
-        },
-        'recent_queries': [
-            'show all books',
-            'list students',
-            'check fines'
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        today = datetime.now().strftime('%Y-%m-%d')
+        stats = {
+            'queries_today': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM QueryHistory WHERE timestamp LIKE ?",
+                (today + '%',),
+            ).fetchone()['cnt'],
+            'active_users': conn.execute(
+                "SELECT COUNT(*) AS cnt FROM SessionLog WHERE status = 'Active' AND logout_time IS NULL"
+            ).fetchone()['cnt'],
+            'database_size': f"{round(os.path.getsize(MAIN_DB) / 1024 / 1024, 2)} MB",
+            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        recent_queries = [
+            row['query']
+            for row in conn.execute(
+                "SELECT query FROM QueryHistory ORDER BY datetime(timestamp) DESC, id DESC LIMIT 5"
+            ).fetchall()
         ]
-    })
+        conn.close()
+        return jsonify({'stats': stats, 'recent_queries': recent_queries})
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/vocabulary')
@@ -1241,27 +2108,10 @@ def recommendations():
     """Recommendations view – renders the main dashboard with query console."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session.get('role') != 'Administrator':
-        return "Access Denied", 403
-    user_role = session.get('role', 'Student')
-    user_id = session['user_id']
-    try:
-        conn = get_db_connection(MAIN_DB)
-        users = conn.execute("SELECT * FROM Users").fetchall()
-        students = conn.execute("SELECT id, roll_number, name, branch, year FROM Students ORDER BY name").fetchall()
-        conn.close()
-    except Exception as e:
-        print(f"[user_management] DB error: {e}")
-        users = []
-        students = []
-    return render_template('admin_dashboard.html',
-                           role=user_role,
-                           user=user_id,
-                           stats={},
-                           recent_activity=[],
-                           users=users,
-                           students=students,
-                           page='user_management')
+    redir = _require_admin()
+    if redir:
+        return redir
+    return render_template('admin_dashboard.html', **_build_admin_dashboard_context('overview'))
 
 
 # ── Role-protected routes ────────────────────────────────────────────────────
@@ -1270,6 +2120,14 @@ def _require_librarian_or_admin():
     """Return a 403 response when the logged-in user is not at least Librarian."""
     role = session.get('role', 'Student')
     if role not in ('Librarian', 'Faculty', 'Administrator'):
+        if 'user_id' in session:
+            _log_activity(session['user_id'], f'Unauthorized access attempt: {request.path}')
+            _log_security_event(
+                'unauthorized_access',
+                f"Role {role} attempted to access {request.path}",
+                severity='high',
+                user_id=session.get('user_id'),
+            )
         return "Access Denied", 403
     return None
 
@@ -1277,6 +2135,14 @@ def _require_librarian_or_admin():
 def _require_admin():
     """Return a 403 response when the logged-in user is not an Administrator."""
     if session.get('role') != 'Administrator':
+        if 'user_id' in session:
+            _log_activity(session['user_id'], f'Unauthorized access attempt: {request.path}')
+            _log_security_event(
+                'unauthorized_access',
+                f"Role {session.get('role', 'Unknown')} attempted to access {request.path}",
+                severity='high',
+                user_id=session.get('user_id'),
+            )
         return "Access Denied", 403
     return None
 
@@ -1450,33 +2316,7 @@ def user_management_view():
     redir = _require_admin()
     if redir:
         return redir
-
-    user_id = session['user_id']
-    user_role = session.get('role')
-
-    try:
-        conn = get_db_connection(MAIN_DB)
-        student_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Students"
-        ).fetchone()['cnt']
-        faculty_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Faculty"
-        ).fetchone()['cnt']
-        students = conn.execute(
-            "SELECT id, roll_number, name, branch, year, email, gpa FROM Students ORDER BY name"
-        ).fetchall()
-        conn.close()
-    except Exception as e:
-        print(f"[user_management] DB error: {e}")
-        student_count = faculty_count = 0
-        students = []
-
-    return render_template('user_management.html',
-                           user=user_id,
-                           role=user_role,
-                           student_count=student_count,
-                           faculty_count=faculty_count,
-                           students=students)
+    return render_template('admin_dashboard.html', **_build_admin_dashboard_context('users'))
 
 
 @app.route('/system_statistics')
@@ -1487,35 +2327,304 @@ def system_statistics_view():
     redir = _require_admin()
     if redir:
         return redir
+    return render_template('admin_dashboard.html', **_build_admin_dashboard_context('analytics'))
 
-    user_id = session['user_id']
-    user_role = session.get('role')
 
+@app.route('/admin/activity_logs')
+def admin_activity_logs():
+    """Return recent activity logs for the admin control panel."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    conn = get_db_connection(MAIN_DB)
     try:
-        conn = get_db_connection(MAIN_DB)
-        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()['cnt']
-        total_students = conn.execute("SELECT COUNT(*) as cnt FROM Students").fetchone()['cnt']
-        active_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-        ).fetchone()['cnt']
-        total_fines = conn.execute(
-            "SELECT COALESCE(SUM(fine_amount), 0) as total FROM Fines WHERE status='Unpaid'"
-        ).fetchone()['total']
+        return jsonify({
+            'success': True,
+            'logs': _fetch_activity_logs(conn, limit=100),
+        })
+    finally:
         conn.close()
-        sys_stats = {
-            'total_books': total_books,
-            'total_students': total_students,
-            'active_issues': active_issues,
-            'total_unpaid_fines': total_fines,
-        }
-    except Exception as e:
-        print(f"[system_statistics] DB error: {e}")
-        sys_stats = {}
 
-    return render_template('system_statistics.html',
-                           user=user_id,
-                           role=user_role,
-                           sys_stats=sys_stats)
+
+@app.route('/admin/add_user', methods=['POST'])
+def admin_add_user():
+    """Create a new managed user."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    payload, error = _validate_managed_user_form(request.form)
+    if error:
+        flash(error, 'error')
+        return redirect(url_for('user_management_view'))
+
+    conn = sqlite3.connect(MAIN_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute(
+            '''
+            INSERT INTO Users (username, password, role, email)
+            VALUES (?, ?, ?, ?)
+            ''',
+            (
+                payload['username'],
+                payload['password'] or 'pass',
+                payload['role'],
+                payload['email'],
+            ),
+        )
+        _sync_role_profile_tables(conn, payload)
+        conn.commit()
+        _log_activity(session['user_id'], f"User created: {payload['username']} ({payload['role']})")
+        _log_audit_event(
+            session['user_id'],
+            session.get('role', 'Administrator'),
+            'USER_CREATE',
+            'USER',
+            f"Created user {payload['username']} with role {payload['role']}",
+            success=True,
+        )
+        flash(f"User {payload['username']} created successfully.", 'success')
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        flash(f'Unable to create user: {exc}', 'error')
+    finally:
+        conn.close()
+
+    return redirect(url_for('user_management_view'))
+
+
+@app.route('/admin/update_user/<int:user_id>', methods=['POST'])
+def admin_update_user(user_id: int):
+    """Update name/email/details for a managed user."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    conn = sqlite3.connect(MAIN_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        existing_user = conn.execute("SELECT * FROM Users WHERE id = ?", (user_id,)).fetchone()
+        if not existing_user:
+            flash('User not found.', 'error')
+            return redirect(url_for('user_management_view'))
+
+        existing_details = _get_user_with_details(conn, user_id) or dict(existing_user)
+        payload, error = _validate_managed_user_form(request.form, existing_details)
+        if error:
+            flash(error, 'error')
+            return redirect(url_for('user_management_view'))
+
+        new_password = payload['password'] or existing_user['password']
+        conn.execute(
+            '''
+            UPDATE Users
+            SET username = ?, password = ?, role = ?, email = ?
+            WHERE id = ?
+            ''',
+            (payload['username'], new_password, payload['role'], payload['email'], user_id),
+        )
+        _sync_role_profile_tables(conn, payload)
+        conn.commit()
+        _log_activity(session['user_id'], f"User updated: {payload['username']}")
+        _log_audit_event(
+            session['user_id'],
+            session.get('role', 'Administrator'),
+            'USER_UPDATE',
+            'USER',
+            f"Updated user {payload['username']} ({payload['role']})",
+            success=True,
+        )
+        flash(f"User {payload['username']} updated.", 'success')
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        flash(f'Unable to update user: {exc}', 'error')
+    finally:
+        conn.close()
+
+    return redirect(url_for('user_management_view'))
+
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+def admin_delete_user(user_id: int):
+    """Delete a managed user and linked profile rows."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    conn = sqlite3.connect(MAIN_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        existing_user = conn.execute("SELECT * FROM Users WHERE id = ?", (user_id,)).fetchone()
+        if not existing_user:
+            flash('User not found.', 'error')
+            return redirect(url_for('user_management_view'))
+
+        username = existing_user['username']
+        email = existing_user['email']
+        conn.execute("DELETE FROM Students WHERE roll_number = ? OR lower(email) = lower(?)", (username, email))
+        conn.execute("DELETE FROM Faculty WHERE lower(email) = lower(?)", (email,))
+        conn.execute("DELETE FROM UserRoles WHERE user_id = ?", (username,))
+        conn.execute("DELETE FROM Users WHERE id = ?", (user_id,))
+        conn.commit()
+        _log_activity(session['user_id'], f"User deleted: {username}")
+        _log_audit_event(
+            session['user_id'],
+            session.get('role', 'Administrator'),
+            'USER_DELETE',
+            'USER',
+            f"Deleted user {username}",
+            success=True,
+        )
+        flash(f'User {username} deleted.', 'success')
+    finally:
+        conn.close()
+
+    return redirect(url_for('user_management_view'))
+
+
+@app.route('/admin/change_role/<int:user_id>', methods=['POST'])
+def admin_change_role(user_id: int):
+    """Change a user's role and synchronize supporting tables."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    new_role = _normalize_role(request.form.get('role', '').strip())
+    if new_role not in ROLE_CHOICES:
+        flash('Please choose a valid role.', 'error')
+        return redirect(url_for('user_management_view'))
+
+    conn = sqlite3.connect(MAIN_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        existing_user = conn.execute("SELECT * FROM Users WHERE id = ?", (user_id,)).fetchone()
+        if not existing_user:
+            flash('User not found.', 'error')
+            return redirect(url_for('user_management_view'))
+
+        details = _get_user_with_details(conn, user_id) or dict(existing_user)
+        details['role'] = new_role
+        details['username'] = existing_user['username']
+        details['email'] = request.form.get('email', details.get('email', existing_user['email']))
+        details['name'] = request.form.get('name', details.get('name', existing_user['username']))
+        details['department'] = request.form.get('department', details.get('department', ''))
+        details['designation'] = request.form.get('designation', details.get('designation', ''))
+        details['branch'] = request.form.get('branch', details.get('branch', ''))
+        details['year'] = request.form.get('year', details.get('year', ''))
+        details['phone'] = request.form.get('phone', details.get('student_phone') or details.get('faculty_phone') or '')
+
+        conn.execute("UPDATE Users SET role = ? WHERE id = ?", (new_role, user_id))
+        _sync_role_profile_tables(conn, details)
+        conn.commit()
+        _log_activity(session['user_id'], f"Role changed: {existing_user['username']} → {new_role}")
+        _log_audit_event(
+            session['user_id'],
+            session.get('role', 'Administrator'),
+            'ROLE_CHANGE',
+            'USER',
+            f"Changed role for {existing_user['username']} to {new_role}",
+            success=True,
+        )
+        flash(f"Role updated to {new_role}.", 'success')
+    finally:
+        conn.close()
+
+    return redirect(url_for('user_management_view'))
+
+
+@app.route('/admin/update_permissions/<role_name>', methods=['POST'])
+def admin_update_permissions(role_name: str):
+    """Update a role's DB-backed permissions."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    role_scope = _role_permission_scope(role_name)
+    selected_permission_ids = {
+        int(permission_id)
+        for permission_id in request.form.getlist('permission_ids')
+        if str(permission_id).isdigit()
+    }
+
+    conn = sqlite3.connect(MAIN_DB)
+    conn.row_factory = sqlite3.Row
+    try:
+        role_row = conn.execute("SELECT id, name FROM Roles WHERE name = ?", (role_scope,)).fetchone()
+        if not role_row:
+            flash('Role not found.', 'error')
+            return redirect(url_for('admin_dashboard_route'))
+
+        conn.execute("DELETE FROM RolePermissions WHERE role_id = ?", (role_row['id'],))
+        for permission_id in selected_permission_ids:
+            conn.execute(
+                "INSERT INTO RolePermissions (role_id, permission_id) VALUES (?, ?)",
+                (role_row['id'], permission_id),
+            )
+        conn.commit()
+        _log_activity(session['user_id'], f"Permissions updated for {role_scope}")
+        _log_audit_event(
+            session['user_id'],
+            session.get('role', 'Administrator'),
+            'PERMISSIONS_UPDATE',
+            'ROLE',
+            f"Updated permissions for role {role_scope}",
+            success=True,
+        )
+        flash(f'Permissions updated for {role_scope}.', 'success')
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin_dashboard_route'))
+
+
+@app.route('/admin/update_settings', methods=['POST'])
+def admin_update_settings():
+    """Update global system settings exposed in the admin panel."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    redir = _require_admin()
+    if redir:
+        return redir
+
+    max_limit = request.form.get('max_query_result_limit', str(DEFAULT_QUERY_LIMIT)).strip() or str(DEFAULT_QUERY_LIMIT)
+    if not max_limit.isdigit():
+        flash('Max query result limit must be numeric.', 'error')
+        return redirect(url_for('admin_dashboard_route'))
+
+    settings_payload = {
+        'max_query_result_limit': max_limit,
+        'voice_input_enabled': 'true' if request.form.get('voice_input_enabled') == 'on' else 'false',
+        'ai_query_enabled': 'true' if request.form.get('ai_query_enabled') == 'on' else 'false',
+        'ollama_sql_enabled': 'true' if request.form.get('ollama_sql_enabled') == 'on' else 'false',
+    }
+    for setting_name, setting_value in settings_payload.items():
+        _set_setting(setting_name, setting_value, updated_by=session.get('user_id'))
+
+    _log_activity(session['user_id'], 'System settings updated')
+    _log_audit_event(
+        session['user_id'],
+        session.get('role', 'Administrator'),
+        'SETTINGS_UPDATE',
+        'SYSTEM',
+        f"Updated settings: {', '.join(settings_payload.keys())}",
+        success=True,
+    )
+    flash('System settings updated.', 'success')
+    return redirect(url_for('admin_dashboard_route'))
 
 
 @app.route('/admin-dashboard')
@@ -1523,57 +2632,10 @@ def admin_dashboard():
     """Administrator dashboard."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session.get('role') != 'Administrator':
-        return "Access Denied", 403
-    user_role = session.get('role', 'Student')
-
-    user_id = session['user_id']
-
-    # Gather system stats for the admin view
-    try:
-        conn = get_db_connection(MAIN_DB)
-        total_users     = conn.execute("SELECT COUNT(*) FROM Users").fetchone()[0]
-        total_students  = conn.execute("SELECT COUNT(*) FROM Students").fetchone()[0]
-        total_faculty   = conn.execute("SELECT COUNT(*) FROM Faculty").fetchone()[0]
-        total_depts     = conn.execute("SELECT COUNT(*) FROM Departments").fetchone()[0]
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Admin dashboard stats error: {e}")
-        total_users = total_students = total_faculty = total_depts = 0
-
-    return render_template(
-        'dashboard_rbac.html',
-        user_info={'user_id': user_id, 'role': user_role},
-        role_badge_class='role-administrator',
-        menu_items=[
-            {'icon': '📊', 'label': 'Dashboard',     'url': '/admin-dashboard'},
-            {'icon': '🔍', 'label': 'Query Console', 'url': '/'},
-            {'icon': '📈', 'label': 'Analytics',     'url': '/analytics'},
-            {'icon': '💡', 'label': 'Recommendations','url': '/recommendations'},
-            {'icon': '⏻', 'label': 'Logout',        'url': '/logout'},
-        ],
-        permissions_summary={'permission_count': 50, 'table_count': 10, 'role_level': 3},
-        search_config={
-            'enabled': True,
-            'placeholder': 'Search users, reports...',
-            'suggestions': [
-                'List all students', 'Show overdue books',
-                'Faculty list', 'Show all fines',
-            ],
-        },
-        dashboard_widgets=[
-            {'type': 'system_overview', 'title': 'System Overview', 'icon': '🖥️'},
-        ],
-        data={
-            'system_stats': {
-                'total_users':       total_users,
-                'total_students':    total_students,
-                'total_faculty':     total_faculty,
-                'total_departments': total_depts,
-            }
-        },
-        theme_css='',
-    )
+    redir = _require_admin()
+    if redir:
+        return redir
+    return redirect(url_for('admin_dashboard_route'))
 
 
 @app.route('/librarian-dashboard')

@@ -3,285 +3,538 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Speak2DB</title>
+    <title>Administrator Control Panel - Speak2DB</title>
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #ffffff; color: #000000; }
-        .navbar-brand { font-weight: 700; font-size: 1.3rem; }
-        .welcome-banner {
-            background: linear-gradient(135deg, #4a148c 0%, #ab47bc 100%);
-            color: white;
-            border-radius: 14px;
+        body { background:#f5f6fb; color:#1f2937; }
+        .navbar-brand { font-weight:700; font-size:1.25rem; }
+        .hero-banner {
+            background: linear-gradient(135deg, #312e81 0%, #7c3aed 100%);
+            color: #fff;
+            border-radius: 18px;
             padding: 2rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        .section-card .card-header {
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 700;
         }
         .stat-card {
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.1);
-            transition: transform .2s;
+            border-radius: 16px;
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
         }
-        .stat-card:hover { transform: translateY(-3px); }
-        .stat-card .card-body { padding: 1.5rem; }
-        .stat-icon { font-size: 2.5rem; opacity: .85; }
-        .query-section {
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.08);
-            padding: 2rem;
-            margin-bottom: 2rem;
+        .stat-card h2 { font-size: 2rem; font-weight: 700; }
+        .mini-badge {
+            font-size: 0.76rem;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
         }
-        .btn-run {
-            background: #4a148c;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: .6rem 1.4rem;
+        .admin-nav a {
+            text-decoration: none;
+            color: #4b5563;
             font-weight: 600;
-            cursor: pointer;
+            margin-right: 1rem;
         }
-        .btn-run:hover { background: #38006b; color: white; }
-        .clarification-card {
-            background: #f3e5f5;
-            border: 1px solid #ce93d8;
+        .admin-nav a.active, .admin-nav a:hover { color: #4f46e5; }
+        .table thead th {
+            background: #eef2ff;
+            color: #3730a3;
+            border-bottom: none;
+        }
+        .permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        .permission-group {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 1rem;
+        }
+        .permission-group h6 {
+            color: #4338ca;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        .form-hint {
+            font-size: 0.82rem;
+            color: #6b7280;
+        }
+        .sticky-subnav {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(245, 246, 251, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 0.75rem 0 1rem;
+        }
+        code.inline-sql {
+            white-space: normal;
+            display: block;
+            padding: 0.5rem;
             border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
+            background: #f8fafc;
+            color: #334155;
         }
-        .btn-clarification {
-            background: #4a148c;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: .45rem 1rem;
-            margin: .25rem;
-            cursor: pointer;
-            font-size: .9rem;
-        }
-        .btn-clarification:hover { background: #38006b; }
-        .results-table th { background: #4a148c; color: white; }
-        .results-table { font-size: .88rem; }
-        #toastContainer {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: .5rem;
-        }
-        .toast {
-            padding: .6rem 1rem;
-            border-radius: 8px;
-            color: white;
-            font-size: .9rem;
-        }
-        .toast-success { background: #2e7d32; }
-        .toast-error   { background: #c62828; }
-        .toast-info    { background: #4a148c; }
-        .toast-warning { background: #e65100; }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#4a148c">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#312e81">
         <div class="container-fluid px-4">
-            <a class="navbar-brand" href="/admin_dashboard">
-                <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
+            <a class="navbar-brand" href="{{ url_for('admin_dashboard_route') }}">
+                <i class="fas fa-user-shield me-2"></i>Speak2DB Admin
             </a>
-            <div class="navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-search me-1"></i>Query
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/analytics">
-                            <i class="fas fa-chart-bar me-1"></i>Analytics
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/user_management">
-                            <i class="fas fa-users-cog me-1"></i>User Management
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/system_statistics">
-                            <i class="fas fa-server me-1"></i>System Statistics
-                        </a>
-                    </li>
-                </ul>
-                <div class="ms-auto d-flex align-items-center gap-3">
-                    <span class="text-white">
-                        Logged in as:
-                        <span class="badge bg-danger ms-1">{{ role|upper }}</span>
-                    </span>
-                    <a href="/logout" class="btn btn-outline-light btn-sm">
-                        <i class="fas fa-sign-out-alt me-1"></i>Logout
-                    </a>
-                </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-white">Logged in as <span class="badge bg-danger ms-1">{{ role|upper }}</span></span>
+                <a href="/" class="btn btn-outline-light btn-sm"><i class="fas fa-search me-1"></i>Query Console</a>
+                <a href="/logout" class="btn btn-light btn-sm"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
             </div>
         </div>
     </nav>
 
     <div class="container-fluid px-4 py-4">
-        <!-- Welcome Banner -->
-        <div class="welcome-banner">
-            <h3 class="mb-1"><i class="fas fa-user-shield me-2"></i>Administrator Control Panel</h3>
-            <p class="mb-0 opacity-75">Full system access — users, books, issues, fines, and reports</p>
-        </div>
-
-        <!-- Stats Row -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#1565c0,#42a5f5)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-book"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('total_books', 0) }}</h2>
-                        <p class="mb-0">Total Books</p>
-                    </div>
+        <div class="hero-banner">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+                <div>
+                    <h2 class="mb-2"><i class="fas fa-shield-alt me-2"></i>Administrator System Control Panel</h2>
+                    <p class="mb-0 opacity-75">Manage users, permissions, audit trails, AI controls, security events, and system-wide settings from one place.</p>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#2e7d32,#66bb6a)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-users"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('total_students', 0) }}</h2>
-                        <p class="mb-0">Registered Students</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#e65100,#ffa726)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-book-reader"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('active_issues', 0) }}</h2>
-                        <p class="mb-0">Active Issues</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-rupee-sign"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('unpaid_fines_amount', 0) | round(2) }}</h2>
-                        <p class="mb-0">Unpaid Fines (₹)</p>
-                    </div>
+                <div class="text-lg-end">
+                    <div class="mini-badge bg-light text-dark d-inline-block mb-2">AI Query: {{ 'ON' if settings.ai_query_enabled else 'OFF' }}</div><br>
+                    <div class="mini-badge bg-light text-dark d-inline-block">Ollama: {{ 'ON' if settings.ollama_sql_enabled else 'OFF' }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- NL Query Section -->
-        <div class="query-section" id="query-section">
-            <h5 class="mb-3"><i class="fas fa-search me-2" style="color:#4a148c"></i>Natural Language Query</h5>
-            <div class="input-group mb-2">
-                <textarea id="queryInput" class="form-control" rows="2"
-                    placeholder="e.g. 'show all students' or 'list books with no copies available' or 'top 10 fines'"></textarea>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-3">
+            {% for category, message in messages %}
+            <div class="alert {% if category == 'success' %}alert-success{% elif category == 'info' %}alert-info{% else %}alert-danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
-            <div class="d-flex gap-2 mt-2">
-                <button id="queryBtn" class="btn btn-run" onclick="submitQuery()">
-                    <i class="fas fa-play me-1"></i>Run Query
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="clearQuery()">
-                    <i class="fas fa-times me-1"></i>Clear
-                </button>
-            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
 
-            <!-- Clarification Card -->
-            <div class="clarification-card mt-3" id="clarificationCard" style="display:none">
-                <p class="fw-semibold mb-2" style="color:#4a148c"><i class="fas fa-question-circle me-1"></i><span id="clarificationQuestion"></span></p>
-                <div id="clarificationOptions"></div>
-            </div>
-
-            <!-- Results -->
-            <div id="resultsSection" class="mt-3" style="display:none">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge" style="background:#4a148c" id="rowCountBadge"></span>
-                    <code id="sqlCode" class="text-muted small"></code>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover results-table">
-                        <thead id="tableHead"></thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-                <div id="noResults" class="text-muted" style="display:none">No results found.</div>
+        <div class="sticky-subnav">
+            <div class="admin-nav">
+                <a href="#overview" class="{% if active_section == 'overview' %}active{% endif %}">Overview</a>
+                <a href="#user-management" class="{% if active_section == 'users' %}active{% endif %}">User Management</a>
+                <a href="#rbac">RBAC</a>
+                <a href="#activity-logs">Logs</a>
+                <a href="#settings">Settings</a>
+                <a href="#security">Security</a>
             </div>
         </div>
 
-        <!-- Recent Activity -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header text-white" style="background:#4a148c">
-                <i class="fas fa-history me-2"></i>Recent Activity
+        <section id="overview" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#1d4ed8,#60a5fa)">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <h2>{{ stats.total_users }}</h2>
+                            <p class="mb-0">Total Users</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#047857,#34d399)">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-clock fa-2x mb-2"></i>
+                            <h2>{{ stats.active_sessions }}</h2>
+                            <p class="mb-0">Active Sessions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#c2410c,#fb923c)">
+                        <div class="card-body text-center">
+                            <i class="fas fa-triangle-exclamation fa-2x mb-2"></i>
+                            <h2>{{ stats.failed_queries }}</h2>
+                            <p class="mb-0">Failed Queries</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#b91c1c,#f87171)">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shield-halved fa-2x mb-2"></i>
+                            <h2>{{ stats.blocked_queries }}</h2>
+                            <p class="mb-0">Blocked Queries</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Date</th>
-                                <th>User</th>
-                                <th>Detail</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for activity in recent_activity %}
-                            <tr>
-                                <td>{{ activity['date'] }}</td>
-                                <td>{{ activity['user'] }}</td>
-                                <td>{{ activity['detail'] }}</td>
-                            </tr>
-                        {% else %}
-                            <tr><td colspan="3" class="text-center text-muted py-3">No recent activity</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+        </section>
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                <div class="card section-card">
+                    <div class="card-header">System Monitoring Dashboard</div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded" style="background:#eef2ff">
+                                    <div class="fw-bold text-primary mb-1">Most Active Users</div>
+                                    <ul class="list-unstyled mb-0">
+                                        {% for user_stat in most_active_users %}
+                                        <li class="d-flex justify-content-between py-1 border-bottom">
+                                            <span>{{ user_stat.user_id }}</span>
+                                            <strong>{{ user_stat.query_count }} queries</strong>
+                                        </li>
+                                        {% else %}
+                                        <li class="text-muted">No query activity yet.</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded" style="background:#fef3c7">
+                                    <div class="fw-bold text-warning mb-1">LLM Usage Stats</div>
+                                    <div class="d-flex justify-content-between"><span>Hybrid/Ollama-enabled queries</span><strong>{{ llm_usage.hybrid_queries }}</strong></div>
+                                    <div class="d-flex justify-content-between"><span>Rule-based queries</span><strong>{{ llm_usage.rule_based_queries }}</strong></div>
+                                    <div class="d-flex justify-content-between"><span>Fallback events</span><strong>{{ llm_usage.llm_failures }}</strong></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <div class="text-muted">Students</div>
+                                    <div class="fs-3 fw-bold">{{ stats.total_students }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <div class="text-muted">Faculty</div>
+                                    <div class="fs-3 fw-bold">{{ stats.total_faculty }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <div class="text-muted">Unauthorized Attempts</div>
+                                    <div class="fs-3 fw-bold">{{ stats.unauthorized_attempts }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card section-card">
+                    <div class="card-header">Administrator Query Console</div>
+                    <div class="card-body">
+                        <p class="form-hint mb-3">The console below respects the current AI/Ollama toggles, role permissions, and the configurable max result limit.</p>
+                        <div class="input-group mb-3">
+                            <textarea id="queryInput" class="form-control" rows="3" placeholder="Try: show all activity logs or list users with failed queries"></textarea>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button id="queryBtn" class="btn btn-primary" onclick="submitQuery()"><i class="fas fa-play me-1"></i>Run Query</button>
+                            <button class="btn btn-outline-secondary" onclick="document.getElementById('queryInput').value=''">Clear</button>
+                            <button id="micBtn" type="button" class="btn btn-outline-info" onclick="toggleMic()"><i class="fas fa-microphone me-1"></i>Voice</button>
+                        </div>
+                        <div id="clarificationCard" class="mt-3" style="display:none; background:#eef2ff; border:1px solid #c7d2fe; border-radius:12px; padding:1rem;">
+                            <p class="fw-semibold mb-2 text-primary"><i class="fas fa-circle-question me-1"></i><span id="clarificationQuestion"></span></p>
+                            <div id="clarificationOptions"></div>
+                        </div>
+                        <div id="resultsSection" class="mt-4" style="display:none;">
+                            <div class="d-flex gap-2 align-items-center mb-2">
+                                <span class="badge bg-primary" id="rowCountBadge"></span>
+                                <span class="badge bg-dark" id="generatorBadge"></span>
+                            </div>
+                            <code id="sqlCode" class="inline-sql"></code>
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-hover">
+                                    <thead id="tableHead"></thead>
+                                    <tbody id="tableBody"></tbody>
+                                </table>
+                            </div>
+                            <div id="noResults" class="text-muted" style="display:none;">No results found.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="card section-card" id="settings">
+                    <div class="card-header">System Settings & AI Controls</div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('admin_update_settings') }}">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Max query result limit</label>
+                                <input type="number" min="1" name="max_query_result_limit" class="form-control" value="{{ settings.max_query_result_limit }}">
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="voice_input_enabled" name="voice_input_enabled" {% if settings.voice_input_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="voice_input_enabled">Voice input</label>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="ai_query_enabled" name="ai_query_enabled" {% if settings.ai_query_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="ai_query_enabled">AI query processing</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="ollama_sql_enabled" name="ollama_sql_enabled" {% if settings.ollama_sql_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="ollama_sql_enabled">Ollama SQL generation</label>
+                            </div>
+                            <button class="btn btn-primary w-100" type="submit"><i class="fas fa-sliders me-1"></i>Save Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card section-card" id="security">
+                    <div class="card-header">Security Monitoring</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between"><span>Blocked SQL queries</span><strong>{{ stats.blocked_queries }}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Unauthorized access attempts</span><strong>{{ stats.unauthorized_attempts }}</strong></div>
+                        </div>
+                        <div class="fw-semibold mb-2">Recent Security Events</div>
+                        <ul class="list-unstyled mb-0">
+                            {% for event in security_events[:6] %}
+                            <li class="border rounded-3 p-2 mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ event.event_type }}</strong>
+                                    <span class="badge bg-secondary">{{ event.severity }}</span>
+                                </div>
+                                <div class="small text-muted">{{ event.timestamp }}</div>
+                                <div class="small">{{ event.details }}</div>
+                            </li>
+                            {% else %}
+                            <li class="text-muted">No security events recorded.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Links -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <a href="/" class="card border-0 shadow-sm text-decoration-none">
-                    <div class="card-body text-center py-3" style="color:#4a148c">
-                        <i class="fas fa-terminal fa-2x mb-2"></i>
-                        <p class="mb-0 fw-semibold">Query Console</p>
+        <div class="card section-card" id="user-management">
+            <div class="card-header">Full User Management</div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <h5 class="mb-3">Create New User</h5>
+                        <form method="POST" action="{{ url_for('admin_add_user') }}">
+                            <div class="mb-2"><input class="form-control" name="username" placeholder="Username / Roll No." required></div>
+                            <div class="mb-2"><input class="form-control" name="name" placeholder="Full Name" required></div>
+                            <div class="mb-2"><input class="form-control" name="email" type="email" placeholder="Email" required></div>
+                            <div class="mb-2"><input class="form-control" name="password" placeholder="Password (default: pass)"></div>
+                            <div class="mb-2">
+                                <select class="form-select" name="role" required>
+                                    {% for role_name in ['Student', 'Faculty', 'Librarian', 'Administrator'] %}
+                                    <option value="{{ role_name }}">{{ role_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6"><input class="form-control" name="branch" placeholder="Branch"></div>
+                                <div class="col-6"><input class="form-control" name="year" placeholder="Year"></div>
+                                <div class="col-12"><input class="form-control" name="department" placeholder="Department"></div>
+                                <div class="col-12"><input class="form-control" name="designation" placeholder="Designation"></div>
+                                <div class="col-12"><input class="form-control" name="phone" placeholder="Phone"></div>
+                            </div>
+                            <p class="form-hint mt-2 mb-3">Student rows populate the Students table; Faculty/Librarian rows populate Faculty; Admin rows remain in Users only.</p>
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-user-plus me-1"></i>Add User</button>
+                        </form>
                     </div>
-                </a>
+                    <div class="col-lg-8">
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Profile</th>
+                                        <th style="min-width: 320px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for managed_user in managed_users %}
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ managed_user.name }}</div>
+                                            <div class="small text-muted">{{ managed_user.username }}</div>
+                                        </td>
+                                        <td>{{ managed_user.email }}</td>
+                                        <td><span class="badge bg-dark">{{ managed_user.role }}</span></td>
+                                        <td class="small text-muted">
+                                            {% if managed_user.roll_number %}Roll: {{ managed_user.roll_number }}<br>{% endif %}
+                                            {% if managed_user.branch %}{{ managed_user.branch }} / Year {{ managed_user.year }}<br>{% endif %}
+                                            {% if managed_user.department %}{{ managed_user.department }}{% endif %}
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('admin_update_user', user_id=managed_user.id) }}" class="row g-2 mb-2">
+                                                <div class="col-md-4"><input class="form-control form-control-sm" name="username" value="{{ managed_user.username }}"></div>
+                                                <div class="col-md-4"><input class="form-control form-control-sm" name="name" value="{{ managed_user.name }}"></div>
+                                                <div class="col-md-4"><input class="form-control form-control-sm" name="email" value="{{ managed_user.email }}"></div>
+                                                <input type="hidden" name="role" value="{{ managed_user.role }}">
+                                                <input type="hidden" name="branch" value="{{ managed_user.branch or '' }}">
+                                                <input type="hidden" name="year" value="{{ managed_user.year or '' }}">
+                                                <input type="hidden" name="department" value="{{ managed_user.department or '' }}">
+                                                <input type="hidden" name="designation" value="{{ managed_user.designation or '' }}">
+                                                <input type="hidden" name="phone" value="{{ managed_user.student_phone or managed_user.faculty_phone or '' }}">
+                                                <div class="col-12">
+                                                    <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-pen me-1"></i>Update Details</button>
+                                                </div>
+                                            </form>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <form method="POST" action="{{ url_for('admin_change_role', user_id=managed_user.id) }}" class="d-flex gap-2">
+                                                    <input type="hidden" name="name" value="{{ managed_user.name }}">
+                                                    <input type="hidden" name="email" value="{{ managed_user.email }}">
+                                                    <input type="hidden" name="branch" value="{{ managed_user.branch or '' }}">
+                                                    <input type="hidden" name="year" value="{{ managed_user.year or '' }}">
+                                                    <input type="hidden" name="department" value="{{ managed_user.department or '' }}">
+                                                    <input type="hidden" name="designation" value="{{ managed_user.designation or '' }}">
+                                                    <input type="hidden" name="phone" value="{{ managed_user.student_phone or managed_user.faculty_phone or '' }}">
+                                                    <select class="form-select form-select-sm" name="role">
+                                                        {% for role_name in ['Student', 'Faculty', 'Librarian', 'Administrator'] %}
+                                                        <option value="{{ role_name }}" {% if managed_user.role == role_name %}selected{% endif %}>{{ role_name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Change Role</button>
+                                                </form>
+                                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=managed_user.id) }}" onsubmit="return confirm('Delete {{ managed_user.username }}?');">
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit"><i class="fas fa-trash me-1"></i>Delete</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="5" class="text-center text-muted py-4">No users found.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-4">
-                <a href="/student_dashboard" class="card border-0 shadow-sm text-decoration-none">
-                    <div class="card-body text-center py-3 text-success">
-                        <i class="fas fa-user-graduate fa-2x mb-2"></i>
-                        <p class="mb-0 fw-semibold">Student View</p>
+        </div>
+
+        <div class="card section-card" id="rbac">
+            <div class="card-header">Role & Permission Control</div>
+            <div class="card-body">
+                <p class="form-hint mb-3">Update query permissions and per-table access for each role. Faculty uses the same permission scope as Librarian to stay compatible with the existing RBAC model.</p>
+                <div class="row g-4">
+                    {% for role_config in role_permissions %}
+                    <div class="col-12">
+                        <div class="border rounded-3 p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">{{ role_config.label }}</h5>
+                                <span class="badge bg-primary">{{ role_config.permissions_by_category|length }} categories</span>
+                            </div>
+                            <form method="POST" action="{{ url_for('admin_update_permissions', role_name=role_config.name) }}">
+                                <div class="permission-grid">
+                                    {% for category, permissions in role_config.permissions_by_category.items() %}
+                                    <div class="permission-group">
+                                        <h6>{{ category.replace('_', ' ')|title }}</h6>
+                                        {% for permission in permissions %}
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input" type="checkbox" name="permission_ids" value="{{ permission.id }}" id="perm-{{ role_config.name }}-{{ permission.id }}" {% if permission.assigned %}checked{% endif %}>
+                                            <label class="form-check-label small" for="perm-{{ role_config.name }}-{{ permission.id }}">
+                                                <strong>{{ permission.name }}</strong><br>
+                                                <span class="text-muted">{{ permission.description }}</span>
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" type="submit"><i class="fas fa-user-lock me-1"></i>Save {{ role_config.label }} Permissions</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </a>
+                    {% endfor %}
+                </div>
             </div>
-            <div class="col-md-4">
-                <a href="/librarian_dashboard" class="card border-0 shadow-sm text-decoration-none">
-                    <div class="card-body text-center py-3 text-primary">
-                        <i class="fas fa-book-open fa-2x mb-2"></i>
-                        <p class="mb-0 fw-semibold">Librarian View</p>
+        </div>
+
+        <div class="card section-card" id="activity-logs">
+            <div class="card-header">Activity Logs / Audit System</div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in recent_activity %}
+                                    <tr>
+                                        <td>{{ log.timestamp }}</td>
+                                        <td>{{ log.user_id }}</td>
+                                        <td>{{ log.action }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="3" class="text-center text-muted py-4">No activity logs recorded.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </a>
+                    <div class="col-lg-4">
+                        <div class="border rounded-3 p-3">
+                            <h6 class="fw-bold">Failed Login Attempts</h6>
+                            <ul class="list-unstyled mb-0">
+                                {% for failed in failed_logins %}
+                                <li class="border-bottom py-2">
+                                    <div class="fw-semibold">{{ failed.username }}</div>
+                                    <div class="small text-muted">{{ failed.attempt_time }} · {{ failed.ip_address }}</div>
+                                    <div class="small">{{ failed.failure_reason }}</div>
+                                </li>
+                                {% else %}
+                                <li class="text-muted">No failed logins recorded.</li>
+                                {% endfor %}
+                            </ul>
+                            <a href="{{ url_for('admin_activity_logs') }}" class="btn btn-outline-primary btn-sm mt-3">Open Logs API</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay">
+    <div id="loadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.65); z-index:9999; color:#fff; align-items:center; justify-content:center; flex-direction:column;">
         <div class="spinner-border text-light mb-3" role="status"></div>
-        <p>Processing your query…</p>
+        <div>Processing query...</div>
     </div>
-
-    <!-- Toast container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/script.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            const originalDisplayResults = window.displayResults;
+            if (!originalDisplayResults) return;
+            window.displayResults = function (result) {
+                originalDisplayResults(result);
+                const badge = document.getElementById('generatorBadge');
+                if (badge) {
+                    badge.textContent = result.generator ? ('Generator: ' + result.generator) : 'Generator: unknown';
+                }
+            };
+        })();
+    </script>
 </body>
 </html>
