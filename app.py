@@ -1023,7 +1023,7 @@ def _apply_student_filters(
 def index():
     """Main query interface with embedded role-specific dashboard widgets."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     user_id = session["user_id"]
     user_role = session.get("role", "Student")
@@ -1160,7 +1160,7 @@ register_admin_routes(
 def modern_ui():
     """Modern interface."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     return render_template("modern.html")
 
 
@@ -1168,7 +1168,7 @@ def modern_ui():
 def minimal_ui():
     """Minimal interface."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     return render_template("modern-minimal.html")
 
 
