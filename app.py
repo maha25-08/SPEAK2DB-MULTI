@@ -1178,8 +1178,8 @@ def faculty_dashboard_route():
         return redirect(url_for('login'))
 
     role = session.get('role')
-    print("Route accessed:", request.path)
-    print("User role:", role)
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", role)
 
     if role not in ('Faculty', 'Librarian', 'Administrator'):
         return "Access Denied", 403
@@ -1220,7 +1220,7 @@ def faculty_dashboard_route():
             'unpaid_fines': unpaid_fines_cnt,
         }
     except Exception as e:
-        print(f"[faculty_dashboard] DB error: {e}")
+        logger.error("[faculty_dashboard] DB error: %s", e)
         recent_issues = []
         stats = {}
 
@@ -1241,8 +1241,8 @@ def librarian_dashboard_route():
         return redirect(url_for('login'))
 
     role = session.get('role')
-    print("Route accessed:", request.path)
-    print("User role:", role)
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", role)
 
     if role not in ('Librarian', 'Faculty', 'Administrator'):
         return "Access Denied", 403
@@ -1278,7 +1278,7 @@ def librarian_dashboard_route():
             'unpaid_fines': unpaid_fines,
         }
     except Exception as e:
-        print(f"[librarian_dashboard] DB error: {e}")
+        logger.error("[librarian_dashboard] DB error: %s", e)
         recent_issues = []
         stats = {}
 
@@ -1340,7 +1340,7 @@ def api_ui_config():
     if _get_bool_setting('ai_query_enabled', True):
         features.append('ai_query')
 
-        return jsonify({
+    return jsonify({
         'role': session.get('role', 'Student'),
         'features': features,
         'settings': {
@@ -1473,7 +1473,7 @@ def api_query_analytics():
             'queries_per_day': queries_per_day,
         })
     except Exception as e:
-        print(f"[api_query_analytics] error: {e}")
+        logger.error("[api_query_analytics] error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1500,7 +1500,7 @@ def analytics():
         ).fetchall()
         conn.close()
     except Exception as e:
-        print(f"[analytics] DB error: {e}")
+        logger.error("[analytics] DB error: %s", e)
         books_per_category = []
         issues_per_month = []
 
@@ -1618,7 +1618,7 @@ def students_view():
         ).fetchall()
         conn.close()
     except Exception as e:
-        print(f"[students_view] DB error: {e}")
+        logger.error("[students_view] DB error: %s", e)
         students = []
 
     return render_template('index.html',
@@ -1680,8 +1680,8 @@ def fines_view():
     redir = _require_librarian_or_admin()
     if redir:
         return redir
-    print("Route accessed:", request.path)
-    print("User role:", session.get("role"))
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", session.get("role"))
     return redirect(url_for('fine_management_view'))
 
 
@@ -1694,8 +1694,8 @@ def api_students():
         return jsonify({'error': 'Not logged in'}), 401
     if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
         return jsonify({'error': 'Access denied'}), 403
-    print("Route accessed:", request.path)
-    print("User role:", session.get("role"))
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
@@ -1704,7 +1704,7 @@ def api_students():
         conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
-        print(f"[api_students] error: {e}")
+        logger.error("[api_students] error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1715,8 +1715,8 @@ def api_issued_books():
         return jsonify({'error': 'Not logged in'}), 401
     if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
         return jsonify({'error': 'Access denied'}), 403
-    print("Route accessed:", request.path)
-    print("User role:", session.get("role"))
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
@@ -1731,7 +1731,7 @@ def api_issued_books():
         conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
-        print(f"[api_issued_books] error: {e}")
+        logger.error("[api_issued_books] error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1742,8 +1742,8 @@ def api_fines():
         return jsonify({'error': 'Not logged in'}), 401
     if session.get('role') not in ('Librarian', 'Faculty', 'Administrator'):
         return jsonify({'error': 'Access denied'}), 403
-    print("Route accessed:", request.path)
-    print("User role:", session.get("role"))
+    logger.debug("Route accessed: %s", request.path)
+    logger.debug("User role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
@@ -1756,7 +1756,7 @@ def api_fines():
         conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
-        print(f"[api_fines] error: {e}")
+        logger.error("[api_fines] error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
