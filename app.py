@@ -27,6 +27,7 @@ from routes.auth_routes import register_auth_routes
 from routes.dashboard import dashboard_bp
 from routes.query_routes import register_query_routes
 from routes.views import views_bp
+from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
 from utils.helpers import is_staff
 from utils.validators import (
     validate_managed_user_form as validate_managed_user_form_service,
@@ -749,6 +750,9 @@ def _build_admin_dashboard_context(active_section: str = 'overview') -> dict:
         return context
     finally:
         conn.close()
+
+
+app.extensions.setdefault(ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY, _build_admin_dashboard_context)
 
 
 def _get_user_with_details(conn, user_id: int):

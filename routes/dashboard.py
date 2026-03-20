@@ -11,9 +11,10 @@ Kebab-case aliases redirect to the canonical form for backward compatibility.
 """
 import logging
 import jinja2
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, current_app, render_template, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
+from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
 from utils.helpers import get_library_stats
 
 logger = logging.getLogger(__name__)
@@ -316,11 +317,15 @@ def admin_dashboard():
     if session.get("role") != "Administrator":
         return "Access Denied", 403
 
-    import app as app_module
+    build_admin_dashboard_context = current_app.extensions.get(ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY)
+    if build_admin_dashboard_context is None:
+        raise RuntimeError(
+            "Admin dashboard context builder must be registered before accessing this route."
+        )
 
     return render_template(
         "admin_dashboard.html",
-        **app_module._build_admin_dashboard_context("overview"),
+        **build_admin_dashboard_context("overview"),
     )
 
 
