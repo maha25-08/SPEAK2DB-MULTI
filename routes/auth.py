@@ -73,4 +73,4 @@ def logout():
     session.clear()
     logger.info("User '%s' logged out", user_id)
     flash("You have been logged out.", "info")
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("login"))
