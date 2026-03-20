@@ -52,21 +52,6 @@ def register_auth_routes(
                     ).fetchone()
                     session['student_id'] = student_row['id'] if student_row else None
                 authenticated = True
-            elif username == 'admin' and password == 'pass':
-                session['user_id'] = 'admin'
-                session['role'] = 'Administrator'
-                session['student_id'] = None
-                authenticated = True
-            elif username == 'librarian' and password == 'pass':
-                session['user_id'] = 'librarian'
-                session['role'] = 'Librarian'
-                session['student_id'] = None
-                authenticated = True
-            elif username == 'faculty_email' and password == 'pass':
-                session['user_id'] = 'faculty_email'
-                session['role'] = 'Faculty'
-                session['student_id'] = None
-                authenticated = True
             else:
                 student = conn.execute(
                     'SELECT id, roll_number FROM Students WHERE roll_number = ? OR lower(email) = lower(?)',
@@ -92,6 +77,11 @@ def register_auth_routes(
         log_activity(session.get('user_id'), 'Login')
         log_audit_event(session.get('user_id'), session.get('role', 'Student'), 'LOGIN', 'SESSION', 'User logged in', success=True)
         flash(f"Welcome, {session.get('role', 'Student')}!", 'success')
+        role = session.get('role', 'Student')
+        if role == 'Administrator':
+            return redirect(url_for('dashboard.admin_dashboard'))
+        elif role == 'Librarian':
+            return redirect(url_for('dashboard.librarian_dashboard'))
         return redirect(url_for('index'))
 
     @app.route('/logout', endpoint='logout')
