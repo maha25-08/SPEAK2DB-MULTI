@@ -201,7 +201,7 @@ def register_admin_routes(
             role_row = conn.execute('SELECT id, name FROM Roles WHERE name = ?', (role_scope,)).fetchone()
             if not role_row:
                 flash('Role not found.', 'error')
-                return redirect(url_for('admin_dashboard_route'))
+                return redirect(url_for('dashboard.admin_dashboard'))
             conn.execute('DELETE FROM RolePermissions WHERE role_id = ?', (role_row['id'],))
             for permission_id in selected_permission_ids:
                 conn.execute('INSERT INTO RolePermissions (role_id, permission_id) VALUES (?, ?)', (role_row['id'], permission_id))
@@ -211,7 +211,7 @@ def register_admin_routes(
             flash(f'Permissions updated for {role_scope}.', 'success')
         finally:
             conn.close()
-        return redirect(url_for('admin_dashboard_route'))
+        return redirect(url_for('dashboard.admin_dashboard'))
 
     @app.route('/admin/update_settings', methods=['POST'], endpoint='admin_update_settings')
     def admin_update_settings():
@@ -224,7 +224,7 @@ def register_admin_routes(
         )
         if error:
             flash(error, 'error')
-            return redirect(url_for('admin_dashboard_route'))
+            return redirect(url_for('dashboard.admin_dashboard'))
         settings_payload = {
             'max_query_result_limit': max_limit,
             'voice_input_enabled': 'true' if request.form.get('voice_input_enabled') == 'on' else 'false',
@@ -236,4 +236,4 @@ def register_admin_routes(
         log_activity(session.get('user_id'), 'System settings updated')
         log_audit_event(session.get('user_id'), session.get('role', 'Administrator'), 'SETTINGS_UPDATE', 'SYSTEM', f"Updated settings: {', '.join(settings_payload.keys())}", success=True)
         flash('System settings updated.', 'success')
-        return redirect(url_for('admin_dashboard_route'))
+        return redirect(url_for('dashboard.admin_dashboard'))
