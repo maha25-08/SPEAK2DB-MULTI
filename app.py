@@ -839,7 +839,32 @@ def _validate_managed_user_form(form_data, existing_user: dict = None) -> Tuple[
     return validate_managed_user_form_service(form_data, existing_user)
 
 
+def _seed_default_users():
+    """Ensure default librarian accounts exist in the Users table."""
+    default_users = [
+        ('librarian1', 'pass', 'Librarian', 'librarian1@library.edu'),
+        ('librarian2', 'pass', 'Librarian', 'librarian2@library.edu'),
+        ('librarian3', 'pass', 'Librarian', 'librarian3@library.edu'),
+    ]
+    try:
+        conn = sqlite3.connect(MAIN_DB)
+        for username, password, role, email in default_users:
+            conn.execute(
+                '''
+                INSERT INTO Users (username, password, role, email)
+                SELECT ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM Users WHERE username = ?)
+                ''',
+                (username, password, role, email, username),
+            )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        logger.warning("[seed-users] Could not seed default users: %s", exc)
+
+
 _ensure_admin_support_schema()
+_seed_default_users()
 
 # ── Jinja2 custom filters ────────────────────────────────────────────────────
 @app.template_filter("days_overdue")
