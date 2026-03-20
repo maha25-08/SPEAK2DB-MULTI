@@ -11,9 +11,10 @@ Kebab-case aliases redirect to the canonical form for backward compatibility.
 """
 import logging
 import jinja2
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, current_app, render_template, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
+from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
 from utils.helpers import get_library_stats
 
 logger = logging.getLogger(__name__)
@@ -316,46 +317,15 @@ def admin_dashboard():
     if session.get("role") != "Administrator":
         return "Access Denied", 403
 
-    user_role = session.get("role", "Administrator")
-    user_id = session["user_id"]
-    recent_activity = []
-    stats = {}
-
-    try:
-        conn = get_db_connection(MAIN_DB)
-        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
-        total_students = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Students"
-        ).fetchone()["cnt"]
-        active_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-        ).fetchone()["cnt"]
-        unpaid_fines_amount = conn.execute(
-            "SELECT COALESCE(SUM(fine_amount), 0) as total FROM Fines WHERE status = 'Unpaid'"
-        ).fetchone()["total"]
-        recent_activity = conn.execute(
-            """SELECT i.issue_date as date, s.name as user, b.title as detail
-               FROM Issued i
-               JOIN Books b ON i.book_id = b.id
-               JOIN Students s ON i.student_id = s.id
-               ORDER BY i.issue_date DESC LIMIT 10"""
-        ).fetchall()
-        conn.close()
-        stats = {
-            "total_books": total_books,
-            "total_students": total_students,
-            "active_issues": active_issues,
-            "unpaid_fines_amount": unpaid_fines_amount,
-        }
-    except Exception as exc:
-        logger.error("admin_dashboard DB error: %s", exc)
+    build_admin_dashboard_context = current_app.extensions.get(ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY)
+    if build_admin_dashboard_context is None:
+        raise RuntimeError(
+            "Admin dashboard context builder must be registered before accessing this route."
+        )
 
     return render_template(
         "admin_dashboard.html",
-        role=user_role,
-        user=user_id,
-        stats=stats,
-        recent_activity=recent_activity,
+        **build_admin_dashboard_context("overview"),
     )
 
 
