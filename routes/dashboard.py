@@ -28,7 +28,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 def student_dashboard():
     """Student dashboard (canonical snake_case route)."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     if session.get("role") != "Student":
         return "Access Denied", 403
@@ -126,14 +126,14 @@ def student_dashboard_alt():
 def student_dashboard_individual():
     """Individual per-student template (roll-number-specific HTML file)."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     if session.get("role") != "Student":
         return redirect(url_for("index"))
 
     roll_number = session.get("user_id")
     if not roll_number:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     template_name = f"student_dashboard_{roll_number.lower()}.html"
     try:
@@ -151,7 +151,7 @@ def student_dashboard_individual():
 def faculty_dashboard():
     """Faculty dashboard – Faculty, Librarian, and Administrator roles."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     role = session.get("role")
     logger.debug("faculty_dashboard accessed by role: %s", role)
@@ -218,7 +218,7 @@ def faculty_dashboard():
 def librarian_dashboard():
     """Librarian dashboard."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     role = session.get("role")
     logger.debug("librarian_dashboard accessed by role: %s", role)
@@ -272,7 +272,7 @@ def librarian_dashboard():
 def librarian_dashboard_kebab():
     """Redirect legacy kebab-case URL to canonical librarian dashboard."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     user_id = session["user_id"]
     user_role = session.get("role", "Student")
@@ -341,7 +341,7 @@ def librarian_dashboard_kebab():
 def admin_dashboard():
     """Administrator dashboard."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     if session.get("role") != "Administrator":
         return "Access Denied", 403
@@ -393,7 +393,7 @@ def admin_dashboard():
 def admin_dashboard_kebab():
     """Administrator dashboard (RBAC template view)."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     if session.get("role") != "Administrator":
         return "Access Denied", 403
 

@@ -230,5 +230,5 @@ def query():
 def query_page():
     """Redirect GET /query to main dashboard (query console is on the main page)."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     return redirect(url_for("index"))
