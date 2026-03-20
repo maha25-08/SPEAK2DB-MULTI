@@ -38,7 +38,7 @@ def _require_admin():
 def dashboard_redirect():
     """Redirect to the appropriate role-specific dashboard."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
 
     if session.get("role") == "Student":
         return redirect(url_for("dashboard.student_dashboard"))
@@ -53,7 +53,7 @@ def dashboard_redirect():
 def analytics():
     """Analytics view – Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_admin()
     if guard:
         return guard
@@ -93,7 +93,7 @@ def analytics():
 def recommendations():
     """Recommendations view – Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_admin()
     if guard:
         return guard
@@ -132,7 +132,7 @@ def recommendations():
 def students_view():
     """All students – Librarian/Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_librarian_or_admin()
     if guard:
         return guard
@@ -159,7 +159,7 @@ def students_view():
 def issued_books_view():
     """Issued books overview – Librarian/Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_librarian_or_admin()
     if guard:
         return guard
@@ -186,7 +186,7 @@ def issued_books_view():
 def fine_management_view():
     """Fine management – Librarian/Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_librarian_or_admin()
     if guard:
         return guard
@@ -209,7 +209,7 @@ def fine_management_view():
 def fines_view():
     """Fines alias – redirects to fine_management."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_librarian_or_admin()
     if guard:
         return guard
@@ -226,7 +226,7 @@ def fines_view():
 def user_management_view():
     """User management – Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_admin()
     if guard:
         return guard
@@ -268,7 +268,7 @@ def user_management_view():
 def system_statistics_view():
     """System statistics – Administrator only."""
     if "user_id" not in session:
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("login"))
     guard = _require_admin()
     if guard:
         return guard
