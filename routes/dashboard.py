@@ -14,6 +14,7 @@ import jinja2
 from flask import Blueprint, render_template, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
+from utils.helpers import get_library_stats
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +163,6 @@ def faculty_dashboard():
     user_id = session["user_id"]
     faculty_info = None
     recent_issues = []
-    stats = {}
 
     try:
         conn = get_db_connection(MAIN_DB)
@@ -172,17 +172,6 @@ def faculty_dashboard():
         ).fetchone()
         if faculty_info is None:
             faculty_info = conn.execute("SELECT * FROM Faculty LIMIT 1").fetchone()
-
-        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
-        total_students = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Students"
-        ).fetchone()["cnt"]
-        active_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-        ).fetchone()["cnt"]
-        unpaid_fines_cnt = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
-        ).fetchone()["cnt"]
         recent_issues = conn.execute(
             """SELECT i.*, b.title, b.author, s.name as student_name
                FROM Issued i
@@ -191,14 +180,10 @@ def faculty_dashboard():
                ORDER BY i.issue_date DESC LIMIT 10"""
         ).fetchall()
         conn.close()
-        stats = {
-            "total_books": total_books,
-            "total_students": total_students,
-            "active_issues": active_issues,
-            "unpaid_fines": unpaid_fines_cnt,
-        }
     except Exception as exc:
         logger.error("faculty_dashboard DB error: %s", exc)
+
+    stats = get_library_stats()
 
     return render_template(
         "faculty_dashboard.html",
@@ -228,20 +213,9 @@ def librarian_dashboard():
 
     user_id = session["user_id"]
     recent_issues = []
-    stats = {}
 
     try:
         conn = get_db_connection(MAIN_DB)
-        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
-        total_students = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Students"
-        ).fetchone()["cnt"]
-        active_issues = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
-        ).fetchone()["cnt"]
-        unpaid_fines = conn.execute(
-            "SELECT COUNT(*) as cnt FROM Fines WHERE status = 'Unpaid'"
-        ).fetchone()["cnt"]
         recent_issues = conn.execute(
             """SELECT i.*, b.title, b.author, s.name as student_name
                FROM Issued i
@@ -250,14 +224,10 @@ def librarian_dashboard():
                ORDER BY i.issue_date DESC LIMIT 10"""
         ).fetchall()
         conn.close()
-        stats = {
-            "total_books": total_books,
-            "total_students": total_students,
-            "active_issues": active_issues,
-            "unpaid_fines": unpaid_fines,
-        }
     except Exception as exc:
         logger.error("librarian_dashboard DB error: %s", exc)
+
+    stats = get_library_stats()
 
     return render_template(
         "librarian_dashboard.html",

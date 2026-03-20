@@ -104,9 +104,9 @@ def recommendations():
     students = []
     try:
         conn = get_db_connection(MAIN_DB)
-        users = conn.execute("SELECT * FROM Users").fetchall()
+        users = conn.execute("SELECT * FROM Users LIMIT 500").fetchall()
         students = conn.execute(
-            "SELECT id, roll_number, name, branch, year FROM Students ORDER BY name"
+            "SELECT id, roll_number, name, branch, year FROM Students ORDER BY name LIMIT 500"
         ).fetchall()
         conn.close()
     except Exception as exc:
