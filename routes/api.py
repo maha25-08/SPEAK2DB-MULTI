@@ -116,8 +116,9 @@ def dashboard_data():
 
         stats = {
             "queries_today": conn.execute(
-                "SELECT COUNT(*) AS cnt FROM QueryHistory WHERE timestamp LIKE ?",
-                (today + "%",),
+                "SELECT COUNT(*) AS cnt FROM QueryHistory "
+                "WHERE date(timestamp) = ?",
+                (today,),
             ).fetchone()["cnt"],
             "active_users": conn.execute(
                 "SELECT COUNT(*) AS cnt FROM SessionLog "
@@ -183,8 +184,8 @@ def query_analytics():
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         queries_today = conn.execute(
-            "SELECT COUNT(*) as cnt FROM QueryHistory WHERE timestamp LIKE ?",
-            (today + "%",),
+            "SELECT COUNT(*) as cnt FROM QueryHistory WHERE date(timestamp) = ?",
+            (today,),
         ).fetchone()["cnt"]
 
         most_common = [
