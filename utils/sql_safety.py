@@ -5,6 +5,8 @@ import re
 import logging
 from typing import Tuple
 
+from utils.constants import DEFAULT_QUERY_LIMIT
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -40,13 +42,17 @@ def is_safe_sql(sql: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def ensure_limit(sql: str, limit: int = 100) -> str:
-    """Append ``LIMIT <limit>`` to *sql* when no LIMIT clause is present."""
+def ensure_limit(sql: str, limit: int = DEFAULT_QUERY_LIMIT) -> str:
+    """Append or cap ``LIMIT <limit>`` on *sql*."""
     if not sql:
         return sql
-    if re.search(r"\bLIMIT\b", sql, re.IGNORECASE):
+    limit_match = re.search(r"\bLIMIT\s+(\d+)\b", sql, re.IGNORECASE)
+    if not limit_match:
+        return sql.rstrip().rstrip(";") + f" LIMIT {limit}"
+    current_limit = int(limit_match.group(1))
+    if current_limit <= limit:
         return sql
-    return sql.rstrip().rstrip(";") + f" LIMIT {limit}"
+    return re.sub(r"\bLIMIT\s+\d+\b", f"LIMIT {limit}", sql, count=1, flags=re.IGNORECASE)
 
 
 def _inject_and_condition(sql_query: str, condition: str) -> str:

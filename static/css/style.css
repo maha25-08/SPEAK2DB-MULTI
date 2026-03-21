@@ -28,6 +28,28 @@ body {
     min-height: 100vh;
 }
 
+.flash-message {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    text-align: center;
+    background: var(--bg-secondary);
+}
+
+.success {
+    color: green;
+}
+
+.error {
+    color: red;
+}
+
+.info {
+    color: var(--text-secondary);
+}
+
 /* ===== DASHBOARD LAYOUT ===== */
 .dashboard {
     display: grid;

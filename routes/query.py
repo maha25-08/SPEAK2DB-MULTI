@@ -6,6 +6,7 @@ import time
 from flask import Blueprint, request, jsonify, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
+from utils.constants import DEFAULT_QUERY_LIMIT
 from utils.sql_safety import is_safe_sql, apply_student_filters, fallback_columns, ensure_limit
 
 try:
@@ -143,7 +144,7 @@ def query():
             # This fallback is intentionally safe: student-specific filters
             # (Step 7) are applied below, so student users will not see
             # unrestricted data even via this default query.
-            sql_query = "SELECT * FROM Books LIMIT 10"
+            sql_query = f"SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT}"
         logger.info("Generated SQL: %s", sql_query)
 
         # Replace student ID placeholders emitted by the SQL generator.
@@ -177,7 +178,7 @@ def query():
             return jsonify({"success": False, "error": f"Query not permitted: {reason}"}), 400
 
         # ── Enforce LIMIT to cap result sets ─────────────────────────────────
-        sql_query = ensure_limit(sql_query)
+        sql_query = ensure_limit(sql_query, DEFAULT_QUERY_LIMIT)
 
         # ── Step 10: RBAC table-access validation ────────────────────────────
         if _RBAC_AVAILABLE:

@@ -10,6 +10,7 @@ from query_correction import correct_query
 from query_context import save_context, is_followup, rewrite_followup, get_last_query
 from ollama_sql import generate_complex_sql, generate_sql
 from utils.helpers import record_query_event
+from utils.constants import DEFAULT_QUERY_LIMIT
 from utils.sql_safety import apply_student_filters, fallback_columns, is_safe_sql
 from services.rbac_service import normalize_role, role_allows_tables, role_can_execute_queries, role_can_use_ai_queries
 from services.security_service import apply_result_limit
@@ -27,7 +28,6 @@ except ImportError:
     SECURITY_LAYER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
-DEFAULT_QUERY_LIMIT = 100
 
 
 def generate_sql_for_query(user_query: str, conn, role_name: str, get_bool_setting):
@@ -122,7 +122,7 @@ def execute_query_request(
         conn = get_db_connection(main_db)
         sql_query, query_engine = generate_sql_for_query(augmented_query, conn, user_role, get_bool_setting)
         if not sql_query or not sql_query.strip():
-            sql_query = 'SELECT * FROM Books LIMIT 10'
+            sql_query = f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT}'
             query_engine = 'rule-based'
 
         if user_role == 'Student' and student_id:
