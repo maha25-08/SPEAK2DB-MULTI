@@ -40,8 +40,13 @@ def dashboard_redirect():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    if session.get("role") == "Student":
-        return redirect(url_for("dashboard.student_dashboard"))
+    role = session.get("role", "Student")
+    if role == "Administrator":
+        return redirect(url_for("admin_dashboard_route"))
+    if role == "Librarian":
+        return redirect(url_for("librarian_dashboard_route"))
+    if role == "Faculty":
+        return redirect(url_for("faculty_dashboard_route"))
     return redirect(url_for("index"))
 
 

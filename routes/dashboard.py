@@ -149,7 +149,7 @@ def student_dashboard_individual():
 # Faculty dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/faculty_dashboard")
+@dashboard_bp.route("/faculty_dashboard", endpoint="faculty_dashboard_route")
 def faculty_dashboard():
     """Faculty dashboard – Faculty, Librarian, and Administrator roles."""
     if "user_id" not in session:
@@ -200,7 +200,7 @@ def faculty_dashboard():
 # Librarian dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/librarian_dashboard")
+@dashboard_bp.route("/librarian_dashboard", endpoint="librarian_dashboard_route")
 def librarian_dashboard():
     """Librarian dashboard."""
     if "user_id" not in session:
@@ -308,7 +308,7 @@ def librarian_dashboard_kebab():
 # Admin dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/admin_dashboard")
+@dashboard_bp.route("/admin_dashboard", endpoint="admin_dashboard_route")
 def admin_dashboard():
     """Administrator dashboard."""
     if "user_id" not in session:
