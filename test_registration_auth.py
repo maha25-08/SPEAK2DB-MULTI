@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash
 class RegistrationAuthTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.original_main_db = app_module.MAIN_DB
         cls.temp_dir = tempfile.mkdtemp(prefix='speak2db-register-tests-')
         cls.test_db = os.path.join(cls.temp_dir, 'library_main.db')
         repo_root = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +22,7 @@ class RegistrationAuthTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        app_module.MAIN_DB = cls.original_main_db
         shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):

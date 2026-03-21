@@ -49,8 +49,14 @@ def register_auth_routes(
         phone = request.form.get('phone', '').strip() or 'N/A'
         branch = request.form.get('branch', '').strip() or 'GEN'
         year = request.form.get('year', '').strip() or '1'
-        department = request.form.get('department', '').strip() or ('Library' if role == 'Librarian' else 'General')
-        designation = request.form.get('designation', '').strip() or ('Librarian' if role == 'Librarian' else 'Faculty')
+        if role == 'Librarian':
+            default_department = 'Library'
+            default_designation = 'Librarian'
+        else:
+            default_department = 'General'
+            default_designation = 'Faculty'
+        department = request.form.get('department', '').strip() or default_department
+        designation = request.form.get('designation', '').strip() or default_designation
         specialization = request.form.get('specialization', '').strip() or designation
 
         if not username or not password or not email:
@@ -102,7 +108,7 @@ def register_auth_routes(
         except Exception as exc:
             conn.rollback()
             logger.error('Registration error for %s: %s', username, exc)
-            flash(f'Registration failed: {exc}', 'error')
+            flash('Registration failed. Please try again later.', 'error')
             return render_template('register.html')
         finally:
             conn.close()
