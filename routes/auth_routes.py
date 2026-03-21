@@ -41,14 +41,7 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            password_matches = False
-            if user_row and user_row['password']:
-                try:
-                    password_matches = check_password_hash(user_row['password'], password)
-                except ValueError:
-                    password_matches = user_row['password'] == password
-
-            if user_row and password_matches:
+            if user_row and user_row['password'] and check_password_hash(user_row['password'], password):
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
