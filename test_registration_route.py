@@ -5,11 +5,13 @@ import tempfile
 import unittest
 
 import app as app_module
+from werkzeug.security import check_password_hash
 
 
 class RegistrationRouteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.original_main_db = app_module.MAIN_DB
         cls.temp_dir = tempfile.mkdtemp(prefix='speak2db-register-')
         cls.test_db = os.path.join(cls.temp_dir, 'library_main.db')
         repo_root = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +24,7 @@ class RegistrationRouteTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        app_module.MAIN_DB = cls.original_main_db
         shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
@@ -57,7 +60,10 @@ class RegistrationRouteTests(unittest.TestCase):
         ).fetchone()
         conn.close()
 
-        self.assertEqual(user_row, ('ZZ9001', 'secret123', 'Student', 'zz9001@example.com'))
+        self.assertEqual(user_row[0], 'ZZ9001')
+        self.assertNotEqual(user_row[1], 'secret123')
+        self.assertTrue(check_password_hash(user_row[1], 'secret123'))
+        self.assertEqual(user_row[2:], ('Student', 'zz9001@example.com'))
         self.assertEqual(student_row, ('ZZ9001', 'zz9001@example.com', 'Student'))
 
         login_response = self.client.post(
@@ -90,10 +96,22 @@ class RegistrationRouteTests(unittest.TestCase):
         self.assertIsNone(user_row)
 
     def test_register_handles_duplicate_username(self):
+        first_response = self.client.post(
+            '/register',
+            data={
+                'username': 'dupuser',
+                'password': 'secret123',
+                'role': 'Student',
+                'email': 'dupuser@example.com',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(first_response.status_code, 200)
+
         response = self.client.post(
             '/register',
             data={
-                'username': 'student',
+                'username': 'dupuser',
                 'password': 'secret123',
                 'role': 'Student',
                 'email': 'another@example.com',
@@ -101,7 +119,7 @@ class RegistrationRouteTests(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Username or email already exists.', response.data)
+        self.assertIn(b'Username already exists.', response.data)
 
 
 if __name__ == '__main__':

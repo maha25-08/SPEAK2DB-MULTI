@@ -1,11 +1,27 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import secrets
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 logger = logging.getLogger(__name__)
 REGISTRATION_ROLES = ('Student', 'Faculty', 'Librarian')
+
+
+def _password_matches(stored_password, provided_password):
+    """Support hashed new passwords and legacy plain-text passwords."""
+    if (
+        isinstance(stored_password, str)
+        and isinstance(provided_password, str)
+        and secrets.compare_digest(stored_password, provided_password)
+    ):
+        return True
+    try:
+        return check_password_hash(stored_password, provided_password)
+    except (ValueError, TypeError):
+        return False
 
 
 def register_auth_routes(
@@ -42,7 +58,7 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            if user_row and user_row['password'] == password:
+            if user_row and _password_matches(user_row['password'], password):
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
@@ -95,6 +111,10 @@ def register_auth_routes(
         password = request.form.get('password', '')
         role = request.form.get('role', '').strip()
         email = request.form.get('email', '').strip()
+        name = request.form.get('name', '').strip() or username
+        branch = request.form.get('branch', '').strip() or 'GEN'
+        year = request.form.get('year', '').strip() or '1'
+        phone = request.form.get('phone', '').strip() or 'N/A'
 
         if not username or not password or not role or not email:
             flash('Please fill in username, password, role, and email.', 'error')
@@ -106,9 +126,20 @@ def register_auth_routes(
 
         conn = get_db_connection(main_db_getter())
         try:
+            existing_user = conn.execute(
+                'SELECT username, email FROM Users WHERE username = ? OR lower(email) = lower(?)',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                if existing_user['username'] == username:
+                    flash('Username already exists.', 'error')
+                else:
+                    flash('Email already exists.', 'error')
+                return render_template('register.html')
+
             conn.execute(
                 'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
-                (username, password, role, email),
+                (username, generate_password_hash(password), role, email),
             )
             if role == 'Student':
                 conn.execute(
@@ -118,21 +149,18 @@ def register_auth_routes(
                     ''',
                     (
                         username,
-                        request.form.get('name', '').strip() or username,
-                        request.form.get('branch', '').strip() or 'GEN',
-                        request.form.get('year', '').strip() or '1',
+                        name,
+                        branch,
+                        year,
                         email,
-                        request.form.get('phone', '').strip() or 'N/A',
+                        phone,
                     ),
                 )
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
-            error_text = str(exc).lower()
-            if 'users.username' in error_text or 'users.email' in error_text:
-                flash('Username or email already exists.', 'error')
-            else:
-                flash('Unable to register with the provided details.', 'error')
+            logger.warning('Registration integrity error for %s: %s', username, exc)
+            flash('Unable to register with the provided details.', 'error')
             return render_template('register.html')
         except Exception as exc:
             conn.rollback()
