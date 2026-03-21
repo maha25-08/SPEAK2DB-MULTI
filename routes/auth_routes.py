@@ -2,6 +2,7 @@
 import logging
 
 from flask import flash, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,14 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            if user_row and user_row['password'] == password:
+            password_matches = False
+            if user_row and user_row['password']:
+                try:
+                    password_matches = check_password_hash(user_row['password'], password)
+                except ValueError:
+                    password_matches = user_row['password'] == password
+
+            if user_row and password_matches:
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role

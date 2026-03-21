@@ -15,6 +15,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Tuple
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import generate_password_hash
 
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
@@ -122,6 +123,11 @@ def _normalize_role(role: str) -> str:
         'Student': 'Student',
     }
     return mapping.get(role, role or 'Student')
+
+
+def _password_is_hashed(password: str) -> bool:
+    """Return True when a stored password already uses a Werkzeug hash format."""
+    return isinstance(password, str) and password.startswith(('scrypt:', 'pbkdf2:'))
 
 
 def _role_permission_scope(role: str) -> str:
@@ -243,6 +249,14 @@ def _ensure_admin_support_schema():
                     VALUES (?, ?)
                     ''',
                     (role_id, perm_id),
+                )
+
+        cursor.execute("UPDATE Users SET role = 'Administrator' WHERE role = 'Admin'")
+        for user_id, stored_password in cursor.execute("SELECT id, password FROM Users").fetchall():
+            if stored_password and not _password_is_hashed(stored_password):
+                cursor.execute(
+                    'UPDATE Users SET password = ? WHERE id = ?',
+                    (generate_password_hash(stored_password), user_id),
                 )
 
         conn.commit()
@@ -859,7 +873,7 @@ def _seed_default_users():
                 SELECT ?, ?, ?, ?
                 WHERE NOT EXISTS (SELECT 1 FROM Users WHERE username = ?)
                 ''',
-                (username, password, role, email, username),
+                (username, generate_password_hash(password), role, email, username),
             )
         conn.commit()
         conn.close()
