@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 import app as app_module
+from werkzeug.security import check_password_hash
 
 
 class RegisterRouteTests(unittest.TestCase):
@@ -64,7 +65,10 @@ class RegisterRouteTests(unittest.TestCase):
         ).fetchone()
         conn.close()
 
-        self.assertEqual(user_row, ('ZZ9001', 'secret123', 'Student', 'zz9001@example.com'))
+        self.assertEqual(user_row[0], 'ZZ9001')
+        self.assertNotEqual(user_row[1], 'secret123')
+        self.assertTrue(check_password_hash(user_row[1], 'secret123'))
+        self.assertEqual(user_row[2:], ('Student', 'zz9001@example.com'))
         self.assertEqual(student_row, ('ZZ9001', 'ZZ9001', 'GEN', '1', 'zz9001@example.com', '', 'Student'))
 
         login_response = self.client.post(
@@ -100,6 +104,19 @@ class RegisterRouteTests(unittest.TestCase):
         )
         self.assertEqual(missing_email.status_code, 200)
         self.assertIn(b'All fields are required.', missing_email.data)
+
+        invalid_email = self.client.post(
+            '/register',
+            data={
+                'username': 'bademail',
+                'password': 'pass123',
+                'role': 'Faculty',
+                'email': 'not-an-email',
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(invalid_email.status_code, 200)
+        self.assertIn(b'Please enter a valid email address.', invalid_email.data)
 
         duplicate = self.client.post(
             '/register',

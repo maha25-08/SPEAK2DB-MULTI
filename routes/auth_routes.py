@@ -1,10 +1,16 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import re
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 logger = logging.getLogger(__name__)
+_EMAIL_PATTERN = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+DEFAULT_STUDENT_BRANCH = 'GEN'
+DEFAULT_STUDENT_YEAR = '1'
+DEFAULT_STUDENT_PHONE = ''
 
 
 def register_auth_routes(
@@ -43,7 +49,14 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            if user_row and user_row['password'] == password:
+            password_matches = False
+            if user_row:
+                stored_password = user_row['password']
+                password_matches = stored_password == password
+                if not password_matches and stored_password.startswith(('pbkdf2:', 'scrypt:')):
+                    password_matches = check_password_hash(stored_password, password)
+
+            if user_row and password_matches:
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
@@ -100,32 +113,41 @@ def register_auth_routes(
         if not username or not password or not email or not role:
             flash('All fields are required.', 'error')
             return render_template('register.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register.html')
         if role not in allowed_registration_roles:
             flash('Please choose a valid role.', 'error')
             return render_template('register.html')
 
         conn = get_db_connection(main_db_getter())
         try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register.html')
+
             conn.execute(
                 'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
-                (username, password, role, email),
+                (username, generate_password_hash(password), role, email),
             )
             if role == 'Student':
+                student_name = username
                 conn.execute(
                     '''
                     INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ''',
-                    (username, username, 'GEN', '1', email, '', 'Student'),
+                    (username, student_name, DEFAULT_STUDENT_BRANCH, DEFAULT_STUDENT_YEAR, email, DEFAULT_STUDENT_PHONE, role),
                 )
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
             logger.warning('Registration failed for %s: %s', username, exc)
-            if 'Users.username' in str(exc) or 'Users.email' in str(exc):
-                flash('Username or email already exists.', 'error')
-            else:
-                flash('Unable to register with those details.', 'error')
+            flash('Username or email already exists.', 'error')
             return render_template('register.html')
         except Exception as exc:
             conn.rollback()
