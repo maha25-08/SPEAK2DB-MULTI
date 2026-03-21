@@ -1,5 +1,6 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
 
@@ -20,6 +21,8 @@ def register_auth_routes(
     main_db_getter,
 ):
     """Register login/logout routes on the Flask app."""
+
+    allowed_registration_roles = {'Student', 'Faculty', 'Librarian'}
 
     @app.route('/login', methods=['GET', 'POST'], endpoint='login')
     def login():
@@ -83,6 +86,57 @@ def register_auth_routes(
         elif role == 'Librarian':
             return redirect(url_for('dashboard.librarian_dashboard'))
         return redirect(url_for('index'))
+
+    @app.route('/register', methods=['GET', 'POST'], endpoint='register')
+    def register():
+        if request.method == 'GET':
+            return render_template('register.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        role = normalize_role(request.form.get('role', '').strip())
+
+        if not username or not password or not email or not role:
+            flash('All fields are required.', 'error')
+            return render_template('register.html')
+        if role not in allowed_registration_roles:
+            flash('Please choose a valid role.', 'error')
+            return render_template('register.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, password, role, email),
+            )
+            if role == 'Student':
+                conn.execute(
+                    '''
+                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (username, username, 'GEN', '1', email, '', 'Student'),
+                )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Registration failed for %s: %s', username, exc)
+            if 'Users.username' in str(exc) or 'Users.email' in str(exc):
+                flash('Username or email already exists.', 'error')
+            else:
+                flash('Unable to register with those details.', 'error')
+            return render_template('register.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
 
     @app.route('/logout', endpoint='logout')
     def logout():
