@@ -29,6 +29,23 @@ class RoleDashboardRoutingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/librarian_dashboard"))
 
+    def test_dashboard_redirects_to_login_when_role_is_missing(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = "test-user"
+
+        response = self.client.get("/dashboard", follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/login"))
+
+    def test_dashboard_redirects_to_login_for_unknown_role(self):
+        self._login_as_role("Guest", user_id="guest-user")
+
+        response = self.client.get("/dashboard", follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/login"))
+
     def test_librarian_is_still_denied_admin_dashboard(self):
         self._login_as_role("Librarian", user_id="librarian1")
 
