@@ -101,6 +101,8 @@ else:
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(views_bp)
+# Compatibility aliases for code/tests that call url_for('..._route') without the
+# dashboard blueprint prefix.
 app.add_url_rule(
     "/admin_dashboard",
     endpoint="admin_dashboard_route",

@@ -151,7 +151,7 @@ def student_dashboard_individual():
 
 @dashboard_bp.route("/faculty_dashboard", endpoint="faculty_dashboard_route")
 def faculty_dashboard():
-    """Faculty dashboard – Faculty, Librarian, and Administrator roles."""
+    """Faculty dashboard template, available to Faculty, Librarian, and Administrator roles."""
     if "user_id" not in session:
         return redirect(url_for("login"))
 

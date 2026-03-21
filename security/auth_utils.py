@@ -28,7 +28,4 @@ def verify_stored_password(stored_password: str, plain_text: str) -> bool:
     if stored_password.startswith(("pbkdf2:", "scrypt:")):
         return check_password_hash(stored_password, plain_text)
 
-    if compare_digest(stored_password, "pass"):
-        return verify_password(plain_text)
-
     return compare_digest(stored_password, plain_text)
