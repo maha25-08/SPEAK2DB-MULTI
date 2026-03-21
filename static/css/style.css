@@ -12,6 +12,10 @@
     --text: #000000;
     --text-secondary: #6c757d;
     --text-muted: #adb5bd;
+    --flash-success-bg: #e8f5e9;
+    --flash-success-border: #2e7d32;
+    --flash-error-bg: #fdecea;
+    --flash-error-border: #c62828;
 }
 
 * {
@@ -40,10 +44,14 @@ body {
 
 .success {
     color: green;
+    background: var(--flash-success-bg);
+    border-color: var(--flash-success-border);
 }
 
 .error {
     color: red;
+    background: var(--flash-error-bg);
+    border-color: var(--flash-error-border);
 }
 
 .info {

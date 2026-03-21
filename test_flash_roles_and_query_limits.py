@@ -77,6 +77,20 @@ def test_api_students_decorator_handles_authentication_and_allowed_roles():
     assert isinstance(payload['data'], list)
 
 
+def test_student_only_route_requires_explicit_role():
+    app_module.app.config.update(TESTING=True)
+
+    with app_module.app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess['user_id'] = 'MT3001'
+            sess['student_id'] = 1
+
+        response = client.get('/student_dashboard')
+
+    assert response.status_code == 403
+    assert b'Access Denied' in response.data
+
+
 def test_select_queries_use_default_query_limit_when_missing_or_excessive():
     assert ensure_limit('SELECT * FROM Books') == f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT}'
     assert (
@@ -84,6 +98,14 @@ def test_select_queries_use_default_query_limit_when_missing_or_excessive():
         == f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT}'
     )
     assert (
+        ensure_limit('SELECT * FROM Books LIMIT 500 OFFSET 10')
+        == f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT} OFFSET 10'
+    )
+    assert (
         apply_result_limit('SELECT * FROM Books LIMIT 500', DEFAULT_QUERY_LIMIT)
         == f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT}'
+    )
+    assert (
+        apply_result_limit('SELECT * FROM Books LIMIT 500 OFFSET 10', DEFAULT_QUERY_LIMIT)
+        == f'SELECT * FROM Books LIMIT {DEFAULT_QUERY_LIMIT} OFFSET 10'
     )

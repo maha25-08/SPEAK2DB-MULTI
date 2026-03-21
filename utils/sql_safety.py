@@ -8,6 +8,7 @@ from typing import Tuple
 from utils.constants import DEFAULT_QUERY_LIMIT
 
 logger = logging.getLogger(__name__)
+_LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?\b", re.IGNORECASE)
 
 # ---------------------------------------------------------------------------
 # Blocked DDL / DML keywords
@@ -46,13 +47,13 @@ def ensure_limit(sql: str, limit: int = DEFAULT_QUERY_LIMIT) -> str:
     """Append or cap ``LIMIT <limit>`` on *sql*."""
     if not sql:
         return sql
-    limit_match = re.search(r"\bLIMIT\s+(\d+)\b", sql, re.IGNORECASE)
+    limit_match = _LIMIT_PATTERN.search(sql)
     if not limit_match:
         return sql.rstrip().rstrip(";") + f" LIMIT {limit}"
     current_limit = int(limit_match.group(1))
     if current_limit <= limit:
         return sql
-    return re.sub(r"\bLIMIT\s+\d+\b", f"LIMIT {limit}", sql, count=1, flags=re.IGNORECASE)
+    return _LIMIT_PATTERN.sub(lambda match: match.group(0).replace(match.group(1), str(limit), 1), sql, count=1)
 
 
 def _inject_and_condition(sql_query: str, condition: str) -> str:

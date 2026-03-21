@@ -11,6 +11,7 @@ from db.connection import MAIN_DB
 from services.rbac_service import normalize_role
 
 logger = logging.getLogger(__name__)
+_LIMIT_PATTERN = re.compile(r'\bLIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?\b', re.IGNORECASE)
 
 
 def request_ip() -> str:
@@ -245,10 +246,14 @@ def apply_result_limit(sql_query: str, max_rows: int) -> str:
     """Cap query results with a configurable LIMIT."""
     if not sql_query or max_rows <= 0:
         return sql_query
-    limit_match = re.search(r'\bLIMIT\s+(\d+)\b', sql_query, re.IGNORECASE)
+    limit_match = _LIMIT_PATTERN.search(sql_query)
     if not limit_match:
         return sql_query.rstrip().rstrip(';') + f' LIMIT {max_rows}'
     current_limit = int(limit_match.group(1))
     if current_limit <= max_rows:
         return sql_query
-    return re.sub(r'\bLIMIT\s+\d+\b', f'LIMIT {max_rows}', sql_query, count=1, flags=re.IGNORECASE)
+    return _LIMIT_PATTERN.sub(
+        lambda match: match.group(0).replace(match.group(1), str(max_rows), 1),
+        sql_query,
+        count=1,
+    )
