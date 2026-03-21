@@ -4,13 +4,9 @@ import sqlite3
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import generate_password_hash
+from security.auth_utils import is_password_hash
 
 logger = logging.getLogger(__name__)
-
-
-def _password_is_hashed(password: str) -> bool:
-    """Return True when a stored password already uses a Werkzeug hash format."""
-    return isinstance(password, str) and password.startswith(('scrypt:', 'pbkdf2:'))
 
 
 def register_admin_routes(
@@ -115,7 +111,7 @@ def register_admin_routes(
             new_password = existing_user['password']
             if payload['password']:
                 new_password = generate_password_hash(payload['password'])
-            elif not _password_is_hashed(existing_user['password']):
+            elif not is_password_hash(existing_user['password']):
                 new_password = generate_password_hash(existing_user['password'])
             conn.execute(
                 'UPDATE Users SET username = ?, password = ?, role = ?, email = ? WHERE id = ?',
