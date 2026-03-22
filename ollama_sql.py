@@ -289,6 +289,7 @@ def generate_sql(user_query):
     """
     Hybrid approach: LLM for simple queries, enhanced keyword for complex queries
     """
+    query_lower = user_query.lower()
     # Strip vocabulary hint annotations before rule matching so that
     # "show books  [TABLES: Books]" is treated the same as "show books".
     clean_query = _strip_vocab_hints(user_query)
