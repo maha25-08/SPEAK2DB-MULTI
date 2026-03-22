@@ -1,11 +1,27 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import secrets
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 logger = logging.getLogger(__name__)
+REGISTRATION_ROLES = ('Student', 'Faculty', 'Librarian')
+
+
+def _password_matches(stored_password, provided_password):
+    """Support hashed new passwords and legacy plain-text passwords."""
+    if (
+        isinstance(stored_password, str)
+        and isinstance(provided_password, str)
+        and secrets.compare_digest(stored_password, provided_password)
+    ):
+        return True
+    try:
+        return check_password_hash(stored_password, provided_password)
+    except (ValueError, TypeError):
+        return False
 
 
 def register_auth_routes(
@@ -180,6 +196,77 @@ def register_auth_routes(
         elif role == 'Librarian':
             return redirect(url_for('dashboard.librarian_dashboard'))
         return redirect(url_for('index'))
+
+    @app.route('/register', methods=['GET', 'POST'], endpoint='register')
+    def register():
+        if request.method == 'GET':
+            return render_template('register.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        role = request.form.get('role', '').strip()
+        email = request.form.get('email', '').strip()
+        name = request.form.get('name', '').strip() or username
+        branch = request.form.get('branch', '').strip() or 'GEN'
+        year = request.form.get('year', '').strip() or '1'
+        phone = request.form.get('phone', '').strip() or 'N/A'
+
+        if not username or not password or not role or not email:
+            flash('Please fill in username, password, role, and email.', 'error')
+            return render_template('register.html')
+
+        if role not in REGISTRATION_ROLES:
+            flash('Please select a valid role.', 'error')
+            return render_template('register.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT username, email FROM Users WHERE username = ? OR lower(email) = lower(?)',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                if existing_user['username'] == username:
+                    flash('Username already exists.', 'error')
+                else:
+                    flash('Email already exists.', 'error')
+                return render_template('register.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), role, email),
+            )
+            if role == 'Student':
+                conn.execute(
+                    '''
+                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Student')
+                    ''',
+                    (
+                        username,
+                        name,
+                        branch,
+                        year,
+                        email,
+                        phone,
+                    ),
+                )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Registration integrity error for %s: %s', username, exc)
+            flash('Unable to register with the provided details.', 'error')
+            return render_template('register.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Registration error: %s', exc)
+            flash('Unable to register with the provided details.', 'error')
+            return render_template('register.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please log in.', 'success')
+        return redirect(url_for('login'))
 
     @app.route('/logout', endpoint='logout')
     def logout():
