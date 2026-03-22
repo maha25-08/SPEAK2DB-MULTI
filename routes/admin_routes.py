@@ -3,6 +3,8 @@ import logging
 import sqlite3
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import generate_password_hash
+from security.auth_utils import is_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +74,10 @@ def register_admin_routes(
         conn = sqlite3.connect(main_db_getter())
         conn.row_factory = sqlite3.Row
         try:
+            password_to_store = generate_password_hash(payload['password'] or 'pass')
             conn.execute(
                 'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
-                (payload['username'], payload['password'] or 'pass', payload['role'], payload['email']),
+                (payload['username'], password_to_store, payload['role'], payload['email']),
             )
             sync_role_profile_tables(conn, payload)
             conn.commit()
@@ -105,7 +108,11 @@ def register_admin_routes(
             if error:
                 flash(error, 'error')
                 return redirect(url_for('user_management_view'))
-            new_password = payload['password'] or existing_user['password']
+            new_password = existing_user['password']
+            if payload['password']:
+                new_password = generate_password_hash(payload['password'])
+            elif not is_password_hash(existing_user['password']):
+                new_password = generate_password_hash(existing_user['password'])
             conn.execute(
                 'UPDATE Users SET username = ?, password = ?, role = ?, email = ? WHERE id = ?',
                 (payload['username'], new_password, payload['role'], payload['email'], user_id),

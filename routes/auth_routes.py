@@ -4,7 +4,7 @@ import re
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 logger = logging.getLogger(__name__)
 _EMAIL_PATTERN = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
@@ -49,14 +49,12 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            password_matches = False
-            if user_row:
-                stored_password = user_row['password']
-                password_matches = stored_password == password
-                if not password_matches and stored_password.startswith(('pbkdf2:', 'scrypt:')):
-                    password_matches = check_password_hash(stored_password, password)
+            if user_row and user_row['password']:
+                password_matches = check_password_hash(user_row['password'], password)
+            else:
+                password_matches = False
 
-            if user_row and password_matches:
+            if password_matches:
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
