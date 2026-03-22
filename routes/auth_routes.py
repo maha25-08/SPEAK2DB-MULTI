@@ -1,10 +1,16 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import re
+import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 logger = logging.getLogger(__name__)
+_EMAIL_PATTERN = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+DEFAULT_STUDENT_BRANCH = 'GEN'
+DEFAULT_STUDENT_YEAR = '1'
+DEFAULT_STUDENT_PHONE = ''
 
 
 def register_auth_routes(
@@ -21,6 +27,8 @@ def register_auth_routes(
     main_db_getter,
 ):
     """Register login/logout routes on the Flask app."""
+
+    allowed_registration_roles = {'Student', 'Faculty', 'Librarian'}
 
     @app.route('/login', methods=['GET', 'POST'], endpoint='login')
     def login():
@@ -89,6 +97,66 @@ def register_auth_routes(
         elif role == 'Librarian':
             return redirect(url_for('dashboard.librarian_dashboard'))
         return redirect(url_for('index'))
+
+    @app.route('/register', methods=['GET', 'POST'], endpoint='register')
+    def register():
+        if request.method == 'GET':
+            return render_template('register.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        role = normalize_role(request.form.get('role', '').strip())
+
+        if not username or not password or not email or not role:
+            flash('All fields are required.', 'error')
+            return render_template('register.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register.html')
+        if role not in allowed_registration_roles:
+            flash('Please choose a valid role.', 'error')
+            return render_template('register.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), role, email),
+            )
+            if role == 'Student':
+                student_name = username
+                conn.execute(
+                    '''
+                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (username, student_name, DEFAULT_STUDENT_BRANCH, DEFAULT_STUDENT_YEAR, email, DEFAULT_STUDENT_PHONE, role),
+                )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
 
     @app.route('/logout', endpoint='logout')
     def logout():
