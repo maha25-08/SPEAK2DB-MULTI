@@ -15,6 +15,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 PASS_HASH: str = generate_password_hash("pass")
 
 
+def is_password_hash(stored_password: str) -> bool:
+    """Return True when a password already uses a Werkzeug hash format."""
+    return isinstance(stored_password, str) and stored_password.startswith(('scrypt:', 'pbkdf2:'))
+
+
 def verify_password(plain_text: str) -> bool:
     """Return True when *plain_text* matches the stored demo password hash."""
     return check_password_hash(PASS_HASH, plain_text)
