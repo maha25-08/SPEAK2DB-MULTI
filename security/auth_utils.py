@@ -5,6 +5,8 @@ All demo accounts share the password 'pass'.  The hash is computed once at
 import time so that check_password_hash() can validate it without storing
 plain-text credentials anywhere in source code.
 """
+from hmac import compare_digest
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Pre-computed hash for the shared demo password.
@@ -21,3 +23,14 @@ def is_password_hash(stored_password: str) -> bool:
 def verify_password(plain_text: str) -> bool:
     """Return True when *plain_text* matches the stored demo password hash."""
     return check_password_hash(PASS_HASH, plain_text)
+
+
+def verify_stored_password(stored_password: str, plain_text: str) -> bool:
+    """Validate a stored password value against the submitted plain text."""
+    if not stored_password or not plain_text:
+        return False
+
+    if stored_password.startswith(("pbkdf2:", "scrypt:")):
+        return check_password_hash(stored_password, plain_text)
+
+    return compare_digest(stored_password, plain_text)

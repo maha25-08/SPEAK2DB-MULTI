@@ -101,28 +101,28 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid px-4">
-            <a class="navbar-brand" href="/librarian_dashboard">
+            <a class="navbar-brand" href="{{ url_for('librarian_dashboard_route') }}">
                 <i class="fas fa-book-open me-2"></i>Speak2DB — Librarian Portal
             </a>
             <div class="navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/">
+                        <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="fas fa-search me-1"></i>Query
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/students">
+                        <a class="nav-link" href="{{ url_for('views.students_view') }}">
                             <i class="fas fa-users me-1"></i>Students
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/issued_books">
+                        <a class="nav-link" href="{{ url_for('views.issued_books_view') }}">
                             <i class="fas fa-book-reader me-1"></i>Issued Books
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/fine_management">
+                        <a class="nav-link" href="{{ url_for('views.fine_management_view') }}">
                             <i class="fas fa-money-bill-wave me-1"></i>Fines
                         </a>
                     </li>
@@ -132,7 +132,7 @@
                         Logged in as:
                         <span class="badge bg-success ms-1">{{ role|upper }}</span>
                     </span>
-                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
                     </a>
                 </div>

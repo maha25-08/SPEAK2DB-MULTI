@@ -103,6 +103,23 @@ else:
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(views_bp)
+# Compatibility aliases for code/tests that call url_for('..._route') without the
+# dashboard blueprint prefix.
+app.add_url_rule(
+    "/admin_dashboard",
+    endpoint="admin_dashboard_route",
+    view_func=app.view_functions["dashboard.admin_dashboard_route"],
+)
+app.add_url_rule(
+    "/librarian_dashboard",
+    endpoint="librarian_dashboard_route",
+    view_func=app.view_functions["dashboard.librarian_dashboard_route"],
+)
+app.add_url_rule(
+    "/faculty_dashboard",
+    endpoint="faculty_dashboard_route",
+    view_func=app.view_functions["dashboard.faculty_dashboard_route"],
+)
 
 # ── Run DB schema migrations at startup ─────────────────────────────────────
 ensure_query_history_schema()

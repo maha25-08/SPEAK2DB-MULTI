@@ -97,28 +97,28 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="/student_dashboard">
+            <a class="navbar-brand" href="{{ url_for('dashboard.student_dashboard') }}">
                 <i class="fas fa-book"></i> Library Management
             </a>
             <div class="navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="/student_dashboard">
+                        <a class="nav-link active" href="{{ url_for('dashboard.student_dashboard') }}">
                             <i class="fas fa-tachometer-alt"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/">
+                        <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="fas fa-search"></i> Query
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/student_dashboard#current-books">
+                        <a class="nav-link" href="{{ url_for('dashboard.student_dashboard') }}#current-books">
                             <i class="fas fa-book-open"></i> My Books
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/student_dashboard#unpaid-fines">
+                        <a class="nav-link" href="{{ url_for('dashboard.student_dashboard') }}#unpaid-fines">
                             <i class="fas fa-money-bill-wave"></i> My Fines
                         </a>
                     </li>
@@ -128,7 +128,7 @@
                         Logged in as:
                         <span class="badge bg-primary border border-light ms-1">{{ role|upper }}</span>
                     </span>
-                    <a class="nav-link text-white" href="/logout">
+                    <a class="nav-link text-white" href="{{ url_for('logout') }}">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </a>
                 </div>

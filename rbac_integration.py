@@ -9,6 +9,7 @@ from datetime import datetime
 from flask import session, jsonify, redirect, url_for
 from rbac_system_fixed import rbac, require_permission, require_role, require_min_role, apply_row_level_filter
 from ollama_sql import generate_sql
+from security.auth_utils import verify_stored_password
 
 class RBACIntegration:
     """🔗 Integration layer for RBAC with existing application"""
@@ -28,32 +29,12 @@ class RBACIntegration:
                          (username, username))
             user = cursor.fetchone()
             
-            if user and user[1] == password:
+            if user and verify_stored_password(user[1], password):
                 user_id, role, email = user[0], user[2], user[3]
                 user_type = 'user'
             else:
-                # Check in Students table
-                cursor.execute("SELECT id, roll_number, name, email, role FROM Students WHERE roll_number = ? OR email = ?", 
-                             (username, username))
-                student = cursor.fetchone()
-                
-                if student and password == "pass":  # Default student password
-                    student_id, roll_number, name, email, role = student
-                    user_id = roll_number
-                    user_type = 'student'
-                else:
-                    # Check in Faculty table
-                    cursor.execute("SELECT id, name, email FROM Faculty WHERE email = ?", (username,))
-                    faculty = cursor.fetchone()
-                    
-                    if faculty and password == "pass":  # Default faculty password
-                        faculty_id, name, email = faculty
-                        user_id = email
-                        role = 'Librarian'
-                        user_type = 'faculty'
-                    else:
-                        conn.close()
-                        return None, None
+                conn.close()
+                return None, None
             
             # Get enhanced role information
             enhanced_role = rbac.get_user_role(user_id)

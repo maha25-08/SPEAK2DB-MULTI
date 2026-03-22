@@ -143,7 +143,7 @@
                         <span class="role-badge role-{{ role.lower() }}">Logged in as: {{ role|upper }}</span>
                     </div>
                 </div>
-                <a href="/logout" class="btn-logout">⏻ Sign Out</a>
+                <a href="{{ url_for('logout') }}" class="btn-logout">⏻ Sign Out</a>
             </div>
 
             <!-- Role-Based Navigation -->
@@ -151,65 +151,86 @@
                 <div class="section-title">📍 Navigation</div>
                 <nav class="modern-nav">
                     {% if role == 'Student' %}
-                    <a href="/student_dashboard" class="nav-link">
+                    <a href="{{ url_for('dashboard.student_dashboard') }}" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">My Dashboard</span>
                     </a>
-                    <a href="/" class="nav-link active">
+                    <a href="{{ url_for('index') }}" class="nav-link active">
                         <span class="nav-icon">🔍</span>
                         <span class="nav-text">Query</span>
                     </a>
-                    {% elif role in ('Librarian', 'Faculty') %}
-                    <a href="/librarian_dashboard" class="nav-link">
+                    {% elif role == 'Librarian' %}
+                    <a href="{{ url_for('librarian_dashboard_route') }}" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="/students" class="nav-link">
+                    <a href="{{ url_for('views.students_view') }}" class="nav-link">
                         <span class="nav-icon">👥</span>
                         <span class="nav-text">Students</span>
                     </a>
-                    <a href="/issued_books" class="nav-link">
+                    <a href="{{ url_for('views.issued_books_view') }}" class="nav-link">
                         <span class="nav-icon">📖</span>
                         <span class="nav-text">Issued Books</span>
                     </a>
-                    <a href="/fine_management" class="nav-link">
+                    <a href="{{ url_for('views.fine_management_view') }}" class="nav-link">
                         <span class="nav-icon">💸</span>
                         <span class="nav-text">Fines</span>
                     </a>
-                    <a href="/" class="nav-link active">
+                    <a href="{{ url_for('index') }}" class="nav-link active">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Query</span>
+                    </a>
+                    {% elif role == 'Faculty' %}
+                    <a href="{{ url_for('faculty_dashboard_route') }}" class="nav-link">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="{{ url_for('views.students_view') }}" class="nav-link">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">Students</span>
+                    </a>
+                    <a href="{{ url_for('views.issued_books_view') }}" class="nav-link">
+                        <span class="nav-icon">📖</span>
+                        <span class="nav-text">Issued Books</span>
+                    </a>
+                    <a href="{{ url_for('views.fine_management_view') }}" class="nav-link">
+                        <span class="nav-icon">💸</span>
+                        <span class="nav-text">Fines</span>
+                    </a>
+                    <a href="{{ url_for('index') }}" class="nav-link active">
                         <span class="nav-icon">🔍</span>
                         <span class="nav-text">Query</span>
                     </a>
                     {% elif role == 'Administrator' %}
-                    <a href="/admin_dashboard" class="nav-link">
+                    <a href="{{ url_for('admin_dashboard_route') }}" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="/students" class="nav-link">
+                    <a href="{{ url_for('views.students_view') }}" class="nav-link">
                         <span class="nav-icon">👥</span>
                         <span class="nav-text">Students</span>
                     </a>
-                    <a href="/issued_books" class="nav-link">
+                    <a href="{{ url_for('views.issued_books_view') }}" class="nav-link">
                         <span class="nav-icon">📖</span>
                         <span class="nav-text">Issued Books</span>
                     </a>
-                    <a href="/fine_management" class="nav-link">
+                    <a href="{{ url_for('views.fine_management_view') }}" class="nav-link">
                         <span class="nav-icon">💸</span>
                         <span class="nav-text">Fines</span>
                     </a>
-                    <a href="/analytics" class="nav-link">
+                    <a href="{{ url_for('views.analytics') }}" class="nav-link">
                         <span class="nav-icon">📈</span>
                         <span class="nav-text">Analytics</span>
                     </a>
-                    <a href="/user_management" class="nav-link">
+                    <a href="{{ url_for('user_management_view') }}" class="nav-link">
                         <span class="nav-icon">👤</span>
                         <span class="nav-text">User Management</span>
                     </a>
-                    <a href="/system_statistics" class="nav-link">
+                    <a href="{{ url_for('system_statistics_view') }}" class="nav-link">
                         <span class="nav-icon">🖥️</span>
                         <span class="nav-text">System Statistics</span>
                     </a>
-                    <a href="/" class="nav-link active">
+                    <a href="{{ url_for('index') }}" class="nav-link active">
                         <span class="nav-icon">🔍</span>
                         <span class="nav-text">Query</span>
                     </a>
@@ -247,7 +268,7 @@
             <section class="dashboard-panel student-panel">
                 <div class="section-header">
                     <h2 class="section-title">🎓 My Library Dashboard</h2>
-                    <a href="/student_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                    <a href="{{ url_for('dashboard.student_dashboard') }}" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
                 </div>
                 <div class="widget-grid">
                     <div class="widget-card widget-blue">
@@ -290,10 +311,10 @@
                 <div class="section-header">
                     {% if role == 'Administrator' %}
                     <h2 class="section-title">🛡️ System Administration</h2>
-                    <a href="/admin_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                    <a href="{{ url_for('admin_dashboard_route') }}" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
                     {% else %}
                     <h2 class="section-title">📋 Library Management Overview</h2>
-                    <a href="/librarian_dashboard" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
+                    <a href="{{ url_for('librarian_dashboard_route') if role == 'Librarian' else url_for('faculty_dashboard_route') }}" class="btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Full Dashboard ↗</a>
                     {% endif %}
                 </div>
                 <div class="widget-grid">

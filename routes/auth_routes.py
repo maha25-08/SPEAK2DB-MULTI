@@ -6,6 +6,8 @@ import sqlite3
 from flask import flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
+from security.auth_utils import verify_stored_password
+
 logger = logging.getLogger(__name__)
 _EMAIL_PATTERN = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 DEFAULT_STUDENT_BRANCH = 'GEN'
@@ -49,12 +51,7 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            if user_row and user_row['password']:
-                password_matches = check_password_hash(user_row['password'], password)
-            else:
-                password_matches = False
-
-            if password_matches:
+            if user_row and verify_stored_password(user_row['password'], password):
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
@@ -66,16 +63,6 @@ def register_auth_routes(
                     ).fetchone()
                     session['student_id'] = student_row['id'] if student_row else None
                 authenticated = True
-            else:
-                student = conn.execute(
-                    'SELECT id, roll_number FROM Students WHERE roll_number = ? OR lower(email) = lower(?)',
-                    (username, username),
-                ).fetchone()
-                if student and password == 'pass':
-                    session['user_id'] = student['roll_number']
-                    session['role'] = 'Student'
-                    session['student_id'] = student['id']
-                    authenticated = True
             conn.close()
         except Exception as exc:
             logger.error('Authentication error: %s', exc)
@@ -93,9 +80,11 @@ def register_auth_routes(
         flash(f"Welcome, {session.get('role', 'Student')}!", 'success')
         role = session.get('role', 'Student')
         if role == 'Administrator':
-            return redirect(url_for('dashboard.admin_dashboard'))
-        elif role == 'Librarian':
-            return redirect(url_for('dashboard.librarian_dashboard'))
+            return redirect(url_for('admin_dashboard_route'))
+        if role == 'Librarian':
+            return redirect(url_for('librarian_dashboard_route'))
+        if role == 'Faculty':
+            return redirect(url_for('faculty_dashboard_route'))
         return redirect(url_for('index'))
 
     @app.route('/register', methods=['GET', 'POST'], endpoint='register')

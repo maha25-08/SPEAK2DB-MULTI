@@ -46,18 +46,18 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark" style="background:#4a148c">
         <div class="container-fluid px-4">
-            <a class="navbar-brand" href="/admin_dashboard">
+            <a class="navbar-brand" href="{{ url_for('admin_dashboard_route') }}">
                 <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
             </a>
             <div class="navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/admin_dashboard">
+                        <a class="nav-link" href="{{ url_for('admin_dashboard_route') }}">
                             <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/">
+                        <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="fas fa-search me-1"></i>Query
                         </a>
                     </li>
@@ -67,12 +67,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/user_management">
+                        <a class="nav-link" href="{{ url_for('user_management_view') }}">
                             <i class="fas fa-users-cog me-1"></i>User Management
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/system_statistics">
+                        <a class="nav-link" href="{{ url_for('system_statistics_view') }}">
                             <i class="fas fa-server me-1"></i>System Statistics
                         </a>
                     </li>
@@ -82,7 +82,7 @@
                         Logged in as:
                         <span class="badge bg-danger ms-1">{{ role|upper }}</span>
                     </span>
-                    <a href="/logout" class="btn btn-outline-light btn-sm">
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
                     </a>
                 </div>

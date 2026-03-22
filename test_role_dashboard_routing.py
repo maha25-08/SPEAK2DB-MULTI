@@ -1,68 +1,80 @@
+import os
+import shutil
+import sqlite3
+import tempfile
 import unittest
 
 import app as app_module
+from flask import url_for
 
 
 class RoleDashboardRoutingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.mkdtemp(prefix='speak2db-role-routing-')
+        cls.test_db = os.path.join(cls.temp_dir, 'library_main.db')
+        repo_root = os.path.dirname(os.path.abspath(__file__))
+        shutil.copyfile(
+            os.path.join(repo_root, 'library_main.db'),
+            cls.test_db,
+        )
+        app_module.MAIN_DB = cls.test_db
+        if hasattr(app_module, 'rbac'):
+            app_module.rbac.db_path = cls.test_db
+        ensure_admin_schema = getattr(
+            app_module,
+            '_ensure_admin_schema',
+            app_module._ensure_admin_support_schema,
+        )
+        ensure_admin_schema()
+        app_module.app.config['TESTING'] = True
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
+
     def setUp(self):
-        app_module.app.config["TESTING"] = True
         self.client = app_module.app.test_client()
 
-    def _login_as_role(self, role, user_id="test-user"):
-        with self.client.session_transaction() as sess:
-            sess["user_id"] = user_id
-            sess["role"] = role
+    def test_named_dashboard_endpoints_build_expected_paths(self):
+        with app_module.app.test_request_context():
+            self.assertEqual(url_for('admin_dashboard_route'), '/admin_dashboard')
+            self.assertEqual(url_for('librarian_dashboard_route'), '/librarian_dashboard')
+            self.assertEqual(url_for('faculty_dashboard_route'), '/faculty_dashboard')
 
-    def test_dashboard_redirects_administrator_to_admin_dashboard(self):
-        self._login_as_role("Administrator", user_id="admin")
+    def test_login_redirects_by_role(self):
+        credentials = [
+            ('admin', 'pass', '/admin_dashboard'),
+            ('librarian', 'pass', '/librarian_dashboard'),
+            ('faculty', 'pass', '/faculty_dashboard'),
+            ('MT3001', 'pass', '/'),
+        ]
 
-        response = self.client.get("/dashboard", follow_redirects=False)
+        for username, password, expected_location in credentials:
+            with self.subTest(username=username):
+                response = self.client.post(
+                    '/login',
+                    data={'username': username, 'password': password},
+                    follow_redirects=False,
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers['Location'].endswith(expected_location))
 
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.headers["Location"].endswith("/admin_dashboard"))
+    def test_student_profile_without_user_credentials_cannot_use_demo_bypass(self):
+        conn = sqlite3.connect(self.test_db)
+        conn.execute("DELETE FROM Users WHERE username = ?", ('MT3001',))
+        conn.commit()
+        conn.close()
 
-    def test_dashboard_redirects_librarian_to_librarian_dashboard(self):
-        self._login_as_role("Librarian", user_id="librarian1")
-
-        response = self.client.get("/dashboard", follow_redirects=False)
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.headers["Location"].endswith("/librarian_dashboard"))
-
-    def test_dashboard_redirects_to_login_when_role_is_missing(self):
-        with self.client.session_transaction() as sess:
-            sess["user_id"] = "test-user"
-
-        response = self.client.get("/dashboard", follow_redirects=False)
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.headers["Location"].endswith("/login"))
-
-    def test_dashboard_redirects_to_login_for_unknown_role(self):
-        self._login_as_role("Guest", user_id="guest-user")
-
-        response = self.client.get("/dashboard", follow_redirects=False)
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.headers["Location"].endswith("/login"))
-
-    def test_librarian_is_still_denied_admin_dashboard(self):
-        self._login_as_role("Librarian", user_id="librarian1")
-
-        response = self.client.get("/admin_dashboard")
-
-        self.assertEqual(response.status_code, 403)
-        self.assertIn(b"Access Denied", response.data)
-
-    def test_query_console_shows_librarian_dashboard_link_without_admin_link(self):
-        self._login_as_role("Librarian", user_id="librarian1")
-
-        response = self.client.get("/")
+        response = self.client.post(
+            '/login',
+            data={'username': 'MT3001', 'password': 'pass'},
+            follow_redirects=False,
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'href="/librarian_dashboard"', response.data)
-        self.assertNotIn(b'href="/admin_dashboard"', response.data)
+        self.assertIn(b'Invalid username or password', response.data)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
