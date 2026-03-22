@@ -19,8 +19,14 @@ class AdminAuthControlPanelTests(unittest.TestCase):
             cls.test_db,
         )
         app_module.MAIN_DB = cls.test_db
-        app_module.rbac.db_path = cls.test_db
-        app_module._ensure_admin_schema()
+        if hasattr(app_module, 'rbac'):
+            app_module.rbac.db_path = cls.test_db
+        ensure_admin_schema = getattr(
+            app_module,
+            '_ensure_admin_schema',
+            app_module._ensure_admin_support_schema,
+        )
+        ensure_admin_schema()
         app_module.app.config['TESTING'] = True
 
     @classmethod

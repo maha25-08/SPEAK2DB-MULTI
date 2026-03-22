@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from werkzeug.security import check_password_hash
 
 import app as app_module
 from rbac_system_fixed import rbac
@@ -66,13 +67,15 @@ def test_admin_can_add_update_and_change_role_for_user(client):
 
     conn = sqlite3.connect(db_path)
     user_row = conn.execute(
-        "SELECT id, username, role, email FROM Users WHERE username = 'NEW1001'"
+        "SELECT id, username, password, role, email FROM Users WHERE username = 'NEW1001'"
     ).fetchone()
     student_row = conn.execute(
         "SELECT name, branch, year FROM Students WHERE roll_number = 'NEW1001'"
     ).fetchone()
     assert user_row is not None
-    assert user_row[2] == 'Student'
+    assert user_row[3] == 'Student'
+    assert user_row[2] != 'pass'
+    assert check_password_hash(user_row[2], 'pass')
     assert student_row == ('New Student', 'CSE', '2')
 
     update_response = test_client.post(
@@ -123,6 +126,44 @@ def test_admin_can_add_update_and_change_role_for_user(client):
     assert faculty_row == ('Updated Student', 'Computer Science', 'Assistant Professor')
     assert removed_student is None
     assert activity_log is not None
+
+
+def test_login_migrates_plaintext_passwords_and_admin_role(client):
+    test_client, db_path = client
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)",
+        ('legacyadmin', 'legacypass', 'Admin', 'legacyadmin@example.com'),
+    )
+    conn.commit()
+    conn.close()
+
+    app_module._ensure_admin_support_schema()
+
+    conn = sqlite3.connect(db_path)
+    migrated_user = conn.execute(
+        "SELECT password, role FROM Users WHERE username = ?",
+        ('legacyadmin',),
+    ).fetchone()
+    conn.close()
+
+    assert migrated_user is not None
+    assert migrated_user[1] == 'Administrator'
+    assert migrated_user[0] != 'legacypass'
+    assert check_password_hash(migrated_user[0], 'legacypass')
+
+    response = test_client.post(
+        '/login',
+        data={'username': 'legacyadmin', 'password': 'legacypass'},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/admin_dashboard')
+    with test_client.session_transaction() as sess:
+        assert sess['user_id'] == 'legacyadmin'
+        assert sess['role'] == 'Administrator'
 
 
 def test_admin_settings_drive_query_limit_and_logs_api(client):

@@ -100,7 +100,7 @@
         {% endif %}
         {% endwith %}
 
-        <form method="POST" action="/register">
+        <form method="POST" action="{{ url_for('register') }}">
             <div class="grid">
                 <div>
                     <label for="username">Username</label>
@@ -152,7 +152,7 @@
                 </div>
             </div>
             <div class="helper">
-                Students should provide branch/year; faculty users should provide department/designation.
+                Only username, password, role, and email are required. Student profile fields default to username / GEN / 1 / N/A when left blank.
             </div>
             <div class="actions">
                 <button class="btn btn-primary" type="submit">Create Account</button>

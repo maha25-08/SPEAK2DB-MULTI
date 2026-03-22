@@ -15,6 +15,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Tuple
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import generate_password_hash
+from security.auth_utils import is_password_hash
 
 # ── New pipeline modules ────────────────────────────────────────────────────
 from domain_vocabulary import build_vocabulary, preprocess_query, get_vocabulary_sample
@@ -101,6 +103,23 @@ else:
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(views_bp)
+# Compatibility aliases for code/tests that call url_for('..._route') without the
+# dashboard blueprint prefix.
+app.add_url_rule(
+    "/admin_dashboard",
+    endpoint="admin_dashboard_route",
+    view_func=app.view_functions["dashboard.admin_dashboard_route"],
+)
+app.add_url_rule(
+    "/librarian_dashboard",
+    endpoint="librarian_dashboard_route",
+    view_func=app.view_functions["dashboard.librarian_dashboard_route"],
+)
+app.add_url_rule(
+    "/faculty_dashboard",
+    endpoint="faculty_dashboard_route",
+    view_func=app.view_functions["dashboard.faculty_dashboard_route"],
+)
 
 # ── Run DB schema migrations at startup ─────────────────────────────────────
 ensure_query_history_schema()
@@ -243,6 +262,14 @@ def _ensure_admin_support_schema():
                     VALUES (?, ?)
                     ''',
                     (role_id, perm_id),
+                )
+
+        cursor.execute("UPDATE Users SET role = 'Administrator' WHERE role = 'Admin'")
+        for user_id, stored_password in cursor.execute("SELECT id, password FROM Users").fetchall():
+            if stored_password and not is_password_hash(stored_password):
+                cursor.execute(
+                    'UPDATE Users SET password = ? WHERE id = ?',
+                    (generate_password_hash(stored_password), user_id),
                 )
 
         conn.commit()
@@ -859,7 +886,7 @@ def _seed_default_users():
                 SELECT ?, ?, ?, ?
                 WHERE NOT EXISTS (SELECT 1 FROM Users WHERE username = ?)
                 ''',
-                (username, password, role, email, username),
+                (username, generate_password_hash(password), role, email, username),
             )
         conn.commit()
         conn.close()
