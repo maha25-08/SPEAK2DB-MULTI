@@ -1,7 +1,9 @@
 """Authentication route registration for SPEAK2DB."""
 import logging
+import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,101 @@ def register_auth_routes(
     main_db_getter,
 ):
     """Register login/logout routes on the Flask app."""
+
+    registration_roles = {'Student', 'Faculty', 'Librarian'}
+
+    def _password_matches(stored_password: str, provided_password: str) -> bool:
+        if not stored_password:
+            return False
+        if stored_password == provided_password:
+            return True
+        try:
+            return check_password_hash(stored_password, provided_password)
+        except ValueError:
+            return False
+
+    @app.route('/auth/register', methods=['GET', 'POST'])
+    @app.route('/register', methods=['GET', 'POST'], endpoint='register')
+    def register():
+        if request.method == 'GET':
+            return render_template('register.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        role = normalize_role(request.form.get('role', '').strip())
+        email = request.form.get('email', '').strip().lower()
+        name = request.form.get('name', '').strip() or username
+        phone = request.form.get('phone', '').strip() or 'N/A'
+        branch = request.form.get('branch', '').strip() or 'GEN'
+        year = request.form.get('year', '').strip() or '1'
+        if role == 'Librarian':
+            default_department = 'Library'
+            default_designation = 'Librarian'
+        else:
+            default_department = 'General'
+            default_designation = 'Faculty'
+        department = request.form.get('department', '').strip() or default_department
+        designation = request.form.get('designation', '').strip() or default_designation
+        specialization = request.form.get('specialization', '').strip() or designation
+
+        if not username or not password or not email:
+            flash('Username, password, and email are required.', 'error')
+            return render_template('register.html')
+
+        if role not in registration_roles:
+            flash('Please choose a valid role: Student, Faculty, or Librarian.', 'error')
+            return render_template('register.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR lower(email) = lower(?)',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), role, email),
+            )
+
+            if role == 'Student':
+                conn.execute(
+                    '''
+                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Student')
+                    ''',
+                    (username, name, branch, year, email, phone),
+                )
+            else:
+                conn.execute(
+                    '''
+                    INSERT INTO Faculty (name, department, designation, email, phone, specialization)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ''',
+                    (name, department, designation, email, phone, specialization),
+                )
+
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Registration error for %s: %s', username, exc)
+            flash('Registration failed. Please try again later.', 'error')
+            return render_template('register.html')
+        finally:
+            conn.close()
+
+        log_activity(username, f'Registration ({role})')
+        log_audit_event(username, role, 'REGISTER', 'USER', f'User registered with role {role}', success=True)
+        flash('Registration successful', 'success')
+        return redirect(url_for('login'))
 
     @app.route('/login', methods=['GET', 'POST'], endpoint='login')
     def login():
@@ -40,7 +137,7 @@ def register_auth_routes(
                 (username, username),
             ).fetchone()
 
-            if user_row and user_row['password'] == password:
+            if user_row and _password_matches(user_row['password'], password):
                 normalized_role = normalize_role(user_row['role'])
                 session['user_id'] = user_row['username']
                 session['role'] = normalized_role
