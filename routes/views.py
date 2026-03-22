@@ -6,28 +6,12 @@ import logging
 from flask import Blueprint, render_template, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
+from utils.decorators import require_roles
 from utils.helpers import get_library_stats
 
 logger = logging.getLogger(__name__)
 
 views_bp = Blueprint("views", __name__)
-
-
-# ---------------------------------------------------------------------------
-# Helper guards
-# ---------------------------------------------------------------------------
-
-def _require_librarian_or_admin():
-    role = session.get("role", "Student")
-    if role not in ("Librarian", "Faculty", "Administrator"):
-        return "Access Denied", 403
-    return None
-
-
-def _require_admin():
-    if session.get("role") != "Administrator":
-        return "Access Denied", 403
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -55,14 +39,9 @@ def dashboard_redirect():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/analytics")
+@require_roles("Administrator")
 def analytics():
     """Analytics view – Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_admin()
-    if guard:
-        return guard
-
     user_role = session.get("role", "Student")
     user_id = session["user_id"]
 
@@ -95,14 +74,9 @@ def analytics():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/recommendations")
+@require_roles("Administrator")
 def recommendations():
     """Recommendations view – Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_admin()
-    if guard:
-        return guard
-
     user_role = session.get("role", "Student")
     user_id = session["user_id"]
     users = []
@@ -134,14 +108,9 @@ def recommendations():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/students")
+@require_roles("Librarian", "Faculty", "Administrator")
 def students_view():
     """All students – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_librarian_or_admin()
-    if guard:
-        return guard
-
     user_id = session["user_id"]
     user_role = session.get("role")
 
@@ -161,14 +130,9 @@ def students_view():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/issued_books")
+@require_roles("Librarian", "Faculty", "Administrator")
 def issued_books_view():
     """Issued books overview – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_librarian_or_admin()
-    if guard:
-        return guard
-
     user_id = session["user_id"]
     user_role = session.get("role")
 
@@ -188,14 +152,9 @@ def issued_books_view():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/fine_management")
+@require_roles("Librarian", "Faculty", "Administrator")
 def fine_management_view():
     """Fine management – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_librarian_or_admin()
-    if guard:
-        return guard
-
     user_id = session["user_id"]
     user_role = session.get("role")
 
@@ -211,14 +170,9 @@ def fine_management_view():
 
 
 @views_bp.route("/fines")
+@require_roles("Librarian", "Faculty", "Administrator")
 def fines_view():
     """Fines alias – redirects to fine_management."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_librarian_or_admin()
-    if guard:
-        return guard
-
     logger.info("fines_view accessed by role: %s", session.get("role"))
     return redirect(url_for("views.fine_management_view"))
 
@@ -228,14 +182,9 @@ def fines_view():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/user_management")
+@require_roles("Administrator")
 def user_management_view():
     """User management – Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_admin()
-    if guard:
-        return guard
-
     user_id = session["user_id"]
     user_role = session.get("role")
     student_count = faculty_count = 0

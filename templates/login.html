@@ -136,16 +136,9 @@
             transform: translateY(-1px);
         }
 
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fda4af;
-            padding: 1.5rem;
-            border-radius: 12px;
+        .flash-message {
             margin-bottom: 2rem;
-            font-size: 1.6rem; /* Bigger error text */
-            text-align: center;
-            font-weight: 500;
+            font-size: 1.6rem; /* Bigger flash text */
         }
 
         .login-footer {
@@ -212,7 +205,7 @@
                 padding: 1.2rem;
             }
             
-            .alert-error {
+            .flash-message {
                 font-size: 1.4rem;
                 padding: 1.2rem;
             }
@@ -237,11 +230,13 @@
                 <p>NLP-Driven Multi-Database Query Assistant</p>
             </div>
 
-            {% with messages = get_flashed_messages() %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-            <div class="alert-error">
-                {{ messages[0] }}
+            {% for category, message in messages %}
+            <div class="flash-message {{ category }}">
+                {{ message }}
             </div>
+            {% endfor %}
             {% endif %}
             {% endwith %}
 

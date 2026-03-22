@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, session
 
 from db.connection import get_db_connection, MAIN_DB, ARCHIVE_DB
+from utils.decorators import require_roles
 
 try:
     from rbac_system_fixed import rbac
@@ -172,13 +173,9 @@ def vocabulary():
 # ---------------------------------------------------------------------------
 
 @api_bp.route("/query_analytics")
+@require_roles("Administrator")
 def query_analytics():
     """Query analytics – Administrator only."""
-    if "user_id" not in session:
-        return jsonify({"success": False, "error": "Not logged in"}), 401
-    if session.get("role") != "Administrator":
-        return jsonify({"success": False, "error": "Access denied"}), 403
-
     try:
         conn = get_db_connection(MAIN_DB)
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -239,13 +236,9 @@ def query_analytics():
 # ---------------------------------------------------------------------------
 
 @api_bp.route("/students")
+@require_roles("Librarian", "Faculty", "Administrator")
 def students():
     """Return all students as JSON – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return jsonify({"success": False, "error": "Not logged in"}), 401
-    if session.get("role") not in ("Librarian", "Faculty", "Administrator"):
-        return jsonify({"success": False, "error": "Access denied"}), 403
-
     logger.info("api/students accessed by role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
@@ -261,13 +254,9 @@ def students():
 
 
 @api_bp.route("/issued_books")
+@require_roles("Librarian", "Faculty", "Administrator")
 def issued_books():
     """Return currently issued books as JSON – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return jsonify({"success": False, "error": "Not logged in"}), 401
-    if session.get("role") not in ("Librarian", "Faculty", "Administrator"):
-        return jsonify({"success": False, "error": "Access denied"}), 403
-
     logger.info("api/issued_books accessed by role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
@@ -288,13 +277,9 @@ def issued_books():
 
 
 @api_bp.route("/fines")
+@require_roles("Librarian", "Faculty", "Administrator")
 def fines():
     """Return fines as JSON – Librarian/Administrator only."""
-    if "user_id" not in session:
-        return jsonify({"success": False, "error": "Not logged in"}), 401
-    if session.get("role") not in ("Librarian", "Faculty", "Administrator"):
-        return jsonify({"success": False, "error": "Access denied"}), 403
-
     logger.info("api/fines accessed by role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)

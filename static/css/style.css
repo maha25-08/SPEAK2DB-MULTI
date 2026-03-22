@@ -12,6 +12,10 @@
     --text: #000000;
     --text-secondary: #6c757d;
     --text-muted: #adb5bd;
+    --flash-success-bg: #e8f5e9;
+    --flash-success-border: #2e7d32;
+    --flash-error-bg: #fdecea;
+    --flash-error-border: #c62828;
 }
 
 * {
@@ -26,6 +30,32 @@ body {
     font-family: 'Inter', sans-serif;
     line-height: 1.6;
     min-height: 100vh;
+}
+
+.flash-message {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    text-align: center;
+    background: var(--bg-secondary);
+}
+
+.success {
+    color: green;
+    background: var(--flash-success-bg);
+    border-color: var(--flash-success-border);
+}
+
+.error {
+    color: red;
+    background: var(--flash-error-bg);
+    border-color: var(--flash-error-border);
+}
+
+.info {
+    color: var(--text-secondary);
 }
 
 /* ===== DASHBOARD LAYOUT ===== */

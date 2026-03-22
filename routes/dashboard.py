@@ -15,6 +15,7 @@ from flask import Blueprint, current_app, render_template, session, redirect, ur
 
 from db.connection import get_db_connection, MAIN_DB
 from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
+from utils.decorators import require_roles
 from utils.helpers import get_library_stats
 
 logger = logging.getLogger(__name__)
@@ -27,14 +28,9 @@ dashboard_bp = Blueprint("dashboard", __name__)
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/student_dashboard")
+@require_roles("Student")
 def student_dashboard():
     """Student dashboard (canonical snake_case route)."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    if session.get("role") != "Student":
-        return "Access Denied", 403
-
     user_role = session.get("role", "Student")
     user_id = session["user_id"]
     student_id = session.get("student_id")
@@ -149,17 +145,12 @@ def student_dashboard_individual():
 # Faculty dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/faculty_dashboard", endpoint="faculty_dashboard_route")
+@dashboard_bp.route("/faculty_dashboard")
+@require_roles("Faculty", "Librarian", "Administrator")
 def faculty_dashboard():
-    """Faculty dashboard template, available to Faculty, Librarian, and Administrator roles."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
+    """Faculty dashboard – Faculty, Librarian, and Administrator roles."""
     role = session.get("role")
     logger.debug("faculty_dashboard accessed by role: %s", role)
-
-    if role not in ("Faculty", "Librarian", "Administrator"):
-        return "Access Denied", 403
 
     user_id = session["user_id"]
     faculty_info = None
@@ -200,17 +191,12 @@ def faculty_dashboard():
 # Librarian dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/librarian_dashboard", endpoint="librarian_dashboard_route")
+@dashboard_bp.route("/librarian_dashboard")
+@require_roles("Librarian", "Faculty", "Administrator")
 def librarian_dashboard():
     """Librarian dashboard."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
     role = session.get("role")
     logger.debug("librarian_dashboard accessed by role: %s", role)
-
-    if role not in ("Librarian", "Faculty", "Administrator"):
-        return "Access Denied", 403
 
     user_id = session["user_id"]
     recent_issues = []
@@ -308,15 +294,10 @@ def librarian_dashboard_kebab():
 # Admin dashboard
 # ---------------------------------------------------------------------------
 
-@dashboard_bp.route("/admin_dashboard", endpoint="admin_dashboard_route")
+@dashboard_bp.route("/admin_dashboard")
+@require_roles("Administrator")
 def admin_dashboard():
     """Administrator dashboard."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    if session.get("role") != "Administrator":
-        return "Access Denied", 403
-
     build_admin_dashboard_context = current_app.extensions.get(ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY)
     if build_admin_dashboard_context is None:
         raise RuntimeError(
@@ -330,13 +311,9 @@ def admin_dashboard():
 
 
 @dashboard_bp.route("/admin-dashboard")
+@require_roles("Administrator")
 def admin_dashboard_kebab():
     """Administrator dashboard (RBAC template view)."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    if session.get("role") != "Administrator":
-        return "Access Denied", 403
-
     user_role = session.get("role", "Student")
     user_id = session["user_id"]
 

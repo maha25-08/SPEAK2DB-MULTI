@@ -77,12 +77,7 @@
             color: var(--text-secondary);
             border: 1px solid var(--border);
         }
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fda4af;
-            padding: 1rem;
-            border-radius: 12px;
+        .flash-message {
             margin-bottom: 1rem;
         }
         .helper {
@@ -97,9 +92,11 @@
         <h1>📝 Register</h1>
         <p>Create a new Speak2DB account with role-based access.</p>
 
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="alert-error">{{ messages[0] }}</div>
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
         {% endif %}
         {% endwith %}
 
