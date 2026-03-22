@@ -754,7 +754,7 @@ function showToast(message, type) {
 // ===== FULL DASHBOARD =====
 function loadFullDashboard() {
     console.log("Button clicked: Full Dashboard");
-    window.location.href = "/analytics";
+    window.location.href = "/dashboard";
 }
 
 // ===== QUERY SUGGESTIONS =====
