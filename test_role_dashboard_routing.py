@@ -41,6 +41,18 @@ class RoleDashboardRoutingTests(unittest.TestCase):
             self.assertEqual(url_for('admin_dashboard_route'), '/admin_dashboard')
             self.assertEqual(url_for('librarian_dashboard_route'), '/librarian_dashboard')
             self.assertEqual(url_for('faculty_dashboard_route'), '/faculty_dashboard')
+            self.assertIs(
+                app_module.app.view_functions['admin_dashboard_route'],
+                app_module.app.view_functions['dashboard.admin_dashboard'],
+            )
+            self.assertIs(
+                app_module.app.view_functions['librarian_dashboard_route'],
+                app_module.app.view_functions['dashboard.librarian_dashboard'],
+            )
+            self.assertIs(
+                app_module.app.view_functions['faculty_dashboard_route'],
+                app_module.app.view_functions['dashboard.faculty_dashboard'],
+            )
 
     def test_login_redirects_by_role(self):
         credentials = [
