@@ -32,6 +32,8 @@ DOMAIN_WORDS: List[str] = [
     "who", "what", "which", "how", "count", "total",
     "top", "most", "popular", "recent", "last", "days",
     "year", "category", "author", "title", "name",
+    "data", "detail", "details", "info", "information", "record", "records",
+    "everything",
     "due", "date", "amount", "status",
 ]
 

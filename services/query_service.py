@@ -5,7 +5,12 @@ import time
 from flask import session
 
 from domain_vocabulary import preprocess_query
-from clarification import apply_clarification_choice, get_clarification, is_ambiguous_query
+from clarification import (
+    apply_clarification_choice,
+    get_clarification,
+    is_ambiguous_query,
+    normalize_query_for_execution,
+)
 from query_correction import correct_query
 from query_context import save_context, is_followup, rewrite_followup, get_last_query
 from ollama_sql import generate_complex_sql, generate_sql
@@ -103,6 +108,7 @@ def execute_query_request(
         if corrected_query != user_query:
             logger.info('Spell-corrected query: %s', corrected_query)
         user_query = corrected_query
+        user_query = normalize_query_for_execution(user_query)
 
         if is_followup(user_query):
             last_query = get_last_query(user_session)
