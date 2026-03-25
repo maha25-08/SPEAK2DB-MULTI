@@ -72,6 +72,19 @@ class RoleDashboardRoutingTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertTrue(response.headers['Location'].endswith(expected_location))
 
+    def test_librarian_dashboard_renders_expected_content_for_librarian_role(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 'librarian'
+            sess['role'] = 'Librarian'
+
+        response = self.client.get('/librarian_dashboard')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Librarian Dashboard', response.data)
+        self.assertIn(b'Welcome librarian', response.data)
+        self.assertIn(b'Total Books:', response.data)
+        self.assertIn(b'Recent Issues', response.data)
+
     def test_student_profile_without_user_credentials_cannot_use_demo_bypass(self):
         conn = sqlite3.connect(self.test_db)
         conn.execute("DELETE FROM Users WHERE username = ?", ('MT3001',))

@@ -192,11 +192,16 @@ def faculty_dashboard():
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/librarian_dashboard")
-@require_roles("Librarian", "Faculty", "Administrator")
 def librarian_dashboard():
     """Librarian dashboard."""
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
     role = session.get("role")
+    print("ROLE:", role)
     logger.debug("librarian_dashboard accessed by role: %s", role)
+    if role not in ("Librarian", "Faculty", "Administrator"):
+        return "Access Denied", 403
 
     user_id = session["user_id"]
     recent_issues = []
@@ -208,7 +213,7 @@ def librarian_dashboard():
                FROM Issued i
                JOIN Books b ON i.book_id = b.id
                JOIN Students s ON i.student_id = s.id
-               ORDER BY i.issue_date DESC LIMIT 10"""
+               ORDER BY i.issue_date DESC LIMIT 5"""
         ).fetchall()
         conn.close()
     except Exception as exc:
