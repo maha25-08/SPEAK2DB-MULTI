@@ -53,6 +53,12 @@ def _extract_table_names(sql: str) -> list:
     return [m.group(1).strip('`"[]') for m in pattern.finditer(sql)]
 
 
+def _primary_table_name(sql: str) -> str:
+    """Return the top-level table following the first FROM clause."""
+    match = re.search(r'\bFROM\s+([`"\[]?[A-Za-z_][A-Za-z0-9_]*[`"\]]?)', sql, re.IGNORECASE)
+    return match.group(1).strip('`"[]').lower() if match else ''
+
+
 def _inject_student_filter(sql: str, student_id: int) -> str:
     """
     Inject ``student_id = <id>`` into the WHERE clause of *sql*.
@@ -171,11 +177,8 @@ def validate_sql(
     filtered_sql = stripped
 
     if role == 'Student' and student_id is not None:
-        for table in tables:
-            if table.lower() in _STUDENT_SCOPED_TABLES:
-                filtered_sql = _inject_student_filter(filtered_sql, student_id)
-                # Only inject once even if multiple scoped tables appear
-                break
+        if _primary_table_name(stripped) in _STUDENT_SCOPED_TABLES:
+            filtered_sql = _inject_student_filter(filtered_sql, student_id)
 
     print(f"[SECURITY] SQL after filter: {filtered_sql}")
     return True, filtered_sql, ""

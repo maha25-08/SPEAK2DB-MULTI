@@ -65,6 +65,12 @@ def _inject_and_condition(sql_query: str, condition: str) -> str:
     return sql_query + f" WHERE {condition}"
 
 
+def _primary_table_name(sql_query: str) -> str:
+    """Return the top-level table following FROM, if present."""
+    match = re.search(r"\bFROM\s+([A-Za-z_][A-Za-z0-9_]*)\b", sql_query, re.IGNORECASE)
+    return match.group(1).lower() if match else ""
+
+
 def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> str:
     """Rewrite *sql_query* to restrict results to the given *student_id*.
 
@@ -81,24 +87,24 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
     q_lower = user_query.lower()
     sq_lower = sql_query.lower()
     has_where = "WHERE" in sql_query.upper()
+    primary_table = _primary_table_name(sql_query)
 
     # ── Always restrict personal tables ─────────────────────────────────────
-    for tbl in ("fines", "issued", "reservations"):
-        if tbl in sq_lower:
-            already_filtered = bool(
-                re.search(
-                    r"\bstudent_id\s*=\s*" + str(sid) + r"\b",
-                    sql_query,
-                    re.IGNORECASE,
-                )
+    if primary_table in {"fines", "issued", "reservations"}:
+        already_filtered = bool(
+            re.search(
+                r"\bstudent_id\s*=\s*" + str(sid) + r"\b",
+                sql_query,
+                re.IGNORECASE,
             )
-            if not already_filtered:
-                if has_where:
-                    return _inject_and_condition(sql_query, f"student_id = {sid}")
-                return sql_query + f" WHERE student_id = {sid}"
-            return sql_query
+        )
+        if not already_filtered:
+            if has_where:
+                return _inject_and_condition(sql_query, f"student_id = {sid}")
+            return sql_query + f" WHERE student_id = {sid}"
+        return sql_query
 
-    if "students" in sq_lower and not has_where:
+    if primary_table == "students" and not has_where:
         return sql_query + f" WHERE id = {sid}"
 
     if "my" not in q_lower:
