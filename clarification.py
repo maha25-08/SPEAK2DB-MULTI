@@ -50,6 +50,10 @@ GENERIC_CLARIFICATION_OPTIONS: List[str] = [
     "Fines",
 ]
 
+DATA_CLARIFICATION_MESSAGE = "What data do you want to see?"
+DETAIL_CLARIFICATION_MESSAGE = "Can you clarify what details you need?"
+GENERIC_CLARIFICATION_MESSAGE = "I didn't fully understand. What would you like to see?"
+
 ENTITY_CANONICAL_MAP = {
     "book": "books",
     "books": "books",
@@ -113,6 +117,11 @@ _SHORTHAND_FILLER_WORDS = _QUERY_VERBS | {
     "record",
     "records",
 }
+
+_DETAIL_REQUEST_RE = re.compile(
+    r"\b(detail|details|info|information|record|records)\b",
+    re.IGNORECASE,
+)
 
 
 def _normalize_query(query: str) -> str:
@@ -207,20 +216,20 @@ def get_clarification(query: str) -> Optional[Dict[str, List[str]]]:
     if not is_ambiguous_query(query_lower):
         return None
 
-    if any(re.search(r"\b" + re.escape(word) + r"\b", query_lower) for word in {"detail", "details", "info", "information", "record", "records"}):
+    if _DETAIL_REQUEST_RE.search(query_lower):
         return {
-            "message": "Can you clarify what details you need?",
+            "message": DETAIL_CLARIFICATION_MESSAGE,
             "options": DETAIL_CLARIFICATION_OPTIONS,
         }
 
     if re.search(r"\bdata\b", query_lower):
         return {
-            "message": "What data do you want to see?",
+            "message": DATA_CLARIFICATION_MESSAGE,
             "options": GENERIC_CLARIFICATION_OPTIONS,
         }
 
     return {
-        "message": "I didn't fully understand. What would you like to see?",
+        "message": GENERIC_CLARIFICATION_MESSAGE,
         "options": GENERIC_CLARIFICATION_OPTIONS,
     }
 

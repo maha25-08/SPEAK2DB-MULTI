@@ -2,8 +2,11 @@ import unittest
 
 import app as speak2db_app
 from clarification import (
+    DATA_CLARIFICATION_MESSAGE,
     DETAIL_CLARIFICATION_OPTIONS,
+    DETAIL_CLARIFICATION_MESSAGE,
     GENERIC_CLARIFICATION_OPTIONS,
+    GENERIC_CLARIFICATION_MESSAGE,
     apply_clarification_choice,
     get_clarification,
     is_ambiguous_query,
@@ -33,21 +36,21 @@ class ClarificationLogicTests(unittest.TestCase):
         self.assertEqual(
             get_clarification("show data"),
             {
-                "message": "What data do you want to see?",
+                "message": DATA_CLARIFICATION_MESSAGE,
                 "options": GENERIC_CLARIFICATION_OPTIONS,
             },
         )
         self.assertEqual(
             get_clarification("show details"),
             {
-                "message": "Can you clarify what details you need?",
+                "message": DETAIL_CLARIFICATION_MESSAGE,
                 "options": DETAIL_CLARIFICATION_OPTIONS,
             },
         )
         self.assertEqual(
             get_clarification("show everything"),
             {
-                "message": "I didn't fully understand. What would you like to see?",
+                "message": GENERIC_CLARIFICATION_MESSAGE,
                 "options": GENERIC_CLARIFICATION_OPTIONS,
             },
         )
@@ -95,7 +98,7 @@ class ClarificationRouteTests(unittest.TestCase):
         self.assertEqual(
             payload["clarification"],
             {
-                "message": "What data do you want to see?",
+                "message": DATA_CLARIFICATION_MESSAGE,
                 "options": GENERIC_CLARIFICATION_OPTIONS,
             },
         )
@@ -110,7 +113,7 @@ class ClarificationRouteTests(unittest.TestCase):
         self.assertEqual(
             payload["clarification"],
             {
-                "message": "Can you clarify what details you need?",
+                "message": DETAIL_CLARIFICATION_MESSAGE,
                 "options": DETAIL_CLARIFICATION_OPTIONS,
             },
         )
