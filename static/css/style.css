@@ -7,6 +7,7 @@
     --bg-card: #ffffff;
     --border: #dee2e6;
     --primary: #4a90e2;
+    --primary-light: #818cf8;
     --secondary: #5cb85c;
     --accent: #f0ad4e;
     --text: #000000;
@@ -16,6 +17,12 @@
     --flash-success-border: #2e7d32;
     --flash-error-bg: #fdecea;
     --flash-error-border: #c62828;
+    /* Gradient & shadow tokens used by login.html */
+    --gradient-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --glow-primary: 0 0 20px rgba(99, 102, 241, 0.4);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 8px 32px rgba(99, 102, 241, 0.5);
 }
 
 * {

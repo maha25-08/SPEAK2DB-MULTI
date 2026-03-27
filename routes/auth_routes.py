@@ -4,7 +4,7 @@ import re
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from security.auth_utils import verify_stored_password
 
