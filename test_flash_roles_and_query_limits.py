@@ -44,7 +44,7 @@ def test_admin_dashboard_decorator_blocks_non_admin_users():
         response = client.get('/admin_dashboard')
 
     assert response.status_code == 403
-    assert b'Access Denied' in response.data
+    assert b'Unauthorized' in response.data
 
 
 def test_api_students_decorator_handles_authentication_and_allowed_roles():

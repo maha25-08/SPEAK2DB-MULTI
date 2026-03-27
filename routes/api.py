@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, session
 
 from db.connection import get_db_connection, MAIN_DB, ARCHIVE_DB
 from utils.decorators import require_roles
+from utils.rbac import role_required
 
 try:
     from rbac_system_fixed import rbac
@@ -173,7 +174,7 @@ def vocabulary():
 # ---------------------------------------------------------------------------
 
 @api_bp.route("/query_analytics")
-@require_roles("Administrator")
+@role_required("Administrator")
 def query_analytics():
     """Query analytics – Administrator only."""
     try:

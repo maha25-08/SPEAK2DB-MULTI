@@ -17,6 +17,7 @@ from db.connection import get_db_connection, MAIN_DB
 from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
 from utils.decorators import require_roles
 from utils.helpers import get_library_stats
+from utils.rbac import role_required
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +301,7 @@ def librarian_dashboard_kebab():
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/admin_dashboard")
-@require_roles("Administrator")
+@role_required("Administrator")
 def admin_dashboard():
     """Administrator dashboard."""
     build_admin_dashboard_context = current_app.extensions.get(ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY)
@@ -316,7 +317,7 @@ def admin_dashboard():
 
 
 @dashboard_bp.route("/admin-dashboard")
-@require_roles("Administrator")
+@role_required("Administrator")
 def admin_dashboard_kebab():
     """Administrator dashboard (RBAC template view)."""
     user_role = session.get("role", "Student")

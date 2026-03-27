@@ -5,6 +5,7 @@ import sqlite3
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import generate_password_hash
 from security.auth_utils import is_password_hash
+from utils.rbac import role_required
 
 logger = logging.getLogger(__name__)
 
@@ -31,30 +32,19 @@ def register_admin_routes(
 ):
     """Register admin control-panel routes on the Flask app."""
 
-    def _require_admin_session():
-        if not session.get('user_id'):
-            return redirect(url_for('login'))
-        return require_admin()
-
     @app.route('/user_management', endpoint='user_management_view')
+    @role_required("Administrator")
     def user_management_view():
-        redir = _require_admin_session()
-        if redir:
-            return redir
         return render_template('admin_dashboard.html', **build_admin_dashboard_context('users'))
 
     @app.route('/system_statistics', endpoint='system_statistics_view')
+    @role_required("Administrator")
     def system_statistics_view():
-        redir = _require_admin_session()
-        if redir:
-            return redir
         return render_template('admin_dashboard.html', **build_admin_dashboard_context('analytics'))
 
     @app.route('/admin/activity_logs', endpoint='admin_activity_logs')
+    @role_required("Administrator")
     def admin_activity_logs():
-        redir = _require_admin_session()
-        if redir:
-            return redir
         conn = get_db_connection(main_db_getter())
         try:
             return jsonify({'success': True, 'logs': fetch_activity_logs(conn, limit=100)})
@@ -62,10 +52,8 @@ def register_admin_routes(
             conn.close()
 
     @app.route('/admin/add_user', methods=['POST'], endpoint='admin_add_user')
+    @role_required("Administrator")
     def admin_add_user():
-        redir = _require_admin_session()
-        if redir:
-            return redir
         payload, error = validate_managed_user_form(request.form)
         if error:
             flash(error, 'error')
@@ -92,10 +80,8 @@ def register_admin_routes(
         return redirect(url_for('user_management_view'))
 
     @app.route('/admin/update_user/<int:user_id>', methods=['POST'], endpoint='admin_update_user')
+    @role_required("Administrator")
     def admin_update_user(user_id: int):
-        redir = _require_admin_session()
-        if redir:
-            return redir
         conn = sqlite3.connect(main_db_getter())
         conn.row_factory = sqlite3.Row
         try:
@@ -130,10 +116,8 @@ def register_admin_routes(
         return redirect(url_for('user_management_view'))
 
     @app.route('/admin/delete_user/<int:user_id>', methods=['POST'], endpoint='admin_delete_user')
+    @role_required("Administrator")
     def admin_delete_user(user_id: int):
-        redir = _require_admin_session()
-        if redir:
-            return redir
         conn = sqlite3.connect(main_db_getter())
         conn.row_factory = sqlite3.Row
         try:
@@ -156,10 +140,8 @@ def register_admin_routes(
         return redirect(url_for('user_management_view'))
 
     @app.route('/admin/change_role/<int:user_id>', methods=['POST'], endpoint='admin_change_role')
+    @role_required("Administrator")
     def admin_change_role(user_id: int):
-        redir = _require_admin_session()
-        if redir:
-            return redir
         new_role = normalize_role(request.form.get('role', '').strip())
         if new_role not in role_choices:
             flash('Please choose a valid role.', 'error')
@@ -192,10 +174,8 @@ def register_admin_routes(
         return redirect(url_for('user_management_view'))
 
     @app.route('/admin/update_permissions/<role_name>', methods=['POST'], endpoint='admin_update_permissions')
+    @role_required("Administrator")
     def admin_update_permissions(role_name: str):
-        redir = _require_admin_session()
-        if redir:
-            return redir
         role_scope = role_permission_scope(role_name)
         selected_permission_ids = {
             int(permission_id)
@@ -221,10 +201,8 @@ def register_admin_routes(
         return redirect(url_for('admin_dashboard_route'))
 
     @app.route('/admin/update_settings', methods=['POST'], endpoint='admin_update_settings')
+    @role_required("Administrator")
     def admin_update_settings():
-        redir = _require_admin_session()
-        if redir:
-            return redir
         max_limit, error = validate_query_result_limit(
             request.form.get('max_query_result_limit'),
             default_query_limit,
