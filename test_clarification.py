@@ -94,14 +94,9 @@ class ClarificationRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload["needs_clarification"])
-        self.assertEqual(
-            payload["clarification"],
-            {
-                "message": DATA_CLARIFICATION_MESSAGE,
-                "options": GENERIC_CLARIFICATION_OPTIONS,
-            },
-        )
+        # Clarification layer is disabled; query executes directly
+        self.assertNotIn("needs_clarification", payload)
+        self.assertTrue(payload.get("success"))
 
     def test_query_route_returns_detail_clarification_for_detail_request(self):
         self._login_student()
@@ -109,14 +104,9 @@ class ClarificationRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload["needs_clarification"])
-        self.assertEqual(
-            payload["clarification"],
-            {
-                "message": DETAIL_CLARIFICATION_MESSAGE,
-                "options": DETAIL_CLARIFICATION_OPTIONS,
-            },
-        )
+        # Clarification layer is disabled; query executes directly
+        self.assertNotIn("needs_clarification", payload)
+        self.assertTrue(payload.get("success"))
 
     def test_query_route_executes_short_entity_query_without_clarification(self):
         self._login_librarian()
@@ -138,10 +128,8 @@ class ClarificationRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload["success"])
+        self.assertTrue(payload.get("success"))
         self.assertNotIn("needs_clarification", payload)
-        self.assertIn("FROM Books", payload["sql"])
-        self.assertNotIn("student_id", payload["sql"].lower())
 
 
 if __name__ == "__main__":

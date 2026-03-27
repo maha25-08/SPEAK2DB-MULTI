@@ -12,11 +12,11 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="/student/dashboard">
+            <a class="navbar-brand" href="{{ url_for('dashboard.student_dashboard') }}">
                 <i class="fas fa-book"></i> Library Management
             </a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/student/dashboard">
+                <a class="nav-link" href="{{ url_for('dashboard.student_dashboard') }}">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
                 <a class="nav-link active" href="/student/profile">
