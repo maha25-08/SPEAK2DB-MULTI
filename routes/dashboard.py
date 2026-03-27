@@ -122,14 +122,9 @@ def student_dashboard_alt():
 
 
 @dashboard_bp.route("/student-dashboard-individual")
+@require_roles("Student")
 def student_dashboard_individual():
     """Individual per-student template (roll-number-specific HTML file)."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
-    if session.get("role") != "Student":
-        return redirect(url_for("index"))
-
     roll_number = session.get("user_id")
     if not roll_number:
         return redirect(url_for("login"))
@@ -193,16 +188,11 @@ def faculty_dashboard():
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/librarian_dashboard")
+@require_roles("Librarian", "Administrator")
 def librarian_dashboard():
     """Librarian dashboard."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
     role = session.get("role")
-    print("ROLE:", role)
     logger.debug("librarian_dashboard accessed by role: %s", role)
-    if role not in ("Librarian", "Faculty", "Administrator"):
-        return "Access Denied", 403
 
     user_id = session["user_id"]
     recent_issues = []
@@ -232,11 +222,9 @@ def librarian_dashboard():
 
 
 @dashboard_bp.route("/librarian-dashboard")
+@require_roles("Librarian", "Administrator")
 def librarian_dashboard_kebab():
     """Redirect legacy kebab-case URL to canonical librarian dashboard."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-
     user_id = session["user_id"]
     user_role = session.get("role", "Student")
 
