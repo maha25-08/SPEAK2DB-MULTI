@@ -5,14 +5,7 @@ import time
 from flask import session
 
 from domain_vocabulary import preprocess_query
-from clarification import (
-    apply_clarification_choice,
-    get_clarification,
-    is_ambiguous_query,
-    normalize_query_for_execution,
-)
-from query_correction import correct_query
-from query_context import save_context, is_followup, rewrite_followup, get_last_query
+from clarification import normalize_query_for_execution
 from ollama_sql import generate_complex_sql, generate_sql
 from utils.helpers import record_query_event
 from utils.constants import DEFAULT_QUERY_LIMIT
@@ -72,7 +65,6 @@ def execute_query_request(
 
     query_start = time.time()
     user_query = (payload or {}).get('query', '').strip()
-    clarification_choice = (payload or {}).get('clarification_choice', '').strip()
     user_role = user_session.get('role', 'Student')
     student_id = user_session.get('student_id')
     sql_query = ''
@@ -104,26 +96,7 @@ def execute_query_request(
         if not user_query:
             return {'error': 'No query provided'}, 400
 
-        corrected_query = correct_query(user_query)
-        if corrected_query != user_query:
-            logger.info('Spell-corrected query: %s', corrected_query)
-        user_query = corrected_query
         user_query = normalize_query_for_execution(user_query)
-
-        if is_followup(user_query):
-            last_query = get_last_query(user_session)
-            if last_query:
-                user_query = rewrite_followup(user_query, last_query)
-                logger.info('Rewrote follow-up query: %s', user_query)
-
-        if clarification_choice:
-            user_query = apply_clarification_choice(user_query, clarification_choice)
-            logger.info('Applied clarification choice: %s', user_query)
-        else:
-            clarification = get_clarification(user_query) if is_ambiguous_query(user_query) else None
-            if clarification is not None:
-                return {'needs_clarification': True, 'clarification': clarification}, 200
-
         augmented_query = preprocess_query(user_query, main_db)
         conn = get_db_connection(main_db)
         sql_query, query_engine = generate_sql_for_query(augmented_query, conn, user_role, get_bool_setting)
@@ -188,7 +161,6 @@ def execute_query_request(
 
         user_session['last_query'] = user_query
         user_session['last_sql'] = sql_query
-        save_context(user_session, user_query, sql_query)
 
         response_time = round(time.time() - query_start, 4)
         record_query_event(

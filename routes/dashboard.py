@@ -17,6 +17,7 @@ from db.connection import get_db_connection, MAIN_DB
 from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
 from utils.decorators import require_roles
 from utils.helpers import get_library_stats
+from utils.rbac import role_required
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/student_dashboard")
-@require_roles("Student")
+@role_required(["student"])
 def student_dashboard():
     """Student dashboard (canonical snake_case route)."""
     user_role = session.get("role", "Student")

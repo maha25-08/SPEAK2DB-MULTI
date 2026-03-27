@@ -16,6 +16,7 @@ class AdminDashboardEndpointTests(unittest.TestCase):
         cls.temp_dir = tempfile.mkdtemp(prefix='speak2db-admin-endpoint-')
         cls.test_db = os.path.join(cls.temp_dir, 'library_main.db')
         repo_root = os.path.dirname(os.path.abspath(__file__))
+        cls.original_main_db = app_module.MAIN_DB
         shutil.copyfile(
             os.path.join(repo_root, 'library_main.db'),
             cls.test_db,
@@ -30,6 +31,7 @@ class AdminDashboardEndpointTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        app_module.MAIN_DB = cls.original_main_db
         shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
