@@ -45,7 +45,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Database package ─────────────────────────────────────────────────────────
-from db.connection import get_db_connection, MAIN_DB, ARCHIVE_DB, ensure_query_history_schema
+from db.connection import get_db_connection, get_main_db, MAIN_DB, ARCHIVE_DB, ensure_query_history_schema
 
 # ── Security headers (Option 2 – safe, non-breaking) ────────────────────────
 try:
@@ -159,7 +159,7 @@ def _request_user_agent() -> str:
 def _ensure_admin_support_schema():
     """Create lightweight admin-control tables and seed settings/permissions."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         cursor = conn.cursor()
         cursor.execute(
             '''
@@ -306,7 +306,7 @@ def _get_int_setting(name: str, default: int) -> int:
 def _set_setting(name: str, value: str, updated_by: str = None, description: str = None):
     """Insert or update a setting value."""
     updated_by = updated_by or session.get('user_id', 'system')
-    conn = sqlite3.connect(MAIN_DB)
+    conn = get_db_connection(MAIN_DB)
     cursor = conn.cursor()
     existing = cursor.execute(
         "SELECT id FROM SecuritySettings WHERE setting_name = ?",
@@ -336,7 +336,7 @@ def _set_setting(name: str, value: str, updated_by: str = None, description: str
 def _log_activity(user_id: str, action: str):
     """Write a compact activity log entry."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             "INSERT INTO ActivityLogs (user_id, action, timestamp) VALUES (?, ?, ?)",
             (user_id, action, datetime.now().isoformat()),
@@ -350,7 +350,7 @@ def _log_activity(user_id: str, action: str):
 def _log_audit_event(user_id: str, role: str, action: str, resource_type: str, details: str, success: bool = True):
     """Write a detailed audit log entry when the table is available."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             INSERT INTO AuditLog (user_id, user_role, action, resource_type, details, ip_address, user_agent, timestamp, success)
@@ -377,7 +377,7 @@ def _log_audit_event(user_id: str, role: str, action: str, resource_type: str, d
 def _log_security_event(event_type: str, details: str, severity: str = 'medium', user_id: str = None):
     """Write a security monitoring record."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             INSERT INTO SecurityLog (event_type, details, ip_address, user_agent, user_id, session_id, timestamp, severity)
@@ -403,7 +403,7 @@ def _log_security_event(event_type: str, details: str, severity: str = 'medium',
 def _record_failed_login(username: str, reason: str):
     """Persist a failed login attempt for admin monitoring."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             INSERT INTO FailedLoginAttempts (username, ip_address, user_agent, attempt_time, failure_reason, blocked)
@@ -421,7 +421,7 @@ def _start_user_session_log(user_id: str, role: str):
     """Create a session log entry for the current login."""
     try:
         session['audit_session_id'] = session.get('audit_session_id') or os.urandom(16).hex()
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             INSERT INTO SessionLog (user_id, user_role, session_id, login_time, ip_address, user_agent, status)
@@ -448,7 +448,7 @@ def _end_user_session_log():
     if not audit_session_id:
         return
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             UPDATE SessionLog
@@ -572,7 +572,7 @@ def _generate_sql_for_query(user_query: str, conn, role_name: str) -> Tuple[str,
 def _log_query_history(user_id: str, role: str, user_query: str, sql_query: str, success: bool, response_time: float = None):
     """Persist query analytics/history."""
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         conn.execute(
             '''
             INSERT INTO QueryHistory (user_id, query, sql_query, response_time, timestamp, success, role)
@@ -873,7 +873,7 @@ def _seed_default_users():
         ('librarian3', 'pass', 'Librarian', 'librarian3@library.edu'),
     ]
     try:
-        conn = sqlite3.connect(MAIN_DB)
+        conn = get_db_connection(MAIN_DB)
         for username, password, role, email in default_users:
             conn.execute(
                 '''

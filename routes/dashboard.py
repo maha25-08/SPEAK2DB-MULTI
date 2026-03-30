@@ -29,7 +29,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 # ---------------------------------------------------------------------------
 
 @dashboard_bp.route("/student_dashboard")
-@require_roles("Student")
+@role_required("Student")
 def student_dashboard():
     """Student dashboard (canonical snake_case route)."""
     user_role = session.get("role", "Student")
