@@ -285,6 +285,70 @@ def librarian_dashboard_kebab():
 
 
 # ---------------------------------------------------------------------------
+# Named librarian dashboards (/dashboard dispatcher)
+# ---------------------------------------------------------------------------
+
+#: Maps username (lower-cased) to the template to render.
+_LIBRARIAN_TEMPLATES = {
+    "librarian1": "librarian1_dashboard.html",
+    "librarian2": "librarian2_dashboard.html",
+    "librarian3": "librarian3_dashboard.html",
+}
+
+
+@dashboard_bp.route("/dashboard")
+@require_roles("Librarian", "Administrator")
+def librarian_named_dashboard():
+    """Route librarian1/2/3 to their dedicated dashboards; others go to
+    the shared librarian dashboard."""
+    username = session.get("username") or session.get("user_id", "")
+    template = _LIBRARIAN_TEMPLATES.get(username.lower())
+
+    if template is None:
+        return redirect(url_for("dashboard.librarian_dashboard"))
+
+    role = session.get("role")
+    recent_issues = []
+    books = []
+    members = []
+
+    try:
+        conn = get_db_connection(MAIN_DB)
+        recent_issues = conn.execute(
+            """SELECT i.*, b.title, b.author, s.name as student_name,
+                      CASE WHEN i.return_date IS NULL AND date(i.due_date) < date('now')
+                           THEN 1 ELSE 0 END as is_overdue
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 10"""
+        ).fetchall()
+        if username.lower() == "librarian1":
+            books = conn.execute(
+                "SELECT id, title, author, category, available_copies FROM Books ORDER BY id DESC LIMIT 20"
+            ).fetchall()
+        elif username.lower() == "librarian2":
+            members = conn.execute(
+                "SELECT id, name, roll_number, branch FROM Students ORDER BY id DESC LIMIT 20"
+            ).fetchall()
+        conn.close()
+    except Exception as exc:
+        logger.error("librarian_named_dashboard DB error: %s", exc)
+
+    stats = get_library_stats()
+
+    return render_template(
+        template,
+        role=role,
+        user=username,
+        stats=stats,
+        recent_issues=recent_issues,
+        books=books,
+        members=members,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Admin dashboard
 # ---------------------------------------------------------------------------
 

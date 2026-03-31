@@ -52,6 +52,9 @@ def login():
 
     role = user["role"]
     session["user_id"] = user["username"]
+    # Also store under 'username' so routes can identify users by name
+    # independently of the generic 'user_id' key used elsewhere.
+    session["username"] = user["username"]
     session["user_role"] = role
     session["role"] = role  # kept for backward-compatibility with existing code
 
@@ -74,6 +77,10 @@ def login():
 
     logger.info("User '%s' logged in with role '%s'", session["user_id"], role)
     flash(f"Welcome, {role}!", "success")
+
+    # librarian1 / librarian2 / librarian3 each have a dedicated dashboard.
+    if role.lower() == "librarian" and username.lower() in ("librarian1", "librarian2", "librarian3"):
+        return redirect(url_for("dashboard.librarian_named_dashboard"))
 
     dashboard_endpoint = _ROLE_DASHBOARD.get(role.lower())
     if dashboard_endpoint:

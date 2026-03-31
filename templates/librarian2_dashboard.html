@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Manager Dashboard - Librarian 2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f0f4ff; color: #000; }
+        .navbar-brand { font-weight: 700; font-size: 1.3rem; }
+        .welcome-banner {
+            background: linear-gradient(135deg, #1a237e 0%, #5c6bc0 100%);
+            color: white;
+            border-radius: 14px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.1);
+            transition: transform .2s;
+        }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-card .card-body { padding: 1.5rem; }
+        .stat-icon { font-size: 2.5rem; opacity: .85; }
+        .action-card {
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.08);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .btn-action {
+            border-radius: 8px;
+            padding: .65rem 1.4rem;
+            font-weight: 600;
+            font-size: .95rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#1a237e;">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="{{ url_for('dashboard.librarian_named_dashboard') }}">
+                <i class="fas fa-users me-2"></i>Speak2DB — User Manager
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span class="text-white">
+                    Logged in as: <span class="badge bg-light text-primary ms-1">{{ user }}</span>
+                </span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- Welcome Banner -->
+        <div class="welcome-banner">
+            <h3 class="mb-1">
+                <i class="fas fa-users me-2"></i>User Manager Dashboard
+            </h3>
+            <p class="mb-1 opacity-90 fw-semibold">Librarian 2 — {{ user }}</p>
+            <p class="mb-0 opacity-75">Manage library members — add users, approve memberships, and handle fines.</p>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#1a237e,#5c6bc0)">
+                    <div class="card-body text-center">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <h2 class="fw-bold mt-1">{{ stats.get('total_students', 0) }}</h2>
+                        <p class="mb-0">Total Members</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#283593,#7986cb)">
+                    <div class="card-body text-center">
+                        <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+                        <h2 class="fw-bold mt-1">{{ stats.get('active_members', 0) }}</h2>
+                        <p class="mb-0">Active Members</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#e65100,#ffa726)">
+                    <div class="card-body text-center">
+                        <div class="stat-icon"><i class="fas fa-user-clock"></i></div>
+                        <h2 class="fw-bold mt-1">{{ stats.get('pending_approvals', 0) }}</h2>
+                        <p class="mb-0">Pending Approvals</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
+                    <div class="card-body text-center">
+                        <div class="stat-icon"><i class="fas fa-rupee-sign"></i></div>
+                        <h2 class="fw-bold mt-1">{{ stats.get('unpaid_fines', 0) }}</h2>
+                        <p class="mb-0">Unpaid Fines</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-card">
+            <h5 class="mb-3"><i class="fas fa-cogs me-2 text-primary"></i>User Management Actions</h5>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <button class="btn btn-primary btn-action" title="Register a new library member">
+                            <i class="fas fa-user-plus me-2"></i>Add User
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <button class="btn btn-info btn-action text-white" title="Browse all registered members">
+                            <i class="fas fa-list-ul me-2"></i>View Users
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <button class="btn btn-warning btn-action text-dark" title="Approve pending membership requests">
+                            <i class="fas fa-user-check me-2"></i>Approve Membership
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <button class="btn btn-danger btn-action" title="Review and settle outstanding fines">
+                            <i class="fas fa-rupee-sign me-2"></i>Manage Fines
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Members Table -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white" style="background:#1a237e;">
+                <i class="fas fa-table me-2"></i>Registered Members — Recent
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Roll / ID</th>
+                                <th>Branch</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for member in members %}
+                            <tr>
+                                <td>{{ member['name'] or 'N/A' }}</td>
+                                <td>{{ member['roll_number'] or 'N/A' }}</td>
+                                <td>{{ member['branch'] or 'N/A' }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info text-white me-1" title="View details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-warning text-dark" title="Edit member">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">No members found.</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
