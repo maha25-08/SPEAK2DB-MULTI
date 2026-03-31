@@ -93,7 +93,7 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
     if primary_table in {"fines", "issued", "reservations"}:
         already_filtered = bool(
             re.search(
-                r"\bstudent_id\s*=\s*" + str(sid) + r"\b",
+                r"\bstudent_id\s*=\s*" + re.escape(str(sid)) + r"\b",
                 sql_query,
                 re.IGNORECASE,
             )
@@ -104,8 +104,21 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
             return sql_query + f" WHERE student_id = {sid}"
         return sql_query
 
-    if primary_table == "students" and not has_where:
-        return sql_query + f" WHERE id = {sid}"
+    if primary_table == "students":
+        # Always restrict the Students table to the logged-in student's own row,
+        # regardless of whether a WHERE clause already exists.
+        already_filtered = bool(
+            re.search(
+                r"\bid\s*=\s*" + re.escape(str(sid)) + r"\b",
+                sql_query,
+                re.IGNORECASE,
+            )
+        )
+        if not already_filtered:
+            if has_where:
+                return _inject_and_condition(sql_query, f"id = {sid}")
+            return sql_query + f" WHERE id = {sid}"
+        return sql_query
 
     if "my" not in q_lower:
         return sql_query
@@ -261,6 +274,37 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
         return _books_base + " AND i.return_date IS NULL ORDER BY i.due_date ASC"
 
     return sql_query
+
+
+def enforce_student_filter(user_query: str, sql_query: str, user_session: dict) -> str:
+    """Enforce student-specific SQL filtering based on session context.
+
+    This is the session-aware entry point for the safe-execution pipeline.
+    It extracts the student identity from *user_session* and delegates to
+    :func:`apply_student_filters` so that all student queries are restricted
+    to the logged-in student's own data.
+
+    Parameters
+    ----------
+    user_query   : Original natural-language query (used for intent detection).
+    sql_query    : AI-generated SQL query to be rewritten if necessary.
+    user_session : Flask session (or dict) containing at minimum:
+                   ``role`` (str) and ``student_id`` (int).
+
+    Returns
+    -------
+    str
+        The (potentially rewritten) SQL query.  For non-Student roles, or
+        when ``student_id`` is ``None``/falsy, the original *sql_query* is
+        returned unchanged.
+    """
+    role = user_session.get("role", "")
+    student_id = user_session.get("student_id")
+
+    if role != "Student" or not student_id:
+        return sql_query
+
+    return apply_student_filters(user_query, sql_query, student_id)
 
 
 def fallback_columns(sql_query: str) -> list:
