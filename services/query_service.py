@@ -20,7 +20,7 @@ except ImportError:
     RBAC_AVAILABLE = False
 
 try:
-    from security_layer import validate_sql as security_validate_sql
+    from security_layer import validate_sql as security_validate_sql, validate_sql_query
     SECURITY_LAYER_AVAILABLE = True
 except ImportError:
     SECURITY_LAYER_AVAILABLE = False
@@ -109,12 +109,12 @@ def execute_query_request(
             sql_query = enforce_student_filter(user_query, sql_query, user_session)
 
         if SECURITY_LAYER_AVAILABLE:
-            allowed, sql_query, sec_error = security_validate_sql(sql_query, user_role, student_id)
+            allowed, sql_query, sec_error = validate_sql_query(sql_query, user_role, student_id)
             if not allowed:
                 return finish(
                     False,
                     status=400,
-                    body={'success': False, 'error': 'Query blocked by security layer'},
+                    body={'success': False, 'error': 'Access Denied'},
                     activity='Blocked query (security layer)',
                     security=('blocked_query', f'Security layer blocked query: {sec_error}', 'high'),
                 )

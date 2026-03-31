@@ -47,7 +47,7 @@ except ImportError:
     _RBAC_AVAILABLE = False
 
 try:
-    from security_layer import validate_sql as security_validate_sql
+    from security_layer import validate_sql as security_validate_sql, validate_sql_query
     _SECURITY_LAYER_AVAILABLE = True
 except ImportError:
     _SECURITY_LAYER_AVAILABLE = False
@@ -162,20 +162,25 @@ def query():
             except (TypeError, ValueError):
                 logger.error("Invalid student_id in session: %r", student_id)
 
-        # ── Step 7: Student-specific SQL rewriting ───────────────────────────
+        # ── Step 7: Student-specific SQL rewriting (enforce_student_filter) ────
+        # Override AI-generated SQL to always scope results to the logged-in
+        # student.  Detects "my", "borrowed", "fines" intent and replaces the
+        # SQL with a correct, join-aware query.
         logger.debug("Role: %s | Student filter applied: %s", user_role, student_id)
         if user_role == "Student" and student_id:
             sql_query = enforce_student_filter(user_query, sql_query, session)
 
-        # ── Step 8: Security layer (injection check + isolation) ─────────────
+        # ── Step 8: Security layer – validate_sql_query ──────────────────────
+        # Blocks DDL/DML, UNION injection, and table-access violations.
+        # Also injects any remaining per-student isolation filters.
         if _SECURITY_LAYER_AVAILABLE:
-            allowed, sql_query, sec_error = security_validate_sql(
+            allowed, sql_query, sec_error = validate_sql_query(
                 sql_query, user_role, student_id
             )
             if not allowed:
                 logger.warning("Security layer blocked query: %s", sec_error)
                 conn.close()
-                return jsonify({"success": False, "error": "Query blocked by security layer"}), 400
+                return jsonify({"success": False, "error": "Access Denied"}), 400
 
         # ── Step 9: Role-based SQL validation ────────────────────────────────
         if not validate_sql_query(sql_query, user_role):

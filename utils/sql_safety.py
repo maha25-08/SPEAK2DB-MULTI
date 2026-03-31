@@ -178,7 +178,7 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
     if primary_table in {"fines", "issued", "reservations"}:
         already_filtered = bool(
             re.search(
-                r"\bstudent_id\s*=\s*" + str(sid) + r"\b",
+                r"\bstudent_id\s*=\s*" + re.escape(str(sid)) + r"\b",
                 sql_query,
                 re.IGNORECASE,
             )
@@ -189,8 +189,21 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
             return sql_query + f" WHERE student_id = {sid}"
         return sql_query
 
-    if primary_table == "students" and not has_where:
-        return sql_query + f" WHERE id = {sid}"
+    if primary_table == "students":
+        # Always restrict the Students table to the logged-in student's own row,
+        # regardless of whether a WHERE clause already exists.
+        already_filtered = bool(
+            re.search(
+                r"\bid\s*=\s*" + re.escape(str(sid)) + r"\b",
+                sql_query,
+                re.IGNORECASE,
+            )
+        )
+        if not already_filtered:
+            if has_where:
+                return _inject_and_condition(sql_query, f"id = {sid}")
+            return sql_query + f" WHERE id = {sid}"
+        return sql_query
 
     if "my" not in q_lower:
         return sql_query
