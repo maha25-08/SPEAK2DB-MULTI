@@ -102,6 +102,49 @@ class LibrarianDashboardKebabRBACTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class LibrarianUserSpecificDashboardTests(unittest.TestCase):
+    """Tests that librarian1/2/3 each get their own dashboard template."""
+
+    @classmethod
+    def setUpClass(cls):
+        app_module.app.config['TESTING'] = True
+
+    def setUp(self):
+        self.client = app_module.app.test_client()
+
+    def _get_librarian_dashboard(self, username):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = username
+            sess['username'] = username
+            sess['role'] = 'Librarian'
+        return self.client.get('/librarian_dashboard')
+
+    def test_librarian1_gets_own_template(self):
+        response = self._get_librarian_dashboard('librarian1')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Librarian 1 Dashboard', response.data)
+
+    def test_librarian2_gets_own_template(self):
+        response = self._get_librarian_dashboard('librarian2')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Librarian 2 Dashboard', response.data)
+
+    def test_librarian3_gets_own_template(self):
+        response = self._get_librarian_dashboard('librarian3')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Librarian 3 Dashboard', response.data)
+
+    def test_other_librarian_gets_default_template(self):
+        response = self._get_librarian_dashboard('librarian')
+        self.assertEqual(response.status_code, 200)
+        # Default template has the generic title
+        self.assertIn(b'Librarian Dashboard', response.data)
+        # Must NOT match a numbered librarian template
+        self.assertNotIn(b'Librarian 1 Dashboard', response.data)
+        self.assertNotIn(b'Librarian 2 Dashboard', response.data)
+        self.assertNotIn(b'Librarian 3 Dashboard', response.data)
+
+
 class StudentDashboardIndividualRBACTests(unittest.TestCase):
     """Tests for /student-dashboard-individual route."""
 
