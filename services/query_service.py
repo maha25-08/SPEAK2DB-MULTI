@@ -9,7 +9,7 @@ from clarification import normalize_query_for_execution
 from ollama_sql import generate_complex_sql, generate_sql
 from utils.helpers import record_query_event
 from utils.constants import DEFAULT_QUERY_LIMIT
-from utils.sql_safety import apply_student_filters, enforce_student_filter, fallback_columns, is_safe_sql
+from utils.sql_safety import apply_student_filters, enforce_student_filter, validate_sql_query, fallback_columns
 from services.rbac_service import normalize_role, role_allows_tables, role_can_execute_queries, role_can_use_ai_queries
 from services.security_service import apply_result_limit
 
@@ -106,8 +106,6 @@ def execute_query_request(
 
         if user_role == 'Student' and student_id:
             sql_query = sql_query.replace('[CURRENT_STUDENT_ID]', str(int(student_id)))
-            # enforce_student_filter: detect intent ("my …") and rewrite SQL
-            # to always scope results to the logged-in student.
             sql_query = enforce_student_filter(user_query, sql_query, user_session)
 
         if SECURITY_LAYER_AVAILABLE:
@@ -121,14 +119,13 @@ def execute_query_request(
                     security=('blocked_query', f'Security layer blocked query: {sec_error}', 'high'),
                 )
 
-        safe, reason = is_safe_sql(sql_query)
-        if not safe:
+        if not validate_sql_query(sql_query, user_role):
             return finish(
                 False,
-                status=400,
-                body={'error': f'Query not permitted: {reason}'},
-                activity=f'Blocked query (safety gate): {reason}',
-                security=('blocked_query', f"Safety gate blocked query for {user_session.get('user_id')}: {reason}", 'high'),
+                status=403,
+                body={'error': 'Access Denied'},
+                activity='Blocked query (role validation)',
+                security=('blocked_query', f"Role validation blocked query for {user_session.get('user_id')}: role={user_role}", 'high'),
             )
 
         allowed_tables, table_message = role_allows_tables(conn, user_role, sql_query)
