@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue Manager – Library Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; color: #000; }
+        .navbar-brand { font-weight: 700; font-size: 1.3rem; }
+        .page-banner {
+            background: linear-gradient(135deg, #880e4f 0%, #e91e63 100%);
+            color: white;
+            border-radius: 14px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .page-banner.overdue {
+            background: linear-gradient(135deg, #b71c1c 0%, #ef5350 100%);
+        }
+        .content-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.08);
+            background: white;
+            margin-bottom: 1.5rem;
+        }
+        .content-card .card-header {
+            background: #880e4f;
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+        }
+        .content-card .card-header.overdue { background: #b71c1c; }
+        .results-table th { background: #880e4f; color: white; }
+        .results-table.overdue th { background: #b71c1c; }
+        .btn-primary-lms {
+            background: #880e4f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: .5rem 1.2rem;
+            font-weight: 600;
+        }
+        .btn-primary-lms:hover { background: #6a0136; color: white; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#880e4f;">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="{{ url_for('lms.view_issued_books') }}">
+                <i class="fas fa-book-reader me-2"></i>LMS – Issue Manager
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <a href="{{ url_for('lms.view_books') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-book me-1"></i>Book Manager
+                </a>
+                <a href="{{ url_for('lms.view_users') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-users me-1"></i>User Manager
+                </a>
+                <a href="{{ url_for('lms.overdue_books') }}" class="btn btn-outline-warning btn-sm">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Overdue
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% if show_overdue %}
+        <!-- Overdue Books View -->
+        <div class="page-banner overdue">
+            <h3 class="mb-1"><i class="fas fa-exclamation-triangle me-2"></i>Overdue Books</h3>
+            <p class="mb-0 opacity-75">Books that have been issued for more than 14 days and not yet returned.</p>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header overdue d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-clock me-2"></i>Overdue Records ({{ overdue|length }})</span>
+                <a href="{{ url_for('lms.view_issued_books') }}" class="btn btn-light btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Issue Manager
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="results-table overdue">
+                            <tr>
+                                <th>#</th>
+                                <th>Book Title</th>
+                                <th>Author</th>
+                                <th>Borrower</th>
+                                <th>Role</th>
+                                <th>Issue Date</th>
+                                <th>Days Overdue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for record in overdue %}
+                            <tr class="table-danger">
+                                <td>{{ record['id'] }}</td>
+                                <td>{{ record['title'] }}</td>
+                                <td>{{ record['author'] }}</td>
+                                <td>{{ record['borrower'] }}</td>
+                                <td><span class="badge bg-secondary">{{ record['borrower_role'] }}</span></td>
+                                <td>{{ record['issue_date'] }}</td>
+                                <td>
+                                    <span class="badge bg-danger">{{ record['days_overdue'] }} days</span>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <i class="fas fa-check-circle text-success me-2"></i>No overdue books. All good!
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Issue / Return View -->
+        <div class="page-banner">
+            <h3 class="mb-1"><i class="fas fa-book-reader me-2"></i>Issue Manager</h3>
+            <p class="mb-0 opacity-75">Issue books to users and record returns.</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Issue Book Form -->
+            <div class="col-lg-4">
+                <div class="content-card">
+                    <div class="card-header">
+                        <i class="fas fa-arrow-right me-2"></i>Issue a Book
+                    </div>
+                    <div class="card-body p-3">
+                        <form method="POST" action="{{ url_for('lms.issue_book') }}">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Book <span class="text-danger">*</span></label>
+                                <select name="book_id" class="form-select" required>
+                                    <option value="" disabled selected>Select available book…</option>
+                                    {% for book in books %}
+                                    <option value="{{ book['id'] }}">
+                                        {{ book['title'] }} ({{ book['author'] }}) — {{ book['quantity'] }} left
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if not books %}
+                                <small class="text-muted">No books with available copies.</small>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">User <span class="text-danger">*</span></label>
+                                <select name="user_id" class="form-select" required>
+                                    <option value="" disabled selected>Select user…</option>
+                                    {% for user in users %}
+                                    <option value="{{ user['id'] }}">{{ user['name'] }} ({{ user['role'] }})</option>
+                                    {% endfor %}
+                                </select>
+                                {% if not users %}
+                                <small class="text-muted">No users registered. <a href="{{ url_for('lms.add_user') }}">Add users first.</a></small>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Issue Date <span class="text-danger">*</span></label>
+                                <input type="date" name="issue_date" class="form-control"
+                                       value="{{ today }}" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary-lms"
+                                    {% if not books or not users %}disabled{% endif %}>
+                                <i class="fas fa-arrow-right me-1"></i>Issue Book
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Issued Books Table -->
+            <div class="col-lg-8">
+                <div class="content-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-list me-2"></i>All Issued Books ({{ issued|length }})</span>
+                        <a href="{{ url_for('lms.overdue_books') }}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-exclamation-triangle me-1"></i>View Overdue
+                        </a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="results-table">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Book</th>
+                                        <th>Borrower</th>
+                                        <th>Issue Date</th>
+                                        <th>Return Date</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for record in issued %}
+                                    <tr>
+                                        <td>{{ record['id'] }}</td>
+                                        <td>
+                                            <strong>{{ record['title'] }}</strong><br>
+                                            <small class="text-muted">{{ record['author'] }}</small>
+                                        </td>
+                                        <td>
+                                            {{ record['borrower'] }}<br>
+                                            <small class="text-muted">{{ record['borrower_role'] }}</small>
+                                        </td>
+                                        <td>{{ record['issue_date'] }}</td>
+                                        <td>{{ record['return_date'] or '—' }}</td>
+                                        <td>
+                                            {% if record['status'] == 'issued' %}
+                                            <span class="badge bg-warning text-dark">Issued</span>
+                                            {% else %}
+                                            <span class="badge bg-success">Returned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if record['status'] == 'issued' %}
+                                            <form method="POST"
+                                                  action="{{ url_for('lms.return_book', issue_id=record['id']) }}">
+                                                <input type="hidden" name="return_date" value="{{ today }}">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-undo me-1"></i>Return
+                                                </button>
+                                            </form>
+                                            {% else %}
+                                            <span class="text-muted small">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            No books have been issued yet.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

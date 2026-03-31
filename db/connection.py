@@ -48,3 +48,46 @@ def ensure_query_history_schema() -> None:
         conn.close()
     except Exception as exc:
         logger.warning("QueryHistory schema migration skipped: %s", exc)
+
+
+def ensure_lms_schema() -> None:
+    """Create LMS tables (lms_books, lms_users, lms_issued_books) if they don't exist."""
+    try:
+        conn = sqlite3.connect(MANAGEMENT_DB)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lms_books (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                author TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lms_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lms_issued_books (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                issue_date TEXT NOT NULL,
+                return_date TEXT,
+                status TEXT NOT NULL DEFAULT 'issued',
+                FOREIGN KEY (book_id) REFERENCES lms_books(id),
+                FOREIGN KEY (user_id) REFERENCES lms_users(id)
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        logger.warning("LMS schema initialization skipped: %s", exc)

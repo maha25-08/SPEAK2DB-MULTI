@@ -27,6 +27,7 @@ from routes.admin_routes import register_admin_routes
 from routes.api import api_bp
 from routes.auth_routes import register_auth_routes
 from routes.dashboard import dashboard_bp
+from routes.lms_routes import lms_bp
 from routes.query_routes import register_query_routes
 from routes.views import views_bp
 from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
@@ -45,7 +46,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Database package ─────────────────────────────────────────────────────────
-from db.connection import get_db_connection, get_main_db, MAIN_DB, ARCHIVE_DB, ensure_query_history_schema
+from db.connection import get_db_connection, get_main_db, MAIN_DB, ARCHIVE_DB, ensure_query_history_schema, ensure_lms_schema
 
 # ── Security headers (Option 2 – safe, non-breaking) ────────────────────────
 try:
@@ -103,6 +104,7 @@ else:
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(views_bp)
+app.register_blueprint(lms_bp)
 # Compatibility aliases for code/tests that call url_for('..._route') without the
 # dashboard blueprint prefix.
 for source_endpoint, alias_endpoint, rule in (
@@ -118,6 +120,7 @@ for source_endpoint, alias_endpoint, rule in (
 
 # ── Run DB schema migrations at startup ─────────────────────────────────────
 ensure_query_history_schema()
+ensure_lms_schema()
 
 
 def _ensure_query_history_schema():
