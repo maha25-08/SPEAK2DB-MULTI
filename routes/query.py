@@ -7,7 +7,14 @@ from flask import Blueprint, request, jsonify, session, redirect, url_for
 
 from db.connection import get_db_connection, MAIN_DB
 from utils.constants import DEFAULT_QUERY_LIMIT
-from utils.sql_safety import is_safe_sql, apply_student_filters, fallback_columns, ensure_limit
+from utils.sql_safety import (
+    is_safe_sql,
+    apply_student_filters,
+    enforce_student_filter,
+    validate_sql_query,
+    fallback_columns,
+    ensure_limit,
+)
 
 try:
     from domain_vocabulary import preprocess_query
@@ -158,7 +165,7 @@ def query():
         # ── Step 7: Student-specific SQL rewriting ───────────────────────────
         logger.debug("Role: %s | Student filter applied: %s", user_role, student_id)
         if user_role == "Student" and student_id:
-            sql_query = apply_student_filters(user_query, sql_query, student_id)
+            sql_query = enforce_student_filter(user_query, sql_query, session)
 
         # ── Step 8: Security layer (injection check + isolation) ─────────────
         if _SECURITY_LAYER_AVAILABLE:
@@ -170,12 +177,11 @@ def query():
                 conn.close()
                 return jsonify({"success": False, "error": "Query blocked by security layer"}), 400
 
-        # ── Step 9: SQL safety gate ──────────────────────────────────────────
-        safe, reason = is_safe_sql(sql_query)
-        if not safe:
-            logger.warning("SQL blocked by safety gate: %s", reason)
+        # ── Step 9: Role-based SQL validation ────────────────────────────────
+        if not validate_sql_query(sql_query, user_role):
+            logger.warning("validate_sql_query blocked query for role=%s: %s", user_role, sql_query)
             conn.close()
-            return jsonify({"success": False, "error": f"Query not permitted: {reason}"}), 400
+            return jsonify({"success": False, "error": "Access Denied"}), 403
 
         # ── Enforce LIMIT to cap result sets ─────────────────────────────────
         sql_query = ensure_limit(sql_query, DEFAULT_QUERY_LIMIT)

@@ -34,6 +34,12 @@ _BLOCKED_KEYWORDS_RE = re.compile(
     re.IGNORECASE,
 )
 
+# DDL-only keywords blocked for Librarians (DML is permitted)
+_LIBRARIAN_BLOCKED_RE = re.compile(
+    r'\b(DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|PRAGMA)\b',
+    re.IGNORECASE,
+)
+
 # UNION SELECT is an injection vector even inside an otherwise SELECT query
 _UNION_SELECT_RE = re.compile(r'\bUNION\s+SELECT\b', re.IGNORECASE)
 
@@ -129,18 +135,37 @@ def validate_sql(
         print(f"[SECURITY] BLOCKED – {msg}")
         return False, sql, msg
 
-    # Only SELECT statements are permitted
-    if not stripped.upper().startswith('SELECT'):
-        msg = "Only SELECT queries are allowed."
-        print(f"[SECURITY] BLOCKED – {msg}")
-        return False, sql, msg
-
-    # Block dangerous DDL/DML keywords
-    kw_match = _BLOCKED_KEYWORDS_RE.search(stripped)
-    if kw_match:
-        msg = f"Keyword '{kw_match.group()}' is not allowed."
-        print(f"[SECURITY] BLOCKED – {msg}")
-        return False, sql, msg
+    # Statement-type check is role-aware:
+    # - Students may only run SELECT
+    # - Librarians may run SELECT + DML (INSERT/UPDATE/DELETE), not DDL
+    # - Administrators have no statement-type restriction here
+    if role == 'Student':
+        if not stripped.upper().startswith('SELECT'):
+            msg = "Only SELECT queries are allowed."
+            print(f"[SECURITY] BLOCKED – {msg}")
+            return False, sql, msg
+        # Block all DML/DDL keywords for students
+        kw_match = _BLOCKED_KEYWORDS_RE.search(stripped)
+        if kw_match:
+            msg = f"Keyword '{kw_match.group()}' is not allowed."
+            print(f"[SECURITY] BLOCKED – {msg}")
+            return False, sql, msg
+    elif role == 'Librarian':
+        # Librarians may use SELECT, INSERT, UPDATE, DELETE but not DDL
+        q_upper = stripped.upper().lstrip()
+        allowed_starts = ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
+        if not any(q_upper.startswith(s) for s in allowed_starts):
+            msg = "Only SELECT/INSERT/UPDATE/DELETE queries are allowed for Librarians."
+            print(f"[SECURITY] BLOCKED – {msg}")
+            return False, sql, msg
+        kw_match = _LIBRARIAN_BLOCKED_RE.search(stripped)
+        if kw_match:
+            msg = f"Keyword '{kw_match.group()}' is not allowed for Librarians."
+            print(f"[SECURITY] BLOCKED – {msg}")
+            return False, sql, msg
+    else:
+        # Administrator: no statement-type restrictions
+        pass
 
     # Block UNION SELECT injection
     if _UNION_SELECT_RE.search(stripped):
