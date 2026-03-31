@@ -187,6 +187,13 @@ def faculty_dashboard():
 # Librarian dashboard
 # ---------------------------------------------------------------------------
 
+_LIBRARIAN_TEMPLATES = {
+    "librarian1": "librarian1_dashboard.html",
+    "librarian2": "librarian2_dashboard.html",
+    "librarian3": "librarian3_dashboard.html",
+}
+
+
 @dashboard_bp.route("/librarian_dashboard")
 @require_roles("Librarian", "Administrator")
 def librarian_dashboard():
@@ -212,8 +219,11 @@ def librarian_dashboard():
 
     stats = get_library_stats()
 
+    username = session.get("username", user_id)
+    template = _LIBRARIAN_TEMPLATES.get(username, "librarian_dashboard.html")
+
     return render_template(
-        "librarian_dashboard.html",
+        template,
         role=role,
         user=user_id,
         stats=stats,

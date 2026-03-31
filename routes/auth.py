@@ -52,6 +52,7 @@ def login():
 
     role = user["role"]
     session["user_id"] = user["username"]
+    session["username"] = user["username"]  # explicit username key for per-user routing
     session["user_role"] = role
     session["role"] = role  # kept for backward-compatibility with existing code
 
