@@ -260,28 +260,6 @@ def librarian_analytics():
 
 
 # ---------------------------------------------------------------------------
-# Books endpoint (Librarian / Faculty / Administrator)
-# ---------------------------------------------------------------------------
-
-@api_bp.route("/books", methods=["GET"])
-@require_roles("Librarian", "Faculty", "Administrator")
-def books():
-    """Return all books as JSON – Librarian/Faculty/Administrator only."""
-    logger.info("api/books accessed by role: %s", session.get("role"))
-    try:
-        conn = get_db_connection(MAIN_DB)
-        rows = conn.execute(
-            "SELECT id as book_id, title, author, category, total_copies, available_copies "
-            "FROM Books ORDER BY title LIMIT 500"
-        ).fetchall()
-        conn.close()
-        return jsonify({"success": True, "data": [dict(r) for r in rows]})
-    except Exception as exc:
-        logger.error("api/books error: %s", exc)
-        return jsonify({"success": False, "error": "Internal server error"}), 500
-
-
-# ---------------------------------------------------------------------------
 # Data endpoints (Librarian / Administrator only)
 # ---------------------------------------------------------------------------
 
@@ -347,10 +325,6 @@ def fines():
         logger.error("api/fines error: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
-
-# ---------------------------------------------------------------------------
-# Librarian analytics (Librarian only)
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Books CRUD (Librarian / Administrator)

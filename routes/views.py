@@ -220,14 +220,9 @@ def user_management_view():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/system_statistics")
+@require_roles("Administrator")
 def system_statistics_view():
     """System statistics – Administrator only."""
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    guard = _require_admin()
-    if guard:
-        return guard
-
     user_id = session["user_id"]
     user_role = session.get("role")
     sys_stats = {}
