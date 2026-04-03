@@ -554,7 +554,7 @@ function loadFines() {
                 '<td>' + f.id + '</td>' +
                 '<td>' + esc(f.student_name) + '</td>' +
                 '<td>' + esc(f.roll_number || '') + '</td>' +
-                '<td>' + parseFloat(f.fine_amount || 0).toFixed(2) + '</td>' +
+                '<td>' + (parseFloat(f.fine_amount) || 0).toFixed(2) + '</td>' +
                 '<td>' + esc(f.fine_type || '') + '</td>' +
                 '<td><span class="badge ' + badge + '">' + f.status + '</span></td>' +
                 '<td>' + (f.issue_date || '').substring(0, 10) + '</td>' +

@@ -351,7 +351,10 @@ def add_book():
     title = (data.get("title") or "").strip()
     author = (data.get("author") or "").strip()
     category = (data.get("category") or "General").strip()
-    total_copies = int(data.get("total_copies") or 1)
+    try:
+        total_copies = max(1, int(data.get("total_copies") or 1))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "total_copies must be a positive integer"}), 400
     if not title or not author:
         return jsonify({"success": False, "error": "title and author are required"}), 400
     try:
@@ -384,9 +387,13 @@ def update_book(book_id):
     try:
         conn = get_db_connection(MAIN_DB)
         if total_copies is not None:
+            try:
+                tc = max(1, int(total_copies))
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "total_copies must be a positive integer"}), 400
             result = conn.execute(
                 "UPDATE Books SET title = ?, author = ?, category = ?, total_copies = ? WHERE id = ?",
-                (title, author, category, int(total_copies), book_id),
+                (title, author, category, tc, book_id),
             )
         else:
             result = conn.execute(
