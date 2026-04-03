@@ -170,13 +170,13 @@ def vocabulary():
 
 
 # ---------------------------------------------------------------------------
-# Query analytics (Administrator only)
+# Query analytics (Administrator and Librarian)
 # ---------------------------------------------------------------------------
 
 @api_bp.route("/query_analytics")
-@role_required("Administrator")
+@role_required("Administrator", "Librarian")
 def query_analytics():
-    """Query analytics – Administrator only."""
+    """Query analytics – Administrator and Librarian."""
     try:
         conn = get_db_connection(MAIN_DB)
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
