@@ -39,9 +39,9 @@ def dashboard_redirect():
 # ---------------------------------------------------------------------------
 
 @views_bp.route("/analytics")
-@require_roles("Administrator", "Librarian")
+@require_roles("Librarian", "Administrator")
 def analytics():
-    """Analytics view – Administrator and Librarian."""
+    """Analytics view – Librarian/Administrator only."""
     user_role = session.get("role", "Student")
     user_id = session["user_id"]
 

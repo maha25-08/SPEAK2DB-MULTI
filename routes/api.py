@@ -233,6 +233,55 @@ def query_analytics():
 
 
 # ---------------------------------------------------------------------------
+# Librarian analytics API (Librarian / Administrator)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/librarian/analytics")
+@require_roles("Librarian", "Administrator")
+def librarian_analytics():
+    """Library analytics summary – Librarian/Administrator only."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
+        issued_books = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()["cnt"]
+        total_fines = conn.execute("SELECT COUNT(*) as cnt FROM Fines").fetchone()["cnt"]
+        conn.close()
+        return jsonify({
+            "success": True,
+            "total_books": total_books,
+            "issued_books": issued_books,
+            "total_fines": total_fines,
+        })
+    except Exception as exc:
+        logger.error("librarian/analytics error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Books endpoint (Librarian / Faculty / Administrator)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/books")
+@require_roles("Librarian", "Faculty", "Administrator")
+def books():
+    """Return all books as JSON – Librarian/Faculty/Administrator only."""
+    logger.info("api/books accessed by role: %s", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            "SELECT id as book_id, title, author, category, total_copies, available_copies "
+            "FROM Books ORDER BY title LIMIT 500"
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as exc:
+        logger.error("api/books error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
 # Data endpoints (Librarian / Administrator only)
 # ---------------------------------------------------------------------------
 
