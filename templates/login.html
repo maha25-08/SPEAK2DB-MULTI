@@ -162,6 +162,13 @@
             text-decoration: underline;
         }
 
+        .login-footer .register-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         @media (max-width: 480px) {
             .login-card {
                 padding: 1.75rem;
@@ -204,7 +211,10 @@
             </form>
 
             <div class="login-footer">
-                <a href="{{ url_for('register') }}">New user? Register here</a>
+                <div class="register-links">
+                    <a href="{{ url_for('register_student') }}">Register as Student</a>
+                    <a href="{{ url_for('register_faculty') }}">Register as Faculty</a>
+                </div>
             </div>
         </div>
     </div>
