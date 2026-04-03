@@ -271,6 +271,73 @@
                 </div>
             </div>
         </div>
+
+        <!-- Analytics Summary -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#1a237e;">
+                <span><i class="fas fa-chart-bar me-2"></i>Library Analytics</span>
+                <a href="/analytics" class="btn btn-outline-light btn-sm">Full Analytics</a>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="analyticsRow">
+                    <div class="col-12 text-center text-muted py-2">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading analytics…
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Books Management -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white" style="background:#1a237e;">
+                <i class="fas fa-book me-2"></i>Books Management
+            </div>
+            <div class="card-body">
+                <!-- Status message -->
+                <div id="crudMessage" class="alert d-none" role="alert"></div>
+
+                <!-- Add book form -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <input type="text" id="newTitle" class="form-control form-control-sm" placeholder="Title *">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" id="newAuthor" class="form-control form-control-sm" placeholder="Author *">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="newCategory" class="form-control form-control-sm" placeholder="Category">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="newCopies" class="form-control form-control-sm" placeholder="Copies" min="1" value="1">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary btn-sm w-100" onclick="addBook()">
+                            <i class="fas fa-plus me-1"></i>Add Book
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Books table -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0" style="font-size:.88rem">
+                        <thead class="results-table">
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Category</th>
+                                <th class="text-center">Copies</th>
+                                <th class="text-center">Available</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="booksTable">
+                            <tr><td colspan="7" class="text-center text-muted py-3">Loading books…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
@@ -284,5 +351,137 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/script.js"></script>
+    <script>
+    // \u2500\u2500 Analytics \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    function loadAnalytics() {
+        fetch("/api/librarian/analytics")
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+                document.getElementById("analyticsRow").innerHTML = `
+                    <div class="col-md-4">
+                        <div class="card text-white text-center" style="background:linear-gradient(135deg,#1a237e,#3949ab);border-radius:10px;">
+                            <div class="card-body py-3">
+                                <i class="fas fa-book fa-2x mb-2 opacity-75"></i>
+                                <h3 class="fw-bold mb-0">${data.total_books}</h3>
+                                <p class="mb-0 small">Total Books</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-white text-center" style="background:linear-gradient(135deg,#e65100,#ffa726);border-radius:10px;">
+                            <div class="card-body py-3">
+                                <i class="fas fa-book-reader fa-2x mb-2 opacity-75"></i>
+                                <h3 class="fw-bold mb-0">${data.issued_books}</h3>
+                                <p class="mb-0 small">Books Issued</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-white text-center" style="background:linear-gradient(135deg,#ad1457,#f48fb1);border-radius:10px;">
+                            <div class="card-body py-3">
+                                <i class="fas fa-exclamation-circle fa-2x mb-2 opacity-75"></i>
+                                <h3 class="fw-bold mb-0">${data.total_fines}</h3>
+                                <p class="mb-0 small">Total Fines</p>
+                            </div>
+                        </div>
+                    </div>`;
+            })
+            .catch(() => {
+                document.getElementById("analyticsRow").innerHTML =
+                    "<div class=\"col-12 text-center text-danger py-2\">Failed to load analytics.</div>";
+            });
+    }
+
+    // \u2500\u2500 Books CRUD \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    function showCrudMessage(msg, type) {
+        const el = document.getElementById("crudMessage");
+        el.className = `alert alert-${type}`;
+        el.textContent = msg;
+        el.classList.remove("d-none");
+        setTimeout(() => el.classList.add("d-none"), 4000);
+    }
+
+    function loadBooks() {
+        fetch("/api/books")
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById("booksTable");
+                if (!data.success || data.data.length === 0) {
+                    tbody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center text-muted py-3\">No books found.</td></tr>";
+                    return;
+                }
+                tbody.innerHTML = data.data.map(book => `
+                    <tr>
+                        <td>${book.book_id}</td>
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.category || "\u2014"}</td>
+                        <td class="text-center">${book.total_copies}</td>
+                        <td class="text-center">${book.available_copies}</td>
+                        <td class="text-center">
+                            <button class="btn btn-danger btn-sm" onclick="deleteBook(${book.book_id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`).join("");
+            })
+            .catch(() => {
+                document.getElementById("booksTable").innerHTML =
+                    "<tr><td colspan=\"7\" class=\"text-center text-danger py-3\">Failed to load books.</td></tr>";
+            });
+    }
+
+    function addBook() {
+        const title = document.getElementById("newTitle").value.trim();
+        const author = document.getElementById("newAuthor").value.trim();
+        const category = document.getElementById("newCategory").value.trim();
+        const total_copies = parseInt(document.getElementById("newCopies").value) || 1;
+        if (!title || !author) {
+            showCrudMessage("Title and Author are required.", "warning");
+            return;
+        }
+        fetch("/api/books", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({title, author, category, total_copies}),
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showCrudMessage(data.message, "success");
+                    document.getElementById("newTitle").value = "";
+                    document.getElementById("newAuthor").value = "";
+                    document.getElementById("newCategory").value = "";
+                    document.getElementById("newCopies").value = "1";
+                    loadBooks();
+                    loadAnalytics();
+                } else {
+                    showCrudMessage(data.error || "Failed to add book.", "danger");
+                }
+            })
+            .catch(() => showCrudMessage("Network error.", "danger"));
+    }
+
+    function deleteBook(bookId) {
+        if (!confirm("Delete this book?")) return;
+        fetch(`/api/books/${bookId}`, {method: "DELETE"})
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showCrudMessage(data.message, "success");
+                    loadBooks();
+                    loadAnalytics();
+                } else {
+                    showCrudMessage(data.error || "Failed to delete book.", "danger");
+                }
+            })
+            .catch(() => showCrudMessage("Network error.", "danger"));
+    }
+
+    // Load on page start
+    loadAnalytics();
+    loadBooks();
+    </script>
 </body>
 </html>
