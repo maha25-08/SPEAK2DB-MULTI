@@ -345,7 +345,7 @@ def books_list():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/books GET error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 @api_bp.route("/books", methods=["POST"])

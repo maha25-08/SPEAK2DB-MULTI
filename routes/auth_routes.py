@@ -87,6 +87,20 @@ def register_auth_routes(
             return redirect(url_for('faculty_dashboard_route'))
         return redirect(url_for('index'))
 
+    def _create_student_profile(conn, username, email, form):
+        """Insert a student row using form fields, falling back to defaults."""
+        student_name = form.get('name', '').strip() or username
+        student_branch = form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
+        student_year = form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
+        student_phone = form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
+        conn.execute(
+            '''
+            INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (username, student_name, student_branch, student_year, email, student_phone, 'Student'),
+        )
+
     @app.route('/register', methods=['GET', 'POST'], endpoint='register')
     @app.route('/auth/register', methods=['GET'], endpoint='auth_register')
     def register():
@@ -123,17 +137,7 @@ def register_auth_routes(
                 (username, generate_password_hash(password), role, email),
             )
             if role == 'Student':
-                student_name = request.form.get('name', '').strip() or username
-                student_branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
-                student_year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
-                student_phone = request.form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
-                conn.execute(
-                    '''
-                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ''',
-                    (username, student_name, student_branch, student_year, email, student_phone, role),
-                )
+                _create_student_profile(conn, username, email, request.form)
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
@@ -167,11 +171,6 @@ def register_auth_routes(
             flash('Please enter a valid email address.', 'error')
             return render_template('register_student.html')
 
-        student_name = request.form.get('name', '').strip() or username
-        student_branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
-        student_year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
-        student_phone = request.form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
-
         conn = get_db_connection(main_db_getter())
         try:
             existing_user = conn.execute(
@@ -186,13 +185,7 @@ def register_auth_routes(
                 'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
                 (username, generate_password_hash(password), 'Student', email),
             )
-            conn.execute(
-                '''
-                INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (username, student_name, student_branch, student_year, email, student_phone, 'Student'),
-            )
+            _create_student_profile(conn, username, email, request.form)
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
