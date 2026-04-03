@@ -63,11 +63,11 @@ def student_dashboard():
             (student_id,),
         ).fetchall()
         unpaid_fines = conn.execute(
-            "SELECT * FROM Fines WHERE student_id = ? AND status = 'Unpaid' ORDER BY issue_date DESC",
+            "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date FROM Fines f WHERE f.student_id = ? AND f.status = 'Unpaid' ORDER BY f.issue_date DESC",
             (student_id,),
         ).fetchall()
         all_fines = conn.execute(
-            "SELECT * FROM Fines WHERE student_id = ? ORDER BY issue_date DESC",
+            "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date FROM Fines f WHERE f.student_id = ? ORDER BY f.issue_date DESC",
             (student_id,),
         ).fetchall()
         reservations = conn.execute(
@@ -219,11 +219,8 @@ def librarian_dashboard():
 
     stats = get_library_stats()
 
-    username = session.get("username", user_id)
-    template = _LIBRARIAN_TEMPLATES.get(username, "librarian_dashboard.html")
-
     return render_template(
-        template,
+        "librarian_dashboard.html",
         role=role,
         user=user_id,
         stats=stats,

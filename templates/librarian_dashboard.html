@@ -7,138 +7,122 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; color: #000; }
-        .navbar-brand { font-weight: 700; font-size: 1.3rem; }
-        .welcome-banner {
-            background: linear-gradient(135deg, #1a237e 0%, #3949ab 100%);
-            color: white;
-            border-radius: 14px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+        :root { --navy: #1a237e; --navy-dark: #0d1757; --navy-light: #3949ab; }
+        body { background: #f0f2f5; color: #222; margin: 0; }
+
+        /* Sidebar */
+        #sidebar {
+            width: 220px; min-height: 100vh; background: var(--navy);
+            position: fixed; top: 0; left: 0; z-index: 100;
+            display: flex; flex-direction: column; padding-top: 1rem;
         }
+        #sidebar .brand {
+            color: #fff; font-weight: 700; font-size: 1.1rem;
+            padding: .8rem 1.2rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,.15);
+        }
+        #sidebar .nav-link {
+            color: rgba(255,255,255,.8); padding: .7rem 1.2rem;
+            font-size: .92rem; border-radius: 0;
+            display: flex; align-items: center; gap: .6rem;
+            text-decoration: none;
+        }
+        #sidebar .nav-link:hover, #sidebar .nav-link.active {
+            background: rgba(255,255,255,.15); color: #fff;
+        }
+        #sidebar .nav-link i { width: 18px; text-align: center; }
+
+        /* Main content */
+        #main { margin-left: 220px; min-height: 100vh; }
+        .topbar {
+            background: var(--navy); color: #fff; padding: .75rem 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 99;
+        }
+        .content-area { padding: 1.5rem; }
+
+        /* Stats */
         .stat-card {
-            border: none;
-            border-radius: 12px;
+            border: none; border-radius: 12px;
             box-shadow: 0 3px 12px rgba(0,0,0,.1);
-            transition: transform .2s;
+            transition: transform .2s; color: #fff;
         }
         .stat-card:hover { transform: translateY(-3px); }
-        .stat-card .card-body { padding: 1.5rem; }
-        .stat-icon { font-size: 2.5rem; opacity: .85; }
-        .query-section {
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.08);
-            padding: 2rem;
-            margin-bottom: 2rem;
+        .stat-card .card-body { padding: 1.4rem; }
+        .stat-icon { font-size: 2.2rem; opacity: .85; }
+
+        /* Section card */
+        .section-card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.07); margin-bottom: 1.5rem; overflow: hidden;
         }
-        .btn-run {
-            background: #1a237e;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: .6rem 1.4rem;
-            font-weight: 600;
-            cursor: pointer;
+        .section-header {
+            background: var(--navy); color: #fff;
+            padding: .75rem 1.25rem; font-weight: 600;
+            display: flex; align-items: center; justify-content: space-between;
         }
-        .btn-run:hover { background: #0d1757; color: white; }
-        #loadingOverlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.5);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            color: white;
-            font-size: 1.2rem;
-        }
-        .clarification-card {
-            background: #e8eaf6;
-            border: 1px solid #9fa8da;
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-        }
-        .btn-clarification {
-            background: #1a237e;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: .45rem 1rem;
-            margin: .25rem;
-            cursor: pointer;
-            font-size: .9rem;
-        }
-        .btn-clarification:hover { background: #0d1757; }
-        .results-table th { background: #1a237e; color: white; }
-        .results-table { font-size: .88rem; }
+        .section-header i { margin-right: .5rem; }
+        .table th { background: #e8eaf6; color: #333; }
+        .table td, .table th { vertical-align: middle; font-size: .88rem; }
+        .btn-action { padding: .25rem .6rem; font-size: .8rem; }
+
+        /* Add form toggle */
+        .add-form { display: none; background: #f5f7ff; border-top: 1px solid #e0e0e0; padding: 1rem 1.25rem; }
+        .add-form.show { display: block; }
+
+        /* Toast */
         #toastContainer {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: .5rem;
+            position: fixed; bottom: 1rem; right: 1rem;
+            z-index: 10000; display: flex; flex-direction: column; gap: .5rem;
         }
-        .toast { padding: .6rem 1rem; border-radius: 8px; color: white; font-size: .9rem; }
+        .toast-msg { padding: .65rem 1rem; border-radius: 8px; color: #fff; font-size: .88rem; }
         .toast-success { background: #2e7d32; }
         .toast-error   { background: #c62828; }
         .toast-info    { background: #1565c0; }
-        .toast-warning { background: #e65100; }
+
+        /* Modal edit form */
+        .edit-field { margin-bottom: .75rem; }
+
+        @media (max-width: 768px) {
+            #sidebar { display: none; }
+            #main { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background:#1a237e;">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand" href="{{ url_for('librarian_dashboard_route') }}">
-                <i class="fas fa-book-open me-2"></i>Speak2DB — Librarian Portal
-            </a>
-            <div class="navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="fas fa-search me-1"></i>Query
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.students_view') }}">
-                            <i class="fas fa-users me-1"></i>Students
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.issued_books_view') }}">
-                            <i class="fas fa-book-reader me-1"></i>Issued Books
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.fines_view') }}">
-                            <i class="fas fa-money-bill-wave me-1"></i>Fines
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.analytics') }}">
-                            <i class="fas fa-chart-bar me-1"></i>Analytics
-                        </a>
-                    </li>
-                </ul>
-                <div class="ms-auto d-flex align-items-center gap-3">
-                    <span class="text-white">
-                        Logged in as:
-                        <span class="badge bg-light text-primary ms-1">{{ role|upper }}</span>
-                    </span>
-                    <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
-                        <i class="fas fa-sign-out-alt me-1"></i>Logout
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
+<!-- Sidebar -->
+<nav id="sidebar">
+    <div class="brand"><i class="fas fa-book-open me-2"></i>Speak2DB</div>
+    <a href="#section-overview" class="nav-link active" onclick="showSection('overview')">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+    <a href="#section-books" class="nav-link" onclick="showSection('books')">
+        <i class="fas fa-book"></i> Books
+    </a>
+    <a href="#section-issued" class="nav-link" onclick="showSection('issued')">
+        <i class="fas fa-book-reader"></i> Issued Books
+    </a>
+    <a href="#section-fines" class="nav-link" onclick="showSection('fines')">
+        <i class="fas fa-money-bill-wave"></i> Fines
+    </a>
+    <div class="mt-auto pb-3">
+        <a href="{{ url_for('logout') }}" class="nav-link text-warning">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+</nav>
 
-    <div class="container-fluid px-4 py-4">
+<!-- Main -->
+<div id="main">
+    <!-- Topbar -->
+    <div class="topbar">
+        <span><i class="fas fa-book-open me-2"></i>Librarian Portal</span>
+        <span>
+            Logged in as: <strong>{{ user }}</strong>
+            <span class="badge bg-light text-primary ms-2">{{ role }}</span>
+        </span>
+    </div>
+
+    <div class="content-area">
         <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -151,121 +135,281 @@
         {% endif %}
         {% endwith %}
 
-        <!-- Welcome Banner -->
-        <div class="welcome-banner">
-            <h3 class="mb-1">
-                <i class="fas fa-book-open me-2"></i>Welcome {{ user }}
-            </h3>
-            <p class="mb-0 opacity-75">Librarian Dashboard — Manage books, students, and circulation.</p>
+        <!-- SECTION: Overview -->
+        <div id="section-overview" class="section-pane">
+            <div class="mb-4 p-3 rounded-3 text-white" style="background:linear-gradient(135deg,var(--navy),var(--navy-light))">
+                <h4 class="mb-1"><i class="fas fa-book-open me-2"></i>Librarian Dashboard</h4>
+                <p class="mb-0 opacity-75">Welcome {{ user }} — Manage books, issued copies, and fines.</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#1a237e,#3949ab)">
+                        <div class="card-body text-center">
+                            <div class="stat-icon"><i class="fas fa-book"></i></div>
+                            <h2 class="fw-bold mt-1" id="statBooks">{{ stats.get('total_books', 0) }}</h2>
+                            <p class="mb-0">Total Books:</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#1565c0,#42a5f5)">
+                        <div class="card-body text-center">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <h2 class="fw-bold mt-1">{{ stats.get('total_students', 0) }}</h2>
+                            <p class="mb-0">Total Students</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#e65100,#ffa726)">
+                        <div class="card-body text-center">
+                            <div class="stat-icon"><i class="fas fa-book-reader"></i></div>
+                            <h2 class="fw-bold mt-1" id="statIssued">{{ stats.get('active_issues', 0) }}</h2>
+                            <p class="mb-0">Issued Books</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="card stat-card" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
+                        <div class="card-body text-center">
+                            <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
+                            <h2 class="fw-bold mt-1" id="statFines">{{ stats.get('unpaid_fines', 0) }}</h2>
+                            <p class="mb-0">Unpaid Fines</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Issues -->
+            <div class="section-card">
+                <div class="section-header"><span><i class="fas fa-history"></i>Recent Issues</span></div>
+                <div class="p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Student</th><th>Book</th><th>Author</th><th>Issue Date</th></tr></thead>
+                            <tbody>
+                            {% for issue in recent_issues %}
+                                <tr>
+                                    <td>{{ issue['student_name']|default('N/A') }}</td>
+                                    <td>{{ issue['title']|default('N/A') }}</td>
+                                    <td>{{ issue['author']|default('N/A') }}</td>
+                                    <td>{{ issue['issue_date']|default('N/A') }}</td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No recent issues</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /section-overview -->
+
+        <!-- SECTION: Books -->
+        <div id="section-books" class="section-pane" style="display:none">
+            <div class="section-card">
+                <div class="section-header">
+                    <span><i class="fas fa-book"></i>Books</span>
+                    <button class="btn btn-light btn-sm" onclick="toggleForm('addBookForm')">
+                        <i class="fas fa-plus me-1"></i>Add Book
+                    </button>
+                </div>
+
+                <!-- Add Book Form -->
+                <div class="add-form" id="addBookForm">
+                    <h6 class="mb-3 text-primary">Add New Book</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <input id="newBookTitle" type="text" class="form-control form-control-sm" placeholder="Title *">
+                        </div>
+                        <div class="col-md-3">
+                            <input id="newBookAuthor" type="text" class="form-control form-control-sm" placeholder="Author *">
+                        </div>
+                        <div class="col-md-2">
+                            <input id="newBookCategory" type="text" class="form-control form-control-sm" placeholder="Category">
+                        </div>
+                        <div class="col-md-1">
+                            <input id="newBookCopies" type="number" class="form-control form-control-sm" placeholder="Copies" value="1" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary btn-sm w-100" onclick="addBook()">
+                                <i class="fas fa-save me-1"></i>Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="booksTable">
+                            <thead><tr><th>ID</th><th>Title</th><th>Author</th><th>Category</th><th>Copies</th><th>Available</th><th>Actions</th></tr></thead>
+                            <tbody id="booksBody">
+                                <tr><td colspan="7" class="text-center text-muted py-3">Loading&#8230;</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /section-books -->
+
+        <!-- SECTION: Issued Books -->
+        <div id="section-issued" class="section-pane" style="display:none">
+            <div class="section-card">
+                <div class="section-header">
+                    <span><i class="fas fa-book-reader"></i>Issued Books</span>
+                    <button class="btn btn-light btn-sm" onclick="toggleForm('issueBookForm')">
+                        <i class="fas fa-plus me-1"></i>Issue Book
+                    </button>
+                </div>
+
+                <!-- Issue Book Form -->
+                <div class="add-form" id="issueBookForm">
+                    <h6 class="mb-3 text-primary">Issue Book to Student</h6>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input id="issueStudentId" type="number" class="form-control form-control-sm" placeholder="Student ID *">
+                        </div>
+                        <div class="col-md-3">
+                            <input id="issueBookId" type="number" class="form-control form-control-sm" placeholder="Book ID *">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary btn-sm w-100" onclick="issueBook()">
+                                <i class="fas fa-save me-1"></i>Issue
+                            </button>
+                        </div>
+                    </div>
+                    <small class="text-muted">Due date is set to 14 days from today.</small>
+                </div>
+
+                <div class="p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Issue ID</th><th>Book</th><th>Student</th><th>Roll No</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th>Action</th></tr></thead>
+                            <tbody id="issuedBody">
+                                <tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /section-issued -->
+
+        <!-- SECTION: Fines -->
+        <div id="section-fines" class="section-pane" style="display:none">
+            <div class="section-card">
+                <div class="section-header"><span><i class="fas fa-money-bill-wave"></i>Fines</span></div>
+                <div class="p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Fine ID</th><th>Student</th><th>Roll No</th><th>Amount</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                            <tbody id="finesBody">
+                                <tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /section-fines -->
+
+    </div><!-- /content-area -->
+</div><!-- /main -->
+
+<!-- Edit Book Modal -->
+<div class="modal fade" id="editBookModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:var(--navy);color:#fff">
+                <h5 class="modal-title">Edit Book</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editBookId">
+                <div class="edit-field">
+                    <label class="form-label">Title</label>
+                    <input id="editBookTitle" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="edit-field">
+                    <label class="form-label">Author</label>
+                    <input id="editBookAuthor" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="edit-field">
+                    <label class="form-label">Category</label>
+                    <input id="editBookCategory" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="edit-field">
+                    <label class="form-label">Total Copies</label>
+                    <input id="editBookCopies" type="number" class="form-control form-control-sm" min="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="saveEditBook()">Save Changes</button>
+            </div>
         </div>
 
-        <!-- Stats Row -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#1a237e,#3949ab)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-book"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('total_books', 0) }}</h2>
-                        <p class="mb-0">Total Books:</p>
-                    </div>
-                </div>
+        <!-- Analytics Summary -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#1a237e;">
+                <span><i class="fas fa-chart-bar me-2"></i>Library Analytics</span>
+                <a href="/analytics" class="btn btn-outline-light btn-sm">Full Analytics</a>
             </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#1565c0,#42a5f5)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-users"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('total_students', 0) }}</h2>
-                        <p class="mb-0">Total Students:</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#e65100,#ffa726)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-book-reader"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('active_issues', 0) }}</h2>
-                        <p class="mb-0">Active Issues:</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card text-white" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
-                    <div class="card-body text-center">
-                        <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
-                        <h2 class="fw-bold mt-1">{{ stats.get('unpaid_fines', 0) }}</h2>
-                        <p class="mb-0">Unpaid Fines:</p>
+            <div class="card-body">
+                <div class="row g-3" id="analyticsRow">
+                    <div class="col-12 text-center text-muted py-2">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading analytics…
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- NL Query Section -->
-        <div class="query-section" id="query-section">
-            <h5 class="mb-3"><i class="fas fa-search me-2 text-primary"></i>Natural Language Query</h5>
-            <div class="input-group mb-2">
-                <textarea id="queryInput" class="form-control" rows="2"
-                    placeholder="e.g. 'show all overdue books' or 'list students with unpaid fines'"></textarea>
-            </div>
-            <div class="d-flex gap-2 mt-2">
-                <button id="queryBtn" class="btn btn-run" onclick="submitQuery()">
-                    <i class="fas fa-play me-1"></i>Run Query
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="clearQuery()">
-                    <i class="fas fa-times me-1"></i>Clear
-                </button>
-            </div>
-
-            <!-- Clarification Card -->
-            <div class="clarification-card mt-3" id="clarificationCard" style="display:none">
-                <p class="fw-semibold text-primary mb-2">
-                    <i class="fas fa-question-circle me-1"></i><span id="clarificationQuestion"></span>
-                </p>
-                <div id="clarificationOptions"></div>
-            </div>
-
-            <!-- Results -->
-            <div id="resultsSection" class="mt-3" style="display:none">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge bg-primary" id="rowCountBadge"></span>
-                    <code id="sqlCode" class="text-muted small"></code>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover results-table">
-                        <thead id="tableHead"></thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-                <div id="noResults" class="text-muted" style="display:none">No results found.</div>
-            </div>
-        </div>
-
-        <!-- Recent Issues -->
+        <!-- Books Management -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header text-white" style="background:#1a237e;">
-                <i class="fas fa-history me-2"></i>Recent Book Issues
+                <i class="fas fa-book me-2"></i>Books Management
             </div>
-            <div class="card-body p-0">
+            <div class="card-body">
+                <!-- Status message -->
+                <div id="crudMessage" class="alert d-none" role="alert"></div>
+
+                <!-- Add book form -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <input type="text" id="newTitle" class="form-control form-control-sm" placeholder="Title *">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" id="newAuthor" class="form-control form-control-sm" placeholder="Author *">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="newCategory" class="form-control form-control-sm" placeholder="Category">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="newCopies" class="form-control form-control-sm" placeholder="Copies" min="1" value="1">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary btn-sm w-100" onclick="addBook()">
+                            <i class="fas fa-plus me-1"></i>Add Book
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Books table -->
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                    <table class="table table-striped table-hover mb-0" style="font-size:.88rem">
+                        <thead class="results-table">
                             <tr>
-                                <th>Student</th>
-                                <th>Book Title</th>
+                                <th>ID</th>
+                                <th>Title</th>
                                 <th>Author</th>
-                                <th>Issue Date</th>
+                                <th>Category</th>
+                                <th class="text-center">Copies</th>
+                                <th class="text-center">Available</th>
+                                <th class="text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        {% for issue in recent_issues %}
-                            <tr>
-                                <td>{{ issue['student_name']|default('N/A') }}</td>
-                                <td>{{ issue['title']|default('N/A') }}</td>
-                                <td>{{ issue['author']|default('N/A') }}</td>
-                                <td>{{ issue['issue_date']|default('N/A') }}</td>
-                            </tr>
-                        {% else %}
-                            <tr><td colspan="4" class="text-center text-muted py-3">No recent issues</td></tr>
-                        {% endfor %}
+                        <tbody id="booksTable">
+                            <tr><td colspan="7" class="text-center text-muted py-3">Loading books…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -362,15 +506,236 @@
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay">
-        <div class="spinner-border text-light mb-3" role="status"></div>
-        <p>Processing your query…</p>
-    </div>
+<!-- Toast container -->
+<div id="toastContainer"></div>
 
-    <!-- Toast container -->
-    <div id="toastContainer"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Section navigation
+function showSection(name) {
+    document.querySelectorAll('.section-pane').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('#sidebar .nav-link').forEach(el => el.classList.remove('active'));
+    var pane = document.getElementById('section-' + name);
+    if (pane) pane.style.display = '';
+    var link = document.querySelector('#sidebar .nav-link[onclick*="' + name + '"]');
+    if (link) link.classList.add('active');
+    if (name === 'books') loadBooks();
+    if (name === 'issued') loadIssued();
+    if (name === 'fines') loadFines();
+}
+
+function toggleForm(id) {
+    var el = document.getElementById(id);
+    el.classList.toggle('show');
+}
+
+// Toast helper
+function toast(msg, type) {
+    type = type || 'info';
+    var el = document.createElement('div');
+    el.className = 'toast-msg toast-' + type;
+    el.textContent = msg;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3500);
+}
+
+// BOOKS
+function loadBooks() {
+    var tbody = document.getElementById('booksBody');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading&#8230;</td></tr>';
+    fetch('/api/books').then(function(r){ return r.json(); }).then(function(json) {
+        if (!json.success) { toast(json.error || 'Failed to load books', 'error'); return; }
+        if (!json.data.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No books found</td></tr>';
+            document.getElementById('statBooks').textContent = 0;
+            return;
+        }
+        document.getElementById('statBooks').textContent = json.data.length;
+        tbody.innerHTML = json.data.map(function(b) {
+            return '<tr>' +
+                '<td>' + b.id + '</td>' +
+                '<td>' + esc(b.title) + '</td>' +
+                '<td>' + esc(b.author) + '</td>' +
+                '<td>' + esc(b.category || '') + '</td>' +
+                '<td>' + b.total_copies + '</td>' +
+                '<td>' + b.available_copies + '</td>' +
+                '<td>' +
+                    '<button class="btn btn-sm btn-outline-primary btn-action me-1 edit-book-btn" ' +
+                        'data-id="' + b.id + '" data-title="' + esc(b.title) + '" data-author="' + esc(b.author) + '" ' +
+                        'data-category="' + esc(b.category || '') + '" data-copies="' + b.total_copies + '">' +
+                        '<i class="fas fa-edit"></i></button> ' +
+                    '<button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteBook(' + b.id + ')">' +
+                        '<i class="fas fa-trash"></i></button>' +
+                '</td></tr>';
+        }).join('');
+    }).catch(function() { toast('Network error loading books', 'error'); });
+}
+
+function addBook() {
+    var title = document.getElementById('newBookTitle').value.trim();
+    var author = document.getElementById('newBookAuthor').value.trim();
+    var category = document.getElementById('newBookCategory').value.trim();
+    var total_copies = parseInt(document.getElementById('newBookCopies').value) || 1;
+    if (!title || !author) { toast('Title and author are required', 'error'); return; }
+    fetch('/api/books', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: title, author: author, category: category, total_copies: total_copies})
+    }).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) {
+            toast('Book added successfully', 'success');
+            document.getElementById('newBookTitle').value = '';
+            document.getElementById('newBookAuthor').value = '';
+            document.getElementById('newBookCategory').value = '';
+            document.getElementById('newBookCopies').value = 1;
+            loadBooks();
+        } else { toast(json.error || 'Failed to add book', 'error'); }
+    });
+}
+
+// Delegate click on Edit buttons (uses data-* to avoid quote issues)
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.edit-book-btn');
+    if (!btn) return;
+    document.getElementById('editBookId').value = btn.dataset.id;
+    document.getElementById('editBookTitle').value = btn.dataset.title;
+    document.getElementById('editBookAuthor').value = btn.dataset.author;
+    document.getElementById('editBookCategory').value = btn.dataset.category;
+    document.getElementById('editBookCopies').value = btn.dataset.copies || 1;
+    new bootstrap.Modal(document.getElementById('editBookModal')).show();
+});
+
+function saveEditBook() {
+    var id = document.getElementById('editBookId').value;
+    var title = document.getElementById('editBookTitle').value.trim();
+    var author = document.getElementById('editBookAuthor').value.trim();
+    var category = document.getElementById('editBookCategory').value.trim();
+    var total_copies = parseInt(document.getElementById('editBookCopies').value) || 1;
+    if (!title || !author) { toast('Title and author are required', 'error'); return; }
+    fetch('/api/books/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: title, author: author, category: category, total_copies: total_copies})
+    }).then(function(r){ return r.json(); }).then(function(json) {
+        bootstrap.Modal.getInstance(document.getElementById('editBookModal')).hide();
+        if (json.success) { toast('Book updated', 'success'); loadBooks(); }
+        else { toast(json.error || 'Update failed', 'error'); }
+    });
+}
+
+function deleteBook(id) {
+    if (!confirm('Delete this book?')) return;
+    fetch('/api/books/' + id, {method: 'DELETE'}).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) { toast('Book deleted', 'success'); loadBooks(); }
+        else { toast(json.error || 'Delete failed', 'error'); }
+    });
+}
+
+// ISSUED
+function loadIssued() {
+    var tbody = document.getElementById('issuedBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>';
+    fetch('/api/issued').then(function(r){ return r.json(); }).then(function(json) {
+        if (!json.success) { toast(json.error || 'Failed to load issued', 'error'); return; }
+        var active = json.data.filter(function(r){ return !r.return_date; });
+        document.getElementById('statIssued').textContent = active.length;
+        if (!json.data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No issued books</td></tr>';
+            return;
+        }
+        tbody.innerHTML = json.data.map(function(r) {
+            var badge = r.return_date ? 'bg-success' : 'bg-warning text-dark';
+            var status = r.status || (r.return_date ? 'Returned' : 'Issued');
+            var action = !r.return_date
+                ? '<button class="btn btn-sm btn-outline-success btn-action" onclick="returnBook(' + r.issue_id + ')">' +
+                  '<i class="fas fa-undo me-1"></i>Return</button>'
+                : '<span class="text-muted">&#8212;</span>';
+            return '<tr>' +
+                '<td>' + r.issue_id + '</td>' +
+                '<td>' + esc(r.title) + '</td>' +
+                '<td>' + esc(r.student_name) + '</td>' +
+                '<td>' + esc(r.roll_number || '') + '</td>' +
+                '<td>' + (r.issue_date || '') + '</td>' +
+                '<td>' + (r.due_date || '') + '</td>' +
+                '<td><span class="badge ' + badge + '">' + status + '</span></td>' +
+                '<td>' + action + '</td></tr>';
+        }).join('');
+    }).catch(function() { toast('Network error loading issued books', 'error'); });
+}
+
+function issueBook() {
+    var student_id = document.getElementById('issueStudentId').value.trim();
+    var book_id = document.getElementById('issueBookId').value.trim();
+    if (!student_id || !book_id) { toast('Student ID and Book ID are required', 'error'); return; }
+    fetch('/api/issued', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({student_id: parseInt(student_id), book_id: parseInt(book_id)})
+    }).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) {
+            toast('Book issued successfully', 'success');
+            document.getElementById('issueStudentId').value = '';
+            document.getElementById('issueBookId').value = '';
+            loadIssued();
+            loadBooks();
+        } else { toast(json.error || 'Failed to issue book', 'error'); }
+    });
+}
+
+function returnBook(issueId) {
+    if (!confirm('Mark this book as returned?')) return;
+    fetch('/api/issued/' + issueId + '/return', {method: 'PUT'})
+        .then(function(r){ return r.json(); }).then(function(json) {
+            if (json.success) { toast('Book returned', 'success'); loadIssued(); loadBooks(); }
+            else { toast(json.error || 'Return failed', 'error'); }
+        });
+}
+
+// FINES
+function loadFines() {
+    var tbody = document.getElementById('finesBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>';
+    fetch('/api/fines').then(function(r){ return r.json(); }).then(function(json) {
+        if (!json.success) { toast(json.error || 'Failed to load fines', 'error'); return; }
+        var unpaid = json.data.filter(function(r){ return r.status === 'Unpaid'; }).length;
+        document.getElementById('statFines').textContent = unpaid;
+        if (!json.data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No fines found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = json.data.map(function(f) {
+            var badge = f.status === 'Paid' ? 'bg-success' : (f.status === 'Waived' ? 'bg-secondary' : 'bg-danger');
+            return '<tr>' +
+                '<td>' + f.id + '</td>' +
+                '<td>' + esc(f.student_name) + '</td>' +
+                '<td>' + esc(f.roll_number || '') + '</td>' +
+                '<td>' + (parseFloat(f.fine_amount) || 0).toFixed(2) + '</td>' +
+                '<td>' + esc(f.fine_type || '') + '</td>' +
+                '<td><span class="badge ' + badge + '">' + f.status + '</span></td>' +
+                '<td>' + (f.issue_date || '').substring(0, 10) + '</td>' +
+                '<td><select class="form-select form-select-sm d-inline-block" style="width:auto;min-width:90px" ' +
+                    'onchange="updateFineStatus(' + f.id + ', this.value)">' +
+                    '<option value="" disabled selected>Update</option>' +
+                    '<option value="Paid">Paid</option>' +
+                    '<option value="Unpaid">Unpaid</option>' +
+                    '<option value="Waived">Waived</option>' +
+                '</select></td></tr>';
+        }).join('');
+    }).catch(function() { toast('Network error loading fines', 'error'); });
+}
+
+function updateFineStatus(fineId, status) {
+    fetch('/api/fines/' + fineId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: status})
+    }).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) { toast('Fine #' + fineId + ' marked as ' + status, 'success'); loadFines(); }
+        else { toast(json.error || 'Update failed', 'error'); }
+    });
+}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/script.js"></script>
