@@ -233,6 +233,55 @@ def query_analytics():
 
 
 # ---------------------------------------------------------------------------
+# Librarian analytics API (Librarian / Administrator)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/librarian/analytics")
+@require_roles("Librarian", "Administrator")
+def librarian_analytics():
+    """Library analytics summary – Librarian/Administrator only."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
+        issued_books = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()["cnt"]
+        total_fines = conn.execute("SELECT COUNT(*) as cnt FROM Fines").fetchone()["cnt"]
+        conn.close()
+        return jsonify({
+            "success": True,
+            "total_books": total_books,
+            "issued_books": issued_books,
+            "total_fines": total_fines,
+        })
+    except Exception as exc:
+        logger.error("librarian/analytics error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Books endpoint (Librarian / Faculty / Administrator)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/books")
+@require_roles("Librarian", "Faculty", "Administrator")
+def books():
+    """Return all books as JSON – Librarian/Faculty/Administrator only."""
+    logger.info("api/books accessed by role: %s", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            "SELECT id as book_id, title, author, category, total_copies, available_copies "
+            "FROM Books ORDER BY title LIMIT 500"
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as exc:
+        logger.error("api/books error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
 # Data endpoints (Librarian / Administrator only)
 # ---------------------------------------------------------------------------
 
@@ -304,7 +353,7 @@ def fines():
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
-            """SELECT f.id, s.roll_number, s.name as student_name,
+            """SELECT f.id AS fine_id, s.roll_number, s.name as student_name,
                       f.fine_amount, f.fine_type, f.status, f.issue_date
                FROM Fines f
                JOIN Students s ON f.student_id = s.id
@@ -315,3 +364,102 @@ def fines():
     except Exception as exc:
         logger.error("api/fines error: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Librarian analytics (Librarian only)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/librarian/analytics")
+@require_roles("Librarian", "Administrator")
+def librarian_analytics():
+    """Library stats for librarian dashboard."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        total_books = conn.execute("SELECT COUNT(*) as cnt FROM Books").fetchone()["cnt"]
+        issued_books = conn.execute(
+            "SELECT COUNT(*) as cnt FROM Issued WHERE return_date IS NULL"
+        ).fetchone()["cnt"]
+        total_fines = conn.execute("SELECT COUNT(*) as cnt FROM Fines").fetchone()["cnt"]
+        conn.close()
+        return jsonify({
+            "success": True,
+            "total_books": total_books,
+            "issued_books": issued_books,
+            "total_fines": total_fines,
+        })
+    except Exception as exc:
+        logger.error("librarian/analytics error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Books CRUD (Librarian / Administrator)
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/books", methods=["GET"])
+@require_roles("Librarian", "Faculty", "Administrator")
+def books_list():
+    """Return all books as JSON – Librarian/Faculty/Administrator only."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            "SELECT id as book_id, title, author, category, available_copies, total_copies "
+            "FROM Books ORDER BY title LIMIT 500"
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as exc:
+        logger.error("api/books GET error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@api_bp.route("/books", methods=["POST"])
+@require_roles("Librarian", "Administrator")
+def books_add():
+    """Add a new book – Librarian/Administrator only."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    author = (data.get("author") or "").strip()
+    category = (data.get("category") or "").strip()
+    total_copies = data.get("total_copies", 1)
+    if not title or not author:
+        return jsonify({"success": False, "error": "title and author are required"}), 400
+    try:
+        total_copies = int(total_copies)
+        if total_copies < 1:
+            total_copies = 1
+    except (TypeError, ValueError):
+        total_copies = 1
+    try:
+        conn = get_db_connection(MAIN_DB)
+        conn.execute(
+            "INSERT INTO Books (title, author, category, total_copies, available_copies) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (title, author, category, total_copies, total_copies),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book added successfully"})
+    except Exception as exc:
+        logger.error("api/books POST error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@api_bp.route("/books/<int:book_id>", methods=["DELETE"])
+@require_roles("Librarian", "Administrator")
+def books_delete(book_id: int):
+    """Delete a book – Librarian/Administrator only."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        existing = conn.execute("SELECT id FROM Books WHERE id = ?", (book_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"success": False, "error": "Book not found"}), 404
+        conn.execute("DELETE FROM Books WHERE id = ?", (book_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book deleted successfully"})
+    except Exception as exc:
+        logger.error("api/books DELETE error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500

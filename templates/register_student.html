@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speak2DB - Register as Student</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--gradient-bg);
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+        }
+        .register-card {
+            width: 100%;
+            max-width: 680px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,.3);
+        }
+        .register-card h1 {
+            font-size: 2.4rem;
+            margin-bottom: .5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .register-card p { color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: .4rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        input {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text);
+            padding: .9rem 1rem;
+            box-sizing: border-box;
+        }
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: .9rem 1.4rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .flash-message { margin-bottom: 1rem; padding: .75rem 1rem; border-radius: 8px; font-size: .875rem; }
+        .flash-message.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+        .flash-message.success { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3); color: #34d399; }
+        .helper { color: var(--text-muted); font-size: .9rem; margin-top: .3rem; }
+    </style>
+</head>
+<body>
+    <div class="register-card">
+        <h1>🎓 Student Registration</h1>
+        <p>Create a new Speak2DB student account.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('register_student') }}">
+            <div class="grid">
+                <div>
+                    <label for="username">Roll Number / Username</label>
+                    <input id="username" name="username" required placeholder="e.g. CS2001">
+                </div>
+                <div>
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" required>
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" required>
+                </div>
+                <div>
+                    <label for="name">Full Name</label>
+                    <input id="name" name="name" placeholder="Optional">
+                </div>
+                <div>
+                    <label for="branch">Branch</label>
+                    <input id="branch" name="branch" placeholder="e.g. CS, MT (default: GEN)">
+                </div>
+                <div>
+                    <label for="year">Year</label>
+                    <input id="year" name="year" placeholder="e.g. 1, 2, 3 (default: 1)">
+                </div>
+                <div>
+                    <label for="phone">Phone</label>
+                    <input id="phone" name="phone" placeholder="Optional">
+                </div>
+            </div>
+            <div class="helper">
+                Only Roll Number, Password, and Email are required. Branch defaults to GEN, Year defaults to 1.
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" type="submit">Create Student Account</button>
+                <a class="btn btn-secondary" href="{{ url_for('login') }}">Back to Login</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

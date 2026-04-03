@@ -147,6 +147,121 @@ def register_auth_routes(
         flash('Registration successful. Please sign in.', 'success')
         return redirect(url_for('login'))
 
+    @app.route('/register/student', methods=['GET', 'POST'], endpoint='register_student')
+    def register_student():
+        if request.method == 'GET':
+            return render_template('register_student.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        full_name = request.form.get('full_name', '').strip()
+        branch = request.form.get('branch', '').strip()
+        year = request.form.get('year', '').strip()
+
+        if not username or not password or not email or not full_name or not branch or not year:
+            flash('All fields are required.', 'error')
+            return render_template('register_student.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_student.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_student.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Student', email),
+            )
+            conn.execute(
+                '''
+                INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (username, full_name, branch, year, email, DEFAULT_STUDENT_PHONE, 'Student'),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Student registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_student.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Student registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_student.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
+
+    @app.route('/register/faculty', methods=['GET', 'POST'], endpoint='register_faculty')
+    def register_faculty():
+        if request.method == 'GET':
+            return render_template('register_faculty.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        full_name = request.form.get('full_name', '').strip()
+        department = request.form.get('department', '').strip()
+        designation = request.form.get('designation', '').strip()
+        specialization = request.form.get('specialization', '').strip()
+
+        if not username or not password or not email or not full_name or not department or not designation or not specialization:
+            flash('All fields are required.', 'error')
+            return render_template('register_faculty.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_faculty.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_faculty.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Faculty', email),
+            )
+            conn.execute(
+                '''
+                INSERT INTO Faculty (name, email, department, designation, specialization)
+                VALUES (?, ?, ?, ?, ?)
+                ''',
+                (full_name, email, department, designation, specialization),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Faculty registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_faculty.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Faculty registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_faculty.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
+
     @app.route('/logout', endpoint='logout')
     def logout():
         user_id = session.get('user_id')
@@ -157,4 +272,107 @@ def register_auth_routes(
             log_audit_event(user_id, user_role, 'LOGOUT', 'SESSION', 'User logged out', success=True)
         session.clear()
         flash('You have been logged out.', 'info')
+        return redirect(url_for('login'))
+
+    @app.route('/register/student', methods=['GET', 'POST'], endpoint='register_student')
+    def register_student():
+        if request.method == 'GET':
+            return render_template('register_student.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        name = request.form.get('name', '').strip() or username
+        branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
+        year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
+        phone = request.form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
+
+        if not username or not password or not email:
+            flash('Username, password, and email are required.', 'error')
+            return render_template('register_student.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_student.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_student.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Student', email),
+            )
+            conn.execute(
+                'INSERT INTO Students (roll_number, name, branch, year, email, phone, role) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (username, name, branch, year, email, phone, 'Student'),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Student registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_student.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Student registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_student.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
+
+    @app.route('/register/librarian', methods=['GET', 'POST'], endpoint='register_librarian')
+    def register_librarian():
+        if request.method == 'GET':
+            return render_template('register_librarian.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+
+        if not username or not password or not email:
+            flash('All fields are required.', 'error')
+            return render_template('register_librarian.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_librarian.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_librarian.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Librarian', email),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Librarian registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_librarian.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Librarian registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_librarian.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
         return redirect(url_for('login'))
