@@ -318,7 +318,7 @@ def update_fine(fine_id):
         return jsonify({"success": True, "message": f"Fine {fine_id} status updated to {status}"})
     except Exception as exc:
         logger.error("api/fines PUT error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to update fine status"}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ def books():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/books GET error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to retrieve books"}), 500
 
 
 @api_bp.route("/books", methods=["POST"])
@@ -367,7 +367,7 @@ def add_book():
         return jsonify({"success": True, "message": "Book added", "id": book_id}), 201
     except Exception as exc:
         logger.error("api/books POST error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to add book"}), 500
 
 
 @api_bp.route("/books/<int:book_id>", methods=["PUT"])
@@ -377,20 +377,22 @@ def update_book(book_id):
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     author = (data.get("author") or "").strip()
-    category = (data.get("category") or "").strip()
+    category = (data.get("category") or "").strip() or "General"
+    total_copies = data.get("total_copies")
     if not title or not author:
         return jsonify({"success": False, "error": "title and author are required"}), 400
     try:
         conn = get_db_connection(MAIN_DB)
-        params = [title, author]
-        set_clause = "title = ?, author = ?"
-        if category:
-            set_clause += ", category = ?"
-            params.append(category)
-        params.append(book_id)
-        result = conn.execute(
-            f"UPDATE Books SET {set_clause} WHERE id = ?", params
-        )
+        if total_copies is not None:
+            result = conn.execute(
+                "UPDATE Books SET title = ?, author = ?, category = ?, total_copies = ? WHERE id = ?",
+                (title, author, category, int(total_copies), book_id),
+            )
+        else:
+            result = conn.execute(
+                "UPDATE Books SET title = ?, author = ?, category = ? WHERE id = ?",
+                (title, author, category, book_id),
+            )
         conn.commit()
         conn.close()
         if result.rowcount == 0:
@@ -398,7 +400,7 @@ def update_book(book_id):
         return jsonify({"success": True, "message": "Book updated"})
     except Exception as exc:
         logger.error("api/books PUT error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to update book"}), 500
 
 
 @api_bp.route("/books/<int:book_id>", methods=["DELETE"])
@@ -415,7 +417,7 @@ def delete_book(book_id):
         return jsonify({"success": True, "message": "Book deleted"})
     except Exception as exc:
         logger.error("api/books DELETE error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to delete book"}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -442,7 +444,7 @@ def issued():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/issued GET error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to retrieve issued books"}), 500
 
 
 @api_bp.route("/issued", methods=["POST"])
@@ -483,7 +485,7 @@ def issue_book():
         return jsonify({"success": True, "message": "Book issued", "issue_id": issue_id}), 201
     except Exception as exc:
         logger.error("api/issued POST error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to issue book"}), 500
 
 
 @api_bp.route("/issued/<int:issue_id>/return", methods=["PUT"])
@@ -516,4 +518,4 @@ def return_book(issue_id):
         return jsonify({"success": True, "message": "Book marked as returned"})
     except Exception as exc:
         logger.error("api/issued return error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to process book return"}), 500

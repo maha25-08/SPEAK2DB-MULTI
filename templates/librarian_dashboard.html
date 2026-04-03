@@ -338,6 +338,10 @@
                     <label class="form-label">Category</label>
                     <input id="editBookCategory" type="text" class="form-control form-control-sm">
                 </div>
+                <div class="edit-field">
+                    <label class="form-label">Total Copies</label>
+                    <input id="editBookCopies" type="number" class="form-control form-control-sm" min="1">
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -401,8 +405,9 @@ function loadBooks() {
                 '<td>' + b.total_copies + '</td>' +
                 '<td>' + b.available_copies + '</td>' +
                 '<td>' +
-                    '<button class="btn btn-sm btn-outline-primary btn-action me-1" ' +
-                        'onclick="openEditBook(' + b.id + ',\'' + esc(b.title) + '\',\'' + esc(b.author) + '\',\'' + esc(b.category||'') + '\')">' +
+                    '<button class="btn btn-sm btn-outline-primary btn-action me-1 edit-book-btn" ' +
+                        'data-id="' + b.id + '" data-title="' + esc(b.title) + '" data-author="' + esc(b.author) + '" ' +
+                        'data-category="' + esc(b.category || '') + '" data-copies="' + b.total_copies + '">' +
                         '<i class="fas fa-edit"></i></button> ' +
                     '<button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteBook(' + b.id + ')">' +
                         '<i class="fas fa-trash"></i></button>' +
@@ -433,24 +438,29 @@ function addBook() {
     });
 }
 
-function openEditBook(id, title, author, category) {
-    document.getElementById('editBookId').value = id;
-    document.getElementById('editBookTitle').value = title;
-    document.getElementById('editBookAuthor').value = author;
-    document.getElementById('editBookCategory').value = category;
+// Delegate click on Edit buttons (uses data-* to avoid quote issues)
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.edit-book-btn');
+    if (!btn) return;
+    document.getElementById('editBookId').value = btn.dataset.id;
+    document.getElementById('editBookTitle').value = btn.dataset.title;
+    document.getElementById('editBookAuthor').value = btn.dataset.author;
+    document.getElementById('editBookCategory').value = btn.dataset.category;
+    document.getElementById('editBookCopies').value = btn.dataset.copies || 1;
     new bootstrap.Modal(document.getElementById('editBookModal')).show();
-}
+});
 
 function saveEditBook() {
     var id = document.getElementById('editBookId').value;
     var title = document.getElementById('editBookTitle').value.trim();
     var author = document.getElementById('editBookAuthor').value.trim();
     var category = document.getElementById('editBookCategory').value.trim();
+    var total_copies = parseInt(document.getElementById('editBookCopies').value) || 1;
     if (!title || !author) { toast('Title and author are required', 'error'); return; }
     fetch('/api/books/' + id, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title: title, author: author, category: category})
+        body: JSON.stringify({title: title, author: author, category: category, total_copies: total_copies})
     }).then(function(r){ return r.json(); }).then(function(json) {
         bootstrap.Modal.getInstance(document.getElementById('editBookModal')).hide();
         if (json.success) { toast('Book updated', 'success'); loadBooks(); }
@@ -544,7 +554,7 @@ function loadFines() {
                 '<td>' + f.id + '</td>' +
                 '<td>' + esc(f.student_name) + '</td>' +
                 '<td>' + esc(f.roll_number || '') + '</td>' +
-                '<td>' + parseFloat(f.fine_amount).toFixed(2) + '</td>' +
+                '<td>' + parseFloat(f.fine_amount || 0).toFixed(2) + '</td>' +
                 '<td>' + esc(f.fine_type || '') + '</td>' +
                 '<td><span class="badge ' + badge + '">' + f.status + '</span></td>' +
                 '<td>' + (f.issue_date || '').substring(0, 10) + '</td>' +
