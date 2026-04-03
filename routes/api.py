@@ -322,7 +322,7 @@ def librarian_analytics():
         })
     except Exception as exc:
         logger.error("librarian/analytics error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ def librarian_analytics():
 @api_bp.route("/books", methods=["GET"])
 @require_roles("Librarian", "Faculty", "Administrator")
 def books_list():
-    """Return all books as JSON – Librarian/Administrator only."""
+    """Return all books as JSON – Librarian/Faculty/Administrator only."""
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
@@ -343,7 +343,7 @@ def books_list():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/books GET error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 @api_bp.route("/books", methods=["POST"])
@@ -375,7 +375,7 @@ def books_add():
         return jsonify({"success": True, "message": "Book added successfully"})
     except Exception as exc:
         logger.error("api/books POST error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 @api_bp.route("/books/<int:book_id>", methods=["DELETE"])
@@ -394,4 +394,4 @@ def books_delete(book_id: int):
         return jsonify({"success": True, "message": "Book deleted successfully"})
     except Exception as exc:
         logger.error("api/books DELETE error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
