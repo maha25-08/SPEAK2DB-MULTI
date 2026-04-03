@@ -46,16 +46,30 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark" style="background:#4a148c">
         <div class="container-fluid px-4">
+            {% if role == 'Administrator' %}
             <a class="navbar-brand" href="{{ url_for('admin_dashboard_route') }}">
                 <i class="fas fa-shield-alt me-2"></i>Speak2DB — Admin Portal
             </a>
+            {% else %}
+            <a class="navbar-brand" href="{{ url_for('librarian_dashboard_route') }}">
+                <i class="fas fa-book-open me-2"></i>Speak2DB — Librarian Portal
+            </a>
+            {% endif %}
             <div class="navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
+                    {% if role == 'Administrator' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('admin_dashboard_route') }}">
                             <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('librarian_dashboard_route') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="fas fa-search me-1"></i>Query
@@ -66,6 +80,7 @@
                             <i class="fas fa-chart-bar me-1"></i>Analytics
                         </a>
                     </li>
+                    {% if role == 'Administrator' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('user_management_view') }}">
                             <i class="fas fa-users-cog me-1"></i>User Management
@@ -76,11 +91,12 @@
                             <i class="fas fa-server me-1"></i>System Statistics
                         </a>
                     </li>
+                    {% endif %}
                 </ul>
                 <div class="ms-auto d-flex align-items-center gap-3">
                     <span class="text-white">
                         Logged in as:
-                        <span class="badge bg-danger ms-1">{{ role|upper }}</span>
+                        <span class="badge {% if role == 'Administrator' %}bg-danger{% else %}bg-light text-primary{% endif %} ms-1">{{ role|upper }}</span>
                     </span>
                     <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
@@ -178,7 +194,8 @@
             </div>
         </div>
 
-        <!-- ── Query Analytics Section ──────────────────────────────────────── -->
+        <!-- ── Query Analytics Section (Administrator only) ──────────────── -->
+        {% if role == 'Administrator' %}
         <div class="page-banner mt-4" style="background:linear-gradient(135deg,#1a237e 0%,#5c6bc0 100%)">
             <h3 class="mb-1"><i class="fas fa-terminal me-2"></i>Query Analytics</h3>
             <p class="mb-0 opacity-75">Real-time statistics on how users interact with the database</p>
@@ -225,6 +242,8 @@
             </div>
         </div>
     </div>
+        {% endif %}{# end Administrator-only Query Analytics section #}
+    </div>
 
     <script>
     (function () {
@@ -267,6 +286,7 @@
         });
 
         // ── Query Analytics (fetched from /api/query_analytics) ────────────
+        {% if role == 'Administrator' %}
         let commonQueriesChart = null;
         let queriesPerDayChart = null;
 
@@ -378,6 +398,7 @@
         }
 
         loadQueryAnalytics();
+        {% endif %}{# end Administrator-only JS #}
     })();
     </script>
 </body>
