@@ -330,23 +330,6 @@ def fines():
 # Books CRUD (Librarian / Administrator)
 # ---------------------------------------------------------------------------
 
-@api_bp.route("/books", methods=["GET"])
-@require_roles("Librarian", "Faculty", "Administrator")
-def books_list():
-    """Return all books as JSON – Librarian/Faculty/Administrator only."""
-    try:
-        conn = get_db_connection(MAIN_DB)
-        rows = conn.execute(
-            "SELECT id as book_id, title, author, category, available_copies, total_copies "
-            "FROM Books ORDER BY title LIMIT 500"
-        ).fetchall()
-        conn.close()
-        return jsonify({"success": True, "data": [dict(r) for r in rows]})
-    except Exception as exc:
-        logger.error("api/books GET error: %s", exc)
-        return jsonify({"success": False, "error": "Internal server error"}), 500
-
-
 @api_bp.route("/books", methods=["POST"])
 @require_roles("Librarian", "Administrator")
 def books_add():
