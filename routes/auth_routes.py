@@ -205,6 +205,63 @@ def register_auth_routes(
         flash('Registration successful. Please sign in.', 'success')
         return redirect(url_for('login'))
 
+    @app.route('/register/student', methods=['GET', 'POST'], endpoint='register_student')
+    def register_student():
+        if request.method == 'GET':
+            return render_template('register_student.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+        branch = request.form.get('branch', DEFAULT_STUDENT_BRANCH).strip() or DEFAULT_STUDENT_BRANCH
+        year = request.form.get('year', DEFAULT_STUDENT_YEAR).strip() or DEFAULT_STUDENT_YEAR
+        phone = request.form.get('phone', DEFAULT_STUDENT_PHONE).strip()
+
+        if not username or not password or not email:
+            flash('All fields are required.', 'error')
+            return render_template('register_student.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_student.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_student.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Student', email),
+            )
+            conn.execute(
+                '''
+                INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (username, username, branch, year, email, phone, 'Student'),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Student registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_student.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Student registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_student.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
+
     @app.route('/logout', endpoint='logout')
     def logout():
         user_id = session.get('user_id')
