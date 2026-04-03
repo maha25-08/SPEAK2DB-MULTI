@@ -3,7 +3,7 @@ SQL safety gate and student-specific query rewriting for SPEAK2DB.
 """
 import re
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 
 from utils.constants import DEFAULT_QUERY_LIMIT
 
@@ -36,6 +36,158 @@ _LIBRARIAN_BLOCKED_OPS_RE = re.compile(
     r"\b(DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|PRAGMA)\b",
     re.IGNORECASE,
 )
+
+
+def get_current_student_id(conn, session: dict) -> Optional[int]:
+    """Look up the authoritative student PK for the logged-in user.
+
+    Uses ``session['user_id']`` (the roll number) to query the Students table
+    and return the integer primary key.  Returns ``None`` when the student
+    cannot be found or the session has no ``user_id``.
+
+    Parameters
+    ----------
+    conn    : An open SQLite connection to the main database.
+    session : The Flask session dict (must contain ``'user_id'``).
+    """
+    roll_number = session.get("user_id")
+    if not roll_number:
+        logger.warning("get_current_student_id: no user_id in session")
+        return None
+    try:
+        row = conn.execute(
+            "SELECT id FROM Students WHERE roll_number = ?", (roll_number,)
+        ).fetchone()
+        if row:
+            return int(row[0])
+        logger.warning("get_current_student_id: no student found for roll_number=%r", roll_number)
+        return None
+    except Exception as exc:
+        logger.error("get_current_student_id: DB error: %s", exc)
+        return None
+
+
+def is_my_query(query: str) -> bool:
+    """Return ``True`` when *query* contains a first-person possessive keyword.
+
+    Detects ``my``, ``mine``, or ``me`` as whole words so that words like
+    "time" or "some" are not falsely matched.
+    """
+    return bool(re.search(r"\b(my|mine|me)\b", query, re.IGNORECASE))
+
+
+# Regex to strip hardcoded ``student_id = <number>`` injected by the LLM.
+_HARDCODED_STUDENT_ID_RE = re.compile(
+    r"\bstudent_id\s*=\s*\d+\b",
+    re.IGNORECASE,
+)
+
+
+# Patterns for personal-intent detection (word boundaries to avoid false matches)
+_FINES_PATTERN = re.compile(r"\b(fines?|payment)\b", re.IGNORECASE)
+_BOOKS_PATTERN = re.compile(r"\b(borrowed|issued|books?)\b", re.IGNORECASE)
+_DETAILS_PATTERN = re.compile(r"\b(details?|profile|account|info|records?)\b", re.IGNORECASE)
+
+
+def enforce_student_context(
+    sql: str,
+    user_query: str,
+    session: dict,
+    conn,
+) -> str:
+    """Rewrite *sql* so that it is always scoped to the currently logged-in student.
+
+    For non-Student roles the original *sql* is returned unchanged.
+
+    Steps performed for Student role
+    ---------------------------------
+    1. Look up the authoritative ``student_id`` from the database via
+       :func:`get_current_student_id`.
+    2. Strip any hardcoded ``student_id = <number>`` literals emitted by the
+       LLM to prevent data leakage to wrong accounts.
+    3. If the natural-language *user_query* expresses personal intent (detected
+       by :func:`is_my_query`), replace *sql* with a safe, alias-correct
+       template:
+
+       * ``fines``             → ``SELECT f.id AS fine_id, …`` filtered by student
+       * ``borrowed`` / ``issued`` → ``SELECT b.book_id, …`` JOIN query with open loans
+       * ``details`` / ``profile`` / ``account`` → student profile row
+
+    4. Fall back to :func:`apply_student_filters` for broader pattern matching
+       when none of the explicit templates apply.
+
+    Parameters
+    ----------
+    sql        : SQL produced by the NL-to-SQL engine.
+    user_query : Original natural-language query from the user.
+    session    : Flask session dict.
+    conn       : Open SQLite connection used for the student lookup.
+    """
+    role = session.get("role", "")
+    if role != "Student":
+        return sql
+
+    student_id = get_current_student_id(conn, session)
+    if student_id is None:
+        # Fall back to session value so we never expose data with no filter at all
+        student_id = session.get("student_id")
+        if not student_id:
+            logger.warning("enforce_student_context: cannot determine student_id; query unchanged")
+            return sql
+    try:
+        student_id = int(student_id)
+    except (TypeError, ValueError):
+        logger.error("enforce_student_context: invalid student_id=%r", student_id)
+        return sql
+
+    # ── Step 2: Remove any hardcoded student_id injected by the LLM ─────────
+    # student_id has already been validated as int above, so direct string
+    # interpolation is safe here (no injection risk from external input).
+    sql = _HARDCODED_STUDENT_ID_RE.sub(f"student_id = {student_id}", sql)
+
+    q_lower = user_query.lower()
+
+    if not is_my_query(user_query):
+        # Not a personal query – still apply table-level row filtering
+        return apply_student_filters(user_query, sql, student_id)
+
+    # ── Step 3: Personal-intent templates ────────────────────────────────────
+    if _FINES_PATTERN.search(q_lower):
+        return (
+            f"SELECT "
+            f"f.id AS fine_id, "
+            f"f.fine_amount, "
+            f"f.fine_type, "
+            f"f.status "
+            f"FROM Fines f "
+            f"WHERE f.student_id = {student_id}"
+        )
+
+    if _BOOKS_PATTERN.search(q_lower):
+        return (
+            f"SELECT "
+            f"b.book_id, "
+            f"b.title, "
+            f"b.author "
+            f"FROM Books b "
+            f"JOIN Issued i ON b.book_id = i.book_id "
+            f"WHERE i.student_id = {student_id} "
+            f"AND i.return_date IS NULL"
+        )
+
+    if _DETAILS_PATTERN.search(q_lower):
+        return (
+            f"SELECT "
+            f"id AS student_id, "
+            f"roll_number, "
+            f"name, "
+            f"email "
+            f"FROM Students "
+            f"WHERE id = {student_id}"
+        )
+
+    # ── Step 4: Broader pattern matching via existing helper ─────────────────
+    return apply_student_filters(user_query, sql, student_id)
 
 
 def validate_sql_query(query: str, role: str) -> bool:
