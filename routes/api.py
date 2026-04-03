@@ -256,7 +256,7 @@ def librarian_analytics():
         })
     except Exception as exc:
         logger.error("librarian/analytics error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ def books():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/books error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 # ---------------------------------------------------------------------------

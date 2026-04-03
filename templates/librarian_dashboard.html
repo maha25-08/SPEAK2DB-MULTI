@@ -388,7 +388,7 @@
                 .then(res => res.json())
                 .then(data => {
                     const table = document.getElementById('booksTable');
-                    if (!data.success || !data.data.length) {
+                    if (!data.success || !(data.data && data.data.length)) {
                         table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No books found.</td></tr>';
                         return;
                     }
@@ -417,7 +417,7 @@
             fetch('/api/books/' + bookId, { method: 'DELETE' })
                 .then(res => res.json())
                 .then(data => {
-                    showMessage(data.message || 'Operation Successful');
+                    showMessage(data.message || 'Book deleted successfully');
                     loadBooks();
                 })
                 .catch(() => showMessage('Delete failed.', true));
@@ -428,7 +428,7 @@
                 .then(res => res.json())
                 .then(data => {
                     const table = document.getElementById('issuedBooksTable');
-                    if (!data.success || !data.data.length) {
+                    if (!data.success || !(data.data && data.data.length)) {
                         table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No issued books.</td></tr>';
                         return;
                     }
@@ -453,7 +453,7 @@
                 .then(res => res.json())
                 .then(data => {
                     const table = document.getElementById('finesTable');
-                    if (!data.success || !data.data.length) {
+                    if (!data.success || !(data.data && data.data.length)) {
                         table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No fines found.</td></tr>';
                         return;
                     }
