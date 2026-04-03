@@ -271,6 +271,96 @@
                 </div>
             </div>
         </div>
+
+        <!-- Operation message -->
+        <div id="message" class="alert alert-success" style="display:none;"></div>
+
+        <!-- Books Management -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#1a237e;">
+                <span><i class="fas fa-book me-2"></i>Books Management</span>
+                <button class="btn btn-light btn-sm" onclick="loadBooks()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Category</th>
+                                <th>Available</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="booksTable">
+                            <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issued Books Management -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#1565c0;">
+                <span><i class="fas fa-book-reader me-2"></i>Issued Books</span>
+                <button class="btn btn-light btn-sm" onclick="loadIssuedBooks()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Roll No.</th>
+                                <th>Student</th>
+                                <th>Book</th>
+                                <th>Issue Date</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="issuedBooksTable">
+                            <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fines Management -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#ad1457;">
+                <span><i class="fas fa-money-bill-wave me-2"></i>Fines</span>
+                <button class="btn btn-light btn-sm" onclick="loadFines()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Roll No.</th>
+                                <th>Student</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finesTable">
+                            <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
@@ -284,5 +374,111 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/script.js"></script>
+    <script>
+        function showMessage(text, isError) {
+            const msg = document.getElementById('message');
+            msg.className = 'alert ' + (isError ? 'alert-danger' : 'alert-success');
+            msg.innerText = text;
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+        }
+
+        function loadBooks() {
+            fetch('/api/books')
+                .then(res => res.json())
+                .then(data => {
+                    const table = document.getElementById('booksTable');
+                    if (!data.success || !data.data.length) {
+                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No books found.</td></tr>';
+                        return;
+                    }
+                    table.innerHTML = data.data.map(book => `
+                        <tr>
+                            <td>${book.book_id}</td>
+                            <td>${book.title}</td>
+                            <td>${book.author}</td>
+                            <td>${book.category || ''}</td>
+                            <td>${book.available_copies}/${book.total_copies}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="deleteBook(${book.book_id})">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </td>
+                        </tr>`).join('');
+                })
+                .catch(() => {
+                    document.getElementById('booksTable').innerHTML =
+                        '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load books.</td></tr>';
+                });
+        }
+
+        function deleteBook(bookId) {
+            if (!confirm('Delete this book?')) return;
+            fetch('/api/books/' + bookId, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(data => {
+                    showMessage(data.message || 'Operation Successful');
+                    loadBooks();
+                })
+                .catch(() => showMessage('Delete failed.', true));
+        }
+
+        function loadIssuedBooks() {
+            fetch('/api/issued_books')
+                .then(res => res.json())
+                .then(data => {
+                    const table = document.getElementById('issuedBooksTable');
+                    if (!data.success || !data.data.length) {
+                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No issued books.</td></tr>';
+                        return;
+                    }
+                    table.innerHTML = data.data.map(item => `
+                        <tr>
+                            <td>${item.roll_number || ''}</td>
+                            <td>${item.student_name || ''}</td>
+                            <td>${item.title || ''}</td>
+                            <td>${item.issue_date || ''}</td>
+                            <td>${item.due_date || ''}</td>
+                            <td><span class="badge bg-${item.status === 'Overdue' ? 'danger' : 'primary'}">${item.status || 'Active'}</span></td>
+                        </tr>`).join('');
+                })
+                .catch(() => {
+                    document.getElementById('issuedBooksTable').innerHTML =
+                        '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load issued books.</td></tr>';
+                });
+        }
+
+        function loadFines() {
+            fetch('/api/fines')
+                .then(res => res.json())
+                .then(data => {
+                    const table = document.getElementById('finesTable');
+                    if (!data.success || !data.data.length) {
+                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No fines found.</td></tr>';
+                        return;
+                    }
+                    table.innerHTML = data.data.map(fine => `
+                        <tr>
+                            <td>${fine.roll_number || ''}</td>
+                            <td>${fine.student_name || ''}</td>
+                            <td>₹${fine.fine_amount || 0}</td>
+                            <td>${fine.fine_type || ''}</td>
+                            <td><span class="badge bg-${fine.status === 'Unpaid' ? 'danger' : 'success'}">${fine.status || ''}</span></td>
+                            <td>${fine.issue_date || ''}</td>
+                        </tr>`).join('');
+                })
+                .catch(() => {
+                    document.getElementById('finesTable').innerHTML =
+                        '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load fines.</td></tr>';
+                });
+        }
+
+        // Load all tables on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBooks();
+            loadIssuedBooks();
+            loadFines();
+        });
+    </script>
 </body>
 </html>
