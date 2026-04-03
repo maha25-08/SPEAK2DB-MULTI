@@ -213,12 +213,13 @@ def register_auth_routes(
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         email = request.form.get('email', '').strip().lower()
-        branch = request.form.get('branch', DEFAULT_STUDENT_BRANCH).strip() or DEFAULT_STUDENT_BRANCH
-        year = request.form.get('year', DEFAULT_STUDENT_YEAR).strip() or DEFAULT_STUDENT_YEAR
-        phone = request.form.get('phone', DEFAULT_STUDENT_PHONE).strip()
+        name = request.form.get('name', '').strip() or username
+        branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
+        year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
+        phone = request.form.get('phone', '').strip()
 
         if not username or not password or not email:
-            flash('All fields are required.', 'error')
+            flash('Roll number, password, and email are required.', 'error')
             return render_template('register_student.html')
         if not _EMAIL_PATTERN.match(email):
             flash('Please enter a valid email address.', 'error')
@@ -243,7 +244,7 @@ def register_auth_routes(
                 INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''',
-                (username, username, branch, year, email, phone, 'Student'),
+                (username, name, branch, year, email, phone, 'Student'),
             )
             conn.commit()
         except sqlite3.IntegrityError as exc:
