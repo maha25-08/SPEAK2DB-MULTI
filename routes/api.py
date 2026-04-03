@@ -236,8 +236,25 @@ def query_analytics():
 # Data endpoints (Librarian / Administrator only)
 # ---------------------------------------------------------------------------
 
-@api_bp.route("/students")
+
+@api_bp.route("/books")
 @require_roles("Librarian", "Faculty", "Administrator")
+def books():
+    """Return all books as JSON – Librarian/Administrator only."""
+    logger.info("api/books accessed by role: %s", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            "SELECT id, title, author, category, total_copies, available_copies "
+            "FROM Books ORDER BY title LIMIT 500"
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as exc:
+        logger.error("api/books error: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 def students():
     """Return all students as JSON – Librarian/Administrator only."""
     logger.info("api/students accessed by role: %s", session.get("role"))
