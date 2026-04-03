@@ -137,7 +137,17 @@ def register_auth_routes(
                 (username, generate_password_hash(password), role, email),
             )
             if role == 'Student':
-                _create_student_profile(conn, username, email, request.form)
+                student_name = request.form.get('name', '').strip() or username
+                student_branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
+                student_year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
+                student_phone = request.form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
+                conn.execute(
+                    '''
+                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (username, student_name, student_branch, student_year, email, student_phone, role),
+                )
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
@@ -272,10 +282,10 @@ def register_auth_routes(
         name = request.form.get('name', '').strip() or username
         branch = request.form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
         year = request.form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
-        phone = request.form.get('phone', '').strip()
+        phone = request.form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
 
         if not username or not password or not email:
-            flash('Roll number, password, and email are required.', 'error')
+            flash('Username, password, and email are required.', 'error')
             return render_template('register_student.html')
         if not _EMAIL_PATTERN.match(email):
             flash('Please enter a valid email address.', 'error')
@@ -377,3 +387,10 @@ def register_auth_routes(
 
         flash('Registration successful. Please sign in.', 'success')
         return redirect(url_for('login'))
+
+    @app.route('/auth/register', methods=['GET', 'POST'], endpoint='auth_register')
+    def auth_register():
+        """Alias for /register – keeps the /auth/* URL pattern consistent."""
+        if request.method == 'POST':
+            return redirect(url_for('register'), code=307)
+        return render_template('register.html')
