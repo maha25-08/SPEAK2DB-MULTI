@@ -240,7 +240,7 @@ def query_analytics():
 @api_bp.route("/books")
 @require_roles("Librarian", "Faculty", "Administrator")
 def books():
-    """Return all books as JSON – Librarian/Administrator only."""
+    """Return all books as JSON – Librarian/Faculty/Administrator only."""
     logger.info("api/books accessed by role: %s", session.get("role"))
     try:
         conn = get_db_connection(MAIN_DB)
@@ -252,9 +252,11 @@ def books():
         return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as exc:
         logger.error("api/books error: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify({"success": False, "error": "Failed to retrieve books"}), 500
 
 
+@api_bp.route("/students")
+@require_roles("Librarian", "Faculty", "Administrator")
 def students():
     """Return all students as JSON – Librarian/Administrator only."""
     logger.info("api/students accessed by role: %s", session.get("role"))
