@@ -219,11 +219,8 @@ def librarian_dashboard():
 
     stats = get_library_stats()
 
-    username = session.get("username", user_id)
-    template = _LIBRARIAN_TEMPLATES.get(username, "librarian_dashboard.html")
-
     return render_template(
-        template,
+        "librarian_dashboard.html",
         role=role,
         user=user_id,
         stats=stats,
