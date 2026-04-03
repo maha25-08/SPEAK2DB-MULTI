@@ -87,7 +87,22 @@ def register_auth_routes(
             return redirect(url_for('faculty_dashboard_route'))
         return redirect(url_for('index'))
 
+    def _create_student_profile(conn, username, email, form):
+        """Insert a student row using form fields, falling back to defaults."""
+        student_name = form.get('name', '').strip() or username
+        student_branch = form.get('branch', '').strip() or DEFAULT_STUDENT_BRANCH
+        student_year = form.get('year', '').strip() or DEFAULT_STUDENT_YEAR
+        student_phone = form.get('phone', '').strip() or DEFAULT_STUDENT_PHONE
+        conn.execute(
+            '''
+            INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (username, student_name, student_branch, student_year, email, student_phone, 'Student'),
+        )
+
     @app.route('/register', methods=['GET', 'POST'], endpoint='register')
+    @app.route('/auth/register', methods=['GET'], endpoint='auth_register')
     def register():
         if request.method == 'GET':
             return render_template('register.html')
@@ -122,14 +137,7 @@ def register_auth_routes(
                 (username, generate_password_hash(password), role, email),
             )
             if role == 'Student':
-                student_name = username
-                conn.execute(
-                    '''
-                    INSERT INTO Students (roll_number, name, branch, year, email, phone, role)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ''',
-                    (username, student_name, DEFAULT_STUDENT_BRANCH, DEFAULT_STUDENT_YEAR, email, DEFAULT_STUDENT_PHONE, role),
-                )
+                _create_student_profile(conn, username, email, request.form)
             conn.commit()
         except sqlite3.IntegrityError as exc:
             conn.rollback()
@@ -141,6 +149,54 @@ def register_auth_routes(
             logger.error('Registration error for %s: %s', username, exc)
             flash('Unable to create account right now.', 'error')
             return render_template('register.html')
+        finally:
+            conn.close()
+
+        flash('Registration successful. Please sign in.', 'success')
+        return redirect(url_for('login'))
+
+    @app.route('/register/student', methods=['GET', 'POST'], endpoint='register_student')
+    def register_student():
+        if request.method == 'GET':
+            return render_template('register_student.html')
+
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        email = request.form.get('email', '').strip().lower()
+
+        if not username or not password or not email:
+            flash('Username, password, and email are required.', 'error')
+            return render_template('register_student.html')
+        if not _EMAIL_PATTERN.match(email):
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register_student.html')
+
+        conn = get_db_connection(main_db_getter())
+        try:
+            existing_user = conn.execute(
+                'SELECT 1 FROM Users WHERE username = ? OR email = ?',
+                (username, email),
+            ).fetchone()
+            if existing_user:
+                flash('Username or email already exists.', 'error')
+                return render_template('register_student.html')
+
+            conn.execute(
+                'INSERT INTO Users (username, password, role, email) VALUES (?, ?, ?, ?)',
+                (username, generate_password_hash(password), 'Student', email),
+            )
+            _create_student_profile(conn, username, email, request.form)
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            logger.warning('Student registration failed for %s: %s', username, exc)
+            flash('Username or email already exists.', 'error')
+            return render_template('register_student.html')
+        except Exception as exc:
+            conn.rollback()
+            logger.error('Student registration error for %s: %s', username, exc)
+            flash('Unable to create account right now.', 'error')
+            return render_template('register_student.html')
         finally:
             conn.close()
 
