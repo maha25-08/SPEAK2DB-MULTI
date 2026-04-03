@@ -209,7 +209,7 @@ def apply_student_filters(user_query: str, sql_query: str, student_id: int) -> s
         return sql_query
 
     _fines_base = (
-        f"SELECT f.*, s.name as student_name FROM Fines f "
+        f"SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f "
         f"JOIN Students s ON f.student_id = s.id "
         f"WHERE f.student_id = {sid}"
     )

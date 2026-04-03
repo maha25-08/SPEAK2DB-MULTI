@@ -285,7 +285,7 @@ def fines():
     try:
         conn = get_db_connection(MAIN_DB)
         rows = conn.execute(
-            """SELECT f.id, s.roll_number, s.name as student_name,
+            """SELECT f.id AS fine_id, s.roll_number, s.name as student_name,
                       f.fine_amount, f.fine_type, f.status, f.issue_date
                FROM Fines f
                JOIN Students s ON f.student_id = s.id
