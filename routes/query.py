@@ -11,6 +11,7 @@ from utils.sql_safety import (
     is_safe_sql,
     apply_student_filters,
     enforce_student_filter,
+    enforce_student_context,
     validate_sql_query,
     fallback_columns,
     ensure_limit,
@@ -162,13 +163,13 @@ def query():
             except (TypeError, ValueError):
                 logger.error("Invalid student_id in session: %r", student_id)
 
-        # ── Step 7: Student-specific SQL rewriting (enforce_student_filter) ────
-        # Override AI-generated SQL to always scope results to the logged-in
-        # student.  Detects "my", "borrowed", "fines" intent and replaces the
-        # SQL with a correct, join-aware query.
-        logger.debug("Role: %s | Student filter applied: %s", user_role, student_id)
-        if user_role == "Student" and student_id:
-            sql_query = enforce_student_filter(user_query, sql_query, session)
+        # ── Step 7: Student-specific SQL rewriting (enforce_student_context) ──
+        # Re-fetches student_id from the DB to guarantee correctness, strips
+        # any hardcoded student_id injected by the LLM, and rewrites personal
+        # ("my …") queries with safe, alias-correct SQL templates.
+        logger.debug("Role: %s | Student context enforcement: %s", user_role, student_id)
+        if user_role == "Student":
+            sql_query = enforce_student_context(sql_query, user_query, session, conn)
 
         # ── Step 8: Security layer – validate_sql_query ──────────────────────
         # Blocks DDL/DML, UNION injection, and table-access violations.
