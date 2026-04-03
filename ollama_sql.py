@@ -42,7 +42,7 @@ _REGEX_RULES = [
      "SELECT id,name,roll_number FROM Students"),
     # Fines – simple/generic
     (re.compile(r"^(show|list|display)\s+(all\s+)?fines?\s*$", re.IGNORECASE),
-     "SELECT * FROM Fines"),
+     "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date FROM Fines f"),
     # Issued books
     (re.compile(r"^(show|list|display)\s+(all\s+)?issued\s+books?\s*$", re.IGNORECASE),
      "SELECT * FROM Issued"),
@@ -133,17 +133,17 @@ _RULE_DICT = [
      "JOIN Issued i ON s.id=i.student_id WHERE i.return_date IS NULL"),
     # ── Fines ───────────────────────────────────────────────────────────────
     ("show all fines with amount and status",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status "
      "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.fine_amount DESC"),
     ("fines with amount and status",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status "
      "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.fine_amount DESC"),
     ("show fines where status is unpaid",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status "
      "FROM Fines f JOIN Students s ON f.student_id=s.id WHERE f.status='Unpaid' "
      "ORDER BY f.fine_amount DESC"),
     ("fines where status is unpaid",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status "
      "FROM Fines f JOIN Students s ON f.student_id=s.id WHERE f.status='Unpaid' "
      "ORDER BY f.fine_amount DESC"),
     ("show total fine amount per student",
@@ -159,10 +159,10 @@ _RULE_DICT = [
      "FROM Students s JOIN Fines f ON s.id=f.student_id "
      "GROUP BY s.id,s.name,s.roll_number ORDER BY total_fines DESC"),
     ("show fines ordered by issue date",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
      "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.issue_date DESC"),
     ("recent fines",
-     "SELECT f.id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
+     "SELECT f.id AS fine_id,s.name as student_name,f.fine_amount,f.status,f.issue_date "
      "FROM Fines f JOIN Students s ON f.student_id=s.id ORDER BY f.issue_date DESC"),
     # ── Issued / Lending ─────────────────────────────────────────────────────
     ("show books currently issued that have not been returned",
@@ -408,7 +408,7 @@ def generate_complex_sql(user_query):
         return "SELECT i.*, b.title, s.name as student_name FROM Issued i JOIN Books b ON i.book_id = b.id JOIN Students s ON i.student_id = s.id"
 
     elif any(k in query_lower for k in ["show fines", "list fines", "display fines", "all fines", "students with fines"]):
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.fine_amount DESC"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.fine_amount DESC"
 
     elif any(k in query_lower for k in ["overdue books", "show overdue", "list overdue"]):
         return "SELECT i.*, b.title, s.name as student_name FROM Issued i JOIN Books b ON i.book_id = b.id JOIN Students s ON i.student_id = s.id WHERE i.return_date IS NULL AND i.due_date < date('now')"
@@ -428,7 +428,7 @@ def generate_complex_sql(user_query):
         return "SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] ORDER BY i.issue_date DESC"
 
     elif any(k in query_lower for k in ["my fines", "my unpaid fines", "my fine"]):
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = [CURRENT_STUDENT_ID]"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = [CURRENT_STUDENT_ID]"
 
     elif any(k in query_lower for k in ["my reservations", "my reserved books", "books i reserved"]):
         return "SELECT r.*, b.title, b.author FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = [CURRENT_STUDENT_ID] ORDER BY r.reservation_date DESC"
@@ -487,7 +487,7 @@ def generate_complex_sql(user_query):
         return "SELECT id, title, author, category, available_copies FROM Books ORDER BY title"
 
     elif "display fine records" in query_lower or "show fine records" in query_lower:
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.issue_date DESC"
     
     elif "find books with reservation queue longer than 5" in query_lower or "queue longer than" in query_lower:
         return "SELECT b.title, COUNT(r.id) as queue_length FROM Books b JOIN Reservations r ON b.id = r.book_id WHERE r.status = 'Waiting' GROUP BY b.id, b.title HAVING COUNT(r.id) > 5 ORDER BY queue_length DESC"
@@ -521,7 +521,7 @@ def generate_complex_sql(user_query):
         return "SELECT i.*, b.title, b.author FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] ORDER BY i.issue_date DESC"
     
     elif "display my current fines" in query_lower or "my current fines" in query_lower:
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = [CURRENT_STUDENT_ID] AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.student_id = [CURRENT_STUDENT_ID] AND f.status = 'Unpaid' ORDER BY f.issue_date DESC"
     
     elif "find books recommended for my major" in query_lower or "books recommended for my major" in query_lower:
         return "SELECT DISTINCT b.* FROM Books b JOIN Students s ON b.department_id = s.branch WHERE s.id = [CURRENT_STUDENT_ID] AND b.id NOT IN (SELECT book_id FROM Issued WHERE student_id = [CURRENT_STUDENT_ID]) ORDER BY b.title LIMIT 10"
@@ -1547,7 +1547,7 @@ def generate_complex_sql(user_query):
         return "SELECT i.*, b.title, b.author, DATEDAY(i.due_date, date('now')) as days_overdue FROM Issued i JOIN Books b ON i.book_id = b.id WHERE i.student_id = [CURRENT_STUDENT_ID] AND i.return_date IS NULL AND i.due_date < date('now')"
     
     elif "show my fines and payments" in query_lower or "my fines" in query_lower:
-        return "SELECT f.*, p.payment_date, p.amount as payment_amount FROM Fines f LEFT JOIN Payments p ON f.id = p.fine_id WHERE f.student_id = [CURRENT_STUDENT_ID] ORDER BY f.issue_date DESC"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, p.payment_date, p.amount as payment_amount FROM Fines f LEFT JOIN Payments p ON f.id = p.fine_id WHERE f.student_id = [CURRENT_STUDENT_ID] ORDER BY f.issue_date DESC"
     
     elif "display my reservation status" in query_lower or "my reservation" in query_lower:
         return "SELECT r.*, b.title, b.author, r.position_in_queue FROM Reservations r JOIN Books b ON r.book_id = b.id WHERE r.student_id = [CURRENT_STUDENT_ID] ORDER BY r.reservation_date DESC"
@@ -1829,7 +1829,7 @@ def generate_complex_sql(user_query):
         return "SELECT f.name, f.email, COUNT(DISTINCT s.id) as student_count FROM Faculty f JOIN Students s ON f.department_id = s.branch GROUP BY f.id, f.name, f.email HAVING COUNT(DISTINCT s.id) > 10 ORDER BY student_count DESC"
     
     elif "find most expensive fines" in query_lower or "most expensive fines" in query_lower or "highest fines" in query_lower:
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.fine_amount DESC LIMIT 10"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id ORDER BY f.fine_amount DESC LIMIT 10"
     
     elif "show books due next week" in query_lower or "books due next week" in query_lower:
         return "SELECT i.*, b.title, s.name as student_name FROM Issued i JOIN Books b ON i.book_id = b.id JOIN Students s ON i.student_id = s.id WHERE i.due_date BETWEEN date('now') AND date('now', '+7 days') AND i.return_date IS NULL"
@@ -1870,7 +1870,7 @@ def generate_complex_sql(user_query):
             return "SELECT * FROM Books WHERE publish_date > '2019-01-01'"
     
     elif "display fines issued in last 30 days" in query_lower or "fines last 30 days" in query_lower:
-        return "SELECT f.*, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.issue_date >= date('now', '-30 days') ORDER BY f.issue_date DESC"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date, s.name as student_name FROM Fines f JOIN Students s ON f.student_id = s.id WHERE f.issue_date >= date('now', '-30 days') ORDER BY f.issue_date DESC"
     
     elif "display average fine per department" in query_lower or "average fine per department" in query_lower:
         return "SELECT d.name, AVG(f.fine_amount) as avg_fine, COUNT(f.id) as fine_count FROM Departments d JOIN Students s ON d.id = s.branch JOIN Fines f ON s.id = f.student_id GROUP BY d.id, d.name ORDER BY avg_fine DESC"
@@ -1889,7 +1889,7 @@ def generate_complex_sql(user_query):
         return "SELECT DISTINCT s.* FROM Students s JOIN Fines f ON s.id = f.student_id"
     
     elif "unpaid fines" in query_lower:
-        return "SELECT * FROM Fines WHERE status = 'Unpaid'"
+        return "SELECT f.id AS fine_id, f.student_id, f.fine_amount, f.fine_type, f.status, f.issue_date FROM Fines f WHERE f.status = 'Unpaid'"
     
     # NESTED QUERIES - Multi-table complex conditions
     elif "borrowed books from" in query_lower and "category" in query_lower:
