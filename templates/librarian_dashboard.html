@@ -505,6 +505,35 @@
                 </div>
             </div>
         </div>
+
+        <!-- Books Catalogue -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background:#1a237e;">
+                <span><i class="fas fa-book me-2"></i>Books Catalogue</span>
+                <button class="btn btn-outline-light btn-sm" onclick="loadBooks()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Category</th>
+                                <th>Total</th>
+                                <th>Available</th>
+                            </tr>
+                        </thead>
+                        <tbody id="booksTableBody">
+                            <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -740,110 +769,42 @@ function updateFineStatus(fineId, status) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/script.js"></script>
     <script>
-        function showMessage(text, isError) {
-            const msg = document.getElementById('message');
-            msg.className = 'alert ' + (isError ? 'alert-danger' : 'alert-success');
-            msg.innerText = text;
-            msg.style.display = 'block';
-            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+        function escHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         function loadBooks() {
             fetch('/api/books')
-                .then(res => res.json())
-                .then(data => {
-                    const table = document.getElementById('booksTable');
-                    if (!data.success || !(data.data && data.data.length)) {
-                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No books found.</td></tr>';
+                .then(function(res) { return res.json(); })
+                .then(function(json) {
+                    var tbody = document.getElementById('booksTableBody');
+                    if (!json.success) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load books.</td></tr>';
                         return;
                     }
-                    table.innerHTML = data.data.map(book => `
-                        <tr>
-                            <td>${book.book_id}</td>
-                            <td>${book.title}</td>
-                            <td>${book.author}</td>
-                            <td>${book.category || ''}</td>
-                            <td>${book.available_copies}/${book.total_copies}</td>
-                            <td>
-                                <button class="btn btn-danger btn-sm" onclick="deleteBook(${book.book_id})">
-                                    <i class="fas fa-trash me-1"></i>Delete
-                                </button>
-                            </td>
-                        </tr>`).join('');
+                    if (!json.data.length) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No books found.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = json.data.map(function(b) {
+                        return '<tr>' +
+                            '<td>' + escHtml(b.id) + '</td>' +
+                            '<td>' + escHtml(b.title || '') + '</td>' +
+                            '<td>' + escHtml(b.author || '') + '</td>' +
+                            '<td>' + escHtml(b.category || '') + '</td>' +
+                            '<td>' + escHtml(b.total_copies || 0) + '</td>' +
+                            '<td>' + escHtml(b.available_copies || 0) + '</td>' +
+                            '</tr>';
+                    }).join('');
                 })
-                .catch(() => {
-                    document.getElementById('booksTable').innerHTML =
+                .catch(function() {
+                    document.getElementById('booksTableBody').innerHTML =
                         '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load books.</td></tr>';
                 });
         }
 
-        function deleteBook(bookId) {
-            if (!confirm('Delete this book?')) return;
-            fetch('/api/books/' + bookId, { method: 'DELETE' })
-                .then(res => res.json())
-                .then(data => {
-                    showMessage(data.message || 'Book deleted successfully');
-                    loadBooks();
-                })
-                .catch(() => showMessage('Delete failed.', true));
-        }
-
-        function loadIssuedBooks() {
-            fetch('/api/issued_books')
-                .then(res => res.json())
-                .then(data => {
-                    const table = document.getElementById('issuedBooksTable');
-                    if (!data.success || !(data.data && data.data.length)) {
-                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No issued books.</td></tr>';
-                        return;
-                    }
-                    table.innerHTML = data.data.map(item => `
-                        <tr>
-                            <td>${item.roll_number || ''}</td>
-                            <td>${item.student_name || ''}</td>
-                            <td>${item.title || ''}</td>
-                            <td>${item.issue_date || ''}</td>
-                            <td>${item.due_date || ''}</td>
-                            <td><span class="badge bg-${item.status === 'Overdue' ? 'danger' : 'primary'}">${item.status || 'Active'}</span></td>
-                        </tr>`).join('');
-                })
-                .catch(() => {
-                    document.getElementById('issuedBooksTable').innerHTML =
-                        '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load issued books.</td></tr>';
-                });
-        }
-
-        function loadFines() {
-            fetch('/api/fines')
-                .then(res => res.json())
-                .then(data => {
-                    const table = document.getElementById('finesTable');
-                    if (!data.success || !(data.data && data.data.length)) {
-                        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No fines found.</td></tr>';
-                        return;
-                    }
-                    table.innerHTML = data.data.map(fine => `
-                        <tr>
-                            <td>${fine.roll_number || ''}</td>
-                            <td>${fine.student_name || ''}</td>
-                            <td>₹${fine.fine_amount || 0}</td>
-                            <td>${fine.fine_type || ''}</td>
-                            <td><span class="badge bg-${fine.status === 'Unpaid' ? 'danger' : 'success'}">${fine.status || ''}</span></td>
-                            <td>${fine.issue_date || ''}</td>
-                        </tr>`).join('');
-                })
-                .catch(() => {
-                    document.getElementById('finesTable').innerHTML =
-                        '<tr><td colspan="6" class="text-center text-danger py-3">Failed to load fines.</td></tr>';
-                });
-        }
-
-        // Load all tables on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadBooks();
-            loadIssuedBooks();
-            loadFines();
-        });
+        window.addEventListener('load', function() { loadBooks(); });
     </script>
 </body>
 </html>
