@@ -91,6 +91,22 @@
         .toast-error   { background: #c62828; }
         .toast-info    { background: #0d6efd; }
         .toast-warning { background: #e65100; }
+        .voice-status {
+            margin-top: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            background: #eef4ff;
+            border: 1px solid #c5d8f5;
+            color: #1a3a6b;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .voice-status:empty { display: none; }
+        .voice-status.status-listening { background: #fff7e6; border-color: #ffd38a; color: #7a4b00; }
+        .voice-status.status-error     { background: #fff1f0; border-color: #ffb3b3; color: #a61d24; }
+        .voice-status.status-warning   { background: #fff8e1; border-color: #f1d48b; color: #7a5a00; }
+        .voice-status .btn-clarification { margin-left: 0.5rem; }
+        .voice-status-note { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: #4a5d7a; }
     </style>
 </head>
 <body>
@@ -242,10 +258,11 @@
                         <button class="btn btn-outline-secondary btn-sm" onclick="clearQuery()">
                             <i class="fas fa-times me-1"></i>Clear
                         </button>
-                        <button id="micBtn" class="btn btn-outline-primary btn-sm">
+                        <button id="micBtn" class="btn btn-outline-primary btn-sm" type="button" title="Push to talk">
                             <i class="fas fa-microphone me-1"></i>Voice Input
                         </button>
                     </div>
+                    <div id="voiceStatus" class="voice-status mt-2" aria-live="polite"></div>
 
                     <!-- Clarification Card -->
                     <div class="clarification-card mt-3" id="clarificationCard" style="display:none">
