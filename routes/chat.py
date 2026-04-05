@@ -91,11 +91,11 @@ def _extract_title_author(text: str) -> dict:
         flags=re.IGNORECASE,
     ).strip()
 
-    # "TITLE by AUTHOR"
-    m = re.match(r'^(.+?)\s+by\s+(.+)$', clean, re.IGNORECASE)
-    if m:
-        data["title"] = m.group(1).strip().strip('"').strip("'")
-        data["author"] = m.group(2).strip().strip('"').strip("'")
+    # "TITLE by AUTHOR" – use split instead of backtracking regex to avoid ReDoS
+    parts = re.split(r'\s+by\s+', clean, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        data["title"] = parts[0].strip().strip('"').strip("'")
+        data["author"] = parts[1].strip().strip('"').strip("'")
         return data
 
     # Just a title without author
@@ -109,10 +109,10 @@ def _extract_copies(text: str) -> Optional[int]:
     m = re.search(r'\b(\d+)\s*cop(?:y|ies)\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m = re.search(r'\bcopies?\s*(?:=|:)?\s*(\d+)\b', text, re.IGNORECASE)
+    m = re.search(r'\bcopies?\s*[=:]\s*(\d+)\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m = re.search(r'\bset\b.*?\bto\b.*?\b(\d+)\b', text, re.IGNORECASE)
+    m = re.search(r'\bset\b[^,;]{0,50}\bto\b[^,;]{0,20}\b(\d+)\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
     return None
@@ -125,8 +125,10 @@ def _extract_entities(text: str, intent: str) -> dict:
     if copies is not None:
         data["copies"] = copies
 
-    # Category: "category: X" or "in X category"
-    m = re.search(r'\bcategory\s*(?::|\s)\s*([A-Za-z][^\s,]+)', text, re.IGNORECASE)
+    # Category: "category: X" or "category X"
+    m = re.search(r'\bcategory\s*[=:]\s*([A-Za-z][^\s,]{0,50})', text, re.IGNORECASE)
+    if not m:
+        m = re.search(r'\bcategory\s+([A-Za-z][^\s,]{0,50})', text, re.IGNORECASE)
     if m:
         data["category"] = m.group(1).strip()
 
@@ -180,7 +182,7 @@ def _add_book(data: dict) -> dict:
         )
         conn.commit()
         conn.close()
-        print(f"[Chat] Book added: title={title!r}, author={author!r}, copies={copies}")
+        logger.info("[Chat] Book added: title=%r, author=%r, copies=%d", title, author, copies)
         return {
             "message": f'Book "{title}" by {author} added successfully!',
             "action": "add",
@@ -189,7 +191,7 @@ def _add_book(data: dict) -> dict:
         }
     except Exception as exc:
         logger.error("chat add_book error: %s", exc)
-        return {"message": f"Failed to add book: {exc}", "action": "add", "success": False}
+        return {"message": "Failed to add book due to a database error.", "action": "add", "success": False}
 
 
 def _delete_book(data: dict) -> dict:
@@ -208,7 +210,7 @@ def _delete_book(data: dict) -> dict:
         conn.execute("DELETE FROM Books WHERE id = ?", (existing["id"],))
         conn.commit()
         conn.close()
-        print(f"[Chat] Book deleted: title={title!r}")
+        logger.info("[Chat] Book deleted: title=%r", title)
         return {
             "message": f'Book "{existing["title"]}" deleted successfully.',
             "action": "delete",
@@ -217,7 +219,7 @@ def _delete_book(data: dict) -> dict:
         }
     except Exception as exc:
         logger.error("chat delete_book error: %s", exc)
-        return {"message": f"Failed to delete book: {exc}", "action": "delete", "success": False}
+        return {"message": "Failed to delete book due to a database error.", "action": "delete", "success": False}
 
 
 def _update_book(data: dict) -> dict:
@@ -250,7 +252,7 @@ def _update_book(data: dict) -> dict:
         )
         conn.commit()
         conn.close()
-        print(f"[Chat] Book updated: title={title!r}")
+        logger.info("[Chat] Book updated: title=%r", title)
         return {
             "message": f'Book "{existing["title"]}" updated successfully.',
             "action": "update",
@@ -259,7 +261,7 @@ def _update_book(data: dict) -> dict:
         }
     except Exception as exc:
         logger.error("chat update_book error: %s", exc)
-        return {"message": f"Failed to update book: {exc}", "action": "update", "success": False}
+        return {"message": "Failed to update book due to a database error.", "action": "update", "success": False}
 
 
 # ---------------------------------------------------------------------------
@@ -294,11 +296,11 @@ def _absorb_answer(answer: str, pending_field: str, data: dict) -> dict:
             flags=re.IGNORECASE,
         ).strip()
         # Also handle "by AUTHOR" if provided together with title in the answer
-        m_by = re.match(r'^(.+?)\s+by\s+(.+)$', clean, re.IGNORECASE)
-        if m_by:
-            data["title"] = m_by.group(1).strip().strip('"').strip("'")
+        parts_by = re.split(r'\s+by\s+', clean, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts_by) == 2:
+            data["title"] = parts_by[0].strip().strip('"').strip("'")
             if not data.get("author"):
-                data["author"] = m_by.group(2).strip().strip('"').strip("'")
+                data["author"] = parts_by[1].strip().strip('"').strip("'")
         elif clean:
             data["title"] = clean.strip('"').strip("'")
     elif pending_field in ("copies",):
@@ -330,9 +332,9 @@ def chat():
     Request body: { "message": "<user text>" }
     """
     body = request.get_json(silent=True) or {}
-    user_text = (body.get("message") or "").strip()
+    user_text = (body.get("message") or "").strip()[:500]  # truncate to prevent ReDoS
 
-    print(f"[Chat] User input: {user_text!r}")
+    logger.debug("[Chat] User input: %r", user_text)
 
     if not user_text:
         return jsonify({"message": "Please type or say something.", "action": None})
@@ -342,7 +344,7 @@ def chat():
     collected_data: dict = session.get("chat_data") or {}
     pending_field: Optional[str] = session.get("chat_pending_field")
 
-    print(f"[Chat] Detected intent: {current_intent!r}, collected: {collected_data!r}, pending: {pending_field!r}")
+    logger.debug("[Chat] State: intent=%r, pending=%r", current_intent, pending_field)
 
     # ── Handle confirmation flow for delete ──────────────────────────────────
     if current_intent == "delete_book" and pending_field == "confirm_delete":
@@ -361,12 +363,12 @@ def chat():
         session["chat_data"] = collected_data
         session["chat_pending_field"] = None
         pending_field = None
-        print(f"[Chat] After absorbing answer: {collected_data!r}")
+        logger.debug("[Chat] After absorbing answer: %r", collected_data)
 
     # ── If there's no active intent, detect one from the new message ─────────
     if not current_intent:
         current_intent = _detect_intent(user_text)
-        print(f"[Chat] Detected intent: {current_intent!r}")
+        logger.debug("[Chat] Detected intent: %r", current_intent)
         if not current_intent:
             return jsonify({
                 "message": (
@@ -380,7 +382,7 @@ def chat():
             })
         # Extract whatever entities are already in the first message
         collected_data = _extract_entities(user_text, current_intent)
-        print(f"[Chat] Extracted data: {collected_data!r}")
+        logger.debug("[Chat] Extracted data: %r", collected_data)
         session["chat_intent"] = current_intent
         session["chat_data"] = collected_data
 
