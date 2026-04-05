@@ -26,6 +26,7 @@ from query_context import save_context, is_followup, rewrite_followup, get_last_
 from routes.admin_routes import register_admin_routes
 from routes.api import api_bp
 from routes.auth_routes import register_auth_routes
+from routes.chat import chat_bp
 from routes.dashboard import dashboard_bp
 from routes.query_routes import register_query_routes
 from routes.views import views_bp
@@ -102,6 +103,7 @@ else:
 # ── Register Blueprints ──────────────────────────────────────────────────────
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
+app.register_blueprint(chat_bp)
 app.register_blueprint(views_bp)
 # Compatibility aliases for code/tests that call url_for('..._route') without the
 # dashboard blueprint prefix.

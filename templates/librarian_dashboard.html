@@ -86,6 +86,34 @@
             #sidebar { display: none; }
             #main { margin-left: 0; }
         }
+
+        /* Chatbot */
+        #chatPanel {
+            display: flex; flex-direction: column; height: calc(100vh - 140px);
+        }
+        #chatMessages {
+            flex: 1; overflow-y: auto; padding: 1rem;
+            background: #f5f7ff; border-radius: 8px; margin-bottom: .75rem;
+        }
+        .chat-msg { margin-bottom: .75rem; display: flex; flex-direction: column; }
+        .chat-msg.user { align-items: flex-end; }
+        .chat-msg.bot  { align-items: flex-start; }
+        .chat-bubble {
+            max-width: 78%; padding: .55rem .85rem;
+            border-radius: 12px; font-size: .88rem; white-space: pre-wrap;
+        }
+        .chat-msg.user .chat-bubble { background: var(--navy); color: #fff; border-bottom-right-radius: 3px; }
+        .chat-msg.bot  .chat-bubble { background: #fff; color: #333; border: 1px solid #d1d5e8; border-bottom-left-radius: 3px; }
+        .chat-msg .chat-label { font-size: .72rem; color: #888; margin-bottom: .2rem; }
+        #chatInput { resize: none; border-radius: 8px; font-size: .9rem; }
+        .chat-send-row { display: flex; gap: .5rem; }
+        .btn-chat-send { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: .5rem 1.1rem; }
+        .btn-chat-send:hover { background: var(--navy-dark); }
+        .btn-chat-voice { background: transparent; border: 2px solid var(--navy); color: var(--navy); border-radius: 8px; padding: .5rem .9rem; }
+        .btn-chat-voice:hover, .btn-chat-voice.recording { background: var(--navy); color: #fff; }
+        .chat-books-table { font-size: .82rem; margin-top: .5rem; }
+        .chat-books-table th { background: var(--navy); color: #fff; }
+        #chatStatus { font-size: .8rem; color: #777; min-height: 1.2em; margin-bottom: .3rem; }
     </style>
 </head>
 <body>
@@ -103,6 +131,9 @@
     </a>
     <a href="#section-fines" class="nav-link" onclick="showSection('fines')">
         <i class="fas fa-money-bill-wave"></i> Fines
+    </a>
+    <a href="#section-chatbot" class="nav-link" onclick="showSection('chatbot')">
+        <i class="fas fa-robot"></i> Chatbot
     </a>
     <div class="mt-auto pb-3">
         <a href="{{ url_for('logout') }}" class="nav-link text-warning">
@@ -312,6 +343,47 @@
                 </div>
             </div>
         </div><!-- /section-fines -->
+
+        <!-- SECTION: Chatbot -->
+        <div id="section-chatbot" class="section-pane" style="display:none">
+            <div class="section-card">
+                <div class="section-header">
+                    <span><i class="fas fa-robot"></i>Library Chatbot</span>
+                    <button class="btn btn-light btn-sm" onclick="chatReset()">
+                        <i class="fas fa-redo me-1"></i>Reset
+                    </button>
+                </div>
+                <div class="p-3">
+                    <p class="text-muted small mb-2">
+                        Ask me to <strong>add</strong>, <strong>delete</strong>, <strong>update</strong>, or <strong>show</strong> books.
+                        I'll ask for any missing details. Works with text and voice.
+                    </p>
+                    <div id="chatPanel">
+                        <div id="chatMessages">
+                            <div class="chat-msg bot">
+                                <div class="chat-label">Bot</div>
+                                <div class="chat-bubble">👋 Hello! I'm your library assistant.<br>
+Try: <em>"add book Python by Guido"</em> or <em>"show books"</em> or <em>"delete book AI"</em>.</div>
+                            </div>
+                        </div>
+                        <div id="chatStatus"></div>
+                        <div class="chat-send-row">
+                            <textarea id="chatInput" class="form-control" rows="2"
+                                placeholder="Type a command or use voice…"
+                                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+                            <div class="d-flex flex-column gap-1">
+                                <button class="btn-chat-send" onclick="sendChatMessage()" title="Send">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                                <button class="btn-chat-voice" id="chatVoiceBtn" onclick="toggleChatVoice()" title="Voice input">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /section-chatbot -->
 
     </div><!-- /content-area -->
 </div><!-- /main -->
@@ -805,6 +877,178 @@ function updateFineStatus(fineId, status) {
         }
 
         window.addEventListener('load', function() { loadBooks(); });
+    </script>
+
+    <!-- ================================================================
+         CHATBOT JAVASCRIPT
+         ================================================================ -->
+    <script>
+    // ── Chatbot state ────────────────────────────────────────────────────────
+    var chatVoiceRecognition = null;
+    var chatIsListening = false;
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // ── Message rendering ────────────────────────────────────────────────────
+    function appendChatMsg(who, text) {
+        var box = document.getElementById('chatMessages');
+        var div = document.createElement('div');
+        div.className = 'chat-msg ' + who;
+        var label = who === 'user' ? 'You' : 'Bot';
+        div.innerHTML =
+            '<div class="chat-label">' + label + '</div>' +
+            '<div class="chat-bubble">' + esc(text) + '</div>';
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function appendBooksTable(books) {
+        var box = document.getElementById('chatMessages');
+        if (!books || !books.length) return;
+        var cols = ['id', 'title', 'author', 'category', 'total_copies', 'available_copies'];
+        var headers = cols.map(function(c){ return '<th>' + esc(c.replace(/_/g,' ')) + '</th>'; }).join('');
+        var rows = books.map(function(b){
+            return '<tr>' + cols.map(function(c){ return '<td>' + esc(b[c] == null ? '' : b[c]) + '</td>'; }).join('') + '</tr>';
+        }).join('');
+        var div = document.createElement('div');
+        div.className = 'chat-msg bot';
+        div.innerHTML =
+            '<div class="chat-label">Bot</div>' +
+            '<div class="chat-bubble" style="max-width:100%">' +
+            '<div class="table-responsive"><table class="table table-sm table-bordered chat-books-table mb-0">' +
+            '<thead><tr>' + headers + '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div></div>';
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // ── Set status line ──────────────────────────────────────────────────────
+    function setChatStatus(msg) {
+        var el = document.getElementById('chatStatus');
+        if (el) el.textContent = msg || '';
+    }
+
+    // ── Send message ─────────────────────────────────────────────────────────
+    function sendChatMessage() {
+        var input = document.getElementById('chatInput');
+        var text = (input.value || '').trim();
+        if (!text) return;
+        input.value = '';
+        appendChatMsg('user', text);
+        setChatStatus('Thinking…');
+
+        fetch('/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: text})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+            setChatStatus('');
+            appendChatMsg('bot', json.message || '');
+            // If the bot returned books data, render the table
+            if (json.action === 'view' && Array.isArray(json.data) && json.data.length) {
+                appendBooksTable(json.data);
+            }
+            // After any successful CRUD operation, refresh the books section
+            if (json.action && json.action !== 'view' && json.action !== 'clarify' && json.success) {
+                // Refresh books table if it's visible
+                var booksBody = document.getElementById('booksBody');
+                if (booksBody) loadBooks();
+                toast('Books list refreshed', 'info');
+            }
+        })
+        .catch(function(err) {
+            setChatStatus('');
+            appendChatMsg('bot', 'Network error. Please try again.');
+            console.error('Chat error:', err);
+        });
+    }
+
+    // ── Reset conversation ───────────────────────────────────────────────────
+    function chatReset() {
+        fetch('/chat/reset', {method: 'POST'})
+            .then(function(r){ return r.json(); })
+            .then(function(json){
+                document.getElementById('chatMessages').innerHTML =
+                    '<div class="chat-msg bot">' +
+                    '<div class="chat-label">Bot</div>' +
+                    '<div class="chat-bubble">Conversation reset. How can I help you?</div>' +
+                    '</div>';
+                setChatStatus('');
+            });
+    }
+
+    // ── Voice input for chatbot ──────────────────────────────────────────────
+    function initChatVoice() {
+        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            setChatStatus('Voice input not supported in this browser.');
+            return false;
+        }
+        chatVoiceRecognition = new SR();
+        chatVoiceRecognition.lang = 'en-US';
+        chatVoiceRecognition.continuous = false;
+        chatVoiceRecognition.interimResults = false;
+        chatVoiceRecognition.maxAlternatives = 1;
+
+        chatVoiceRecognition.onstart = function() {
+            chatIsListening = true;
+            var btn = document.getElementById('chatVoiceBtn');
+            if (btn) { btn.classList.add('recording'); btn.title = 'Listening…'; }
+            setChatStatus('🎤 Listening… Speak clearly.');
+        };
+
+        chatVoiceRecognition.onresult = function(event) {
+            var transcript = '';
+            for (var i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    transcript = event.results[i][0].transcript || '';
+                }
+            }
+            transcript = transcript.replace(/\s+/g, ' ').trim();
+            if (transcript) {
+                document.getElementById('chatInput').value = transcript;
+                setChatStatus('You said: "' + transcript + '"');
+            }
+        };
+
+        chatVoiceRecognition.onerror = function(event) {
+            chatIsListening = false;
+            var btn = document.getElementById('chatVoiceBtn');
+            if (btn) { btn.classList.remove('recording'); btn.title = 'Voice input'; }
+            if (event.error !== 'aborted') {
+                setChatStatus('Voice recognition failed. Please try again.');
+            }
+        };
+
+        chatVoiceRecognition.onend = function() {
+            chatIsListening = false;
+            var btn = document.getElementById('chatVoiceBtn');
+            if (btn) { btn.classList.remove('recording'); btn.title = 'Voice input'; }
+            if (document.getElementById('chatInput').value.trim()) {
+                setChatStatus('Press Send or Enter to submit.');
+            } else {
+                setChatStatus('No speech detected.');
+            }
+        };
+        return true;
+    }
+
+    function toggleChatVoice() {
+        if (!chatVoiceRecognition && !initChatVoice()) return;
+        if (chatIsListening) {
+            chatVoiceRecognition.stop();
+        } else {
+            try { chatVoiceRecognition.start(); }
+            catch(e) { setChatStatus('Voice recognition failed to start.'); }
+        }
+    }
     </script>
 </body>
 </html>

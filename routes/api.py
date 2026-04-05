@@ -380,6 +380,50 @@ def books_add():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
+@api_bp.route("/books/<int:book_id>", methods=["PUT"])
+@require_roles("Librarian", "Administrator")
+def books_update(book_id: int):
+    """Update an existing book – Librarian/Administrator only."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    author = (data.get("author") or "").strip()
+    category = (data.get("category") or "").strip()
+    total_copies = data.get("total_copies")
+    if not title or not author:
+        return jsonify({"success": False, "error": "title and author are required"}), 400
+    try:
+        if total_copies is not None:
+            total_copies = int(total_copies)
+            if total_copies < 1:
+                total_copies = 1
+    except (TypeError, ValueError):
+        total_copies = None
+    try:
+        conn = get_db_connection(MAIN_DB)
+        existing = conn.execute("SELECT id, available_copies, total_copies FROM Books WHERE id = ?", (book_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"success": False, "error": "Book not found"}), 404
+        if total_copies is not None:
+            diff = total_copies - existing["total_copies"]
+            new_available = max(0, existing["available_copies"] + diff)
+            conn.execute(
+                "UPDATE Books SET title = ?, author = ?, category = ?, total_copies = ?, available_copies = ? WHERE id = ?",
+                (title, author, category, total_copies, new_available, book_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE Books SET title = ?, author = ?, category = ? WHERE id = ?",
+                (title, author, category, book_id),
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book updated successfully"})
+    except Exception as exc:
+        logger.error("api/books PUT error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
 @api_bp.route("/books/<int:book_id>", methods=["DELETE"])
 @require_roles("Librarian", "Administrator")
 def books_delete(book_id: int):
