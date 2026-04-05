@@ -143,9 +143,9 @@ def _extract_entities(text: str, intent: str) -> dict:
 
     # Category: "category: X" or "category X" (normalise spaces first)
     norm = _normalize_spaces(text)
-    m = re.search(r'\bcategory ?[=:] ?([A-Za-z][^\s,]{0,50}?)\b', norm, re.IGNORECASE)
+    m = re.search(r'\bcategory ?[=:] ?([A-Za-z][^\s,]{0,50})\b', norm, re.IGNORECASE)
     if not m:
-        m = re.search(r'\bcategory ([A-Za-z][^\s,]{0,50}?)\b', norm, re.IGNORECASE)
+        m = re.search(r'\bcategory ([A-Za-z][^\s,]{0,50})\b', norm, re.IGNORECASE)
     if m:
         data["category"] = m.group(1).strip()
 
@@ -259,6 +259,20 @@ def _update_book(data: dict) -> dict:
             new_copies = int(data.get("copies", existing["total_copies"]))
         except (TypeError, ValueError):
             new_copies = existing["total_copies"]
+
+        # Ensure at least one field is actually changing
+        if (new_author == existing["author"] and
+                new_category == existing["category"] and
+                new_copies == existing["total_copies"]):
+            conn.close()
+            return {
+                "message": (
+                    f'No changes detected for "{existing["title"]}". '
+                    "Please specify what you'd like to update (author, category, or copies)."
+                ),
+                "action": "update",
+                "success": False,
+            }
 
         diff = new_copies - existing["total_copies"]
         new_available = max(0, existing["available_copies"] + diff)
