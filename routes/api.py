@@ -3,7 +3,7 @@ JSON API endpoints for SPEAK2DB.
 """
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, session
 
 from db.connection import get_db_connection, MAIN_DB, ARCHIVE_DB
@@ -19,6 +19,9 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+# Number of days a book may be borrowed before it is due
+DEFAULT_LOAN_PERIOD_DAYS = 14
 
 
 # ---------------------------------------------------------------------------
@@ -491,9 +494,8 @@ def issued_create():
         if not student:
             conn.close()
             return jsonify({"success": False, "error": "Student not found"}), 404
-        from datetime import date, timedelta
         issue_date = date.today().isoformat()
-        due_date = (date.today() + timedelta(days=14)).isoformat()
+        due_date = (date.today() + timedelta(days=DEFAULT_LOAN_PERIOD_DAYS)).isoformat()
         conn.execute(
             "INSERT INTO Issued (student_id, book_id, issue_date, due_date, status) VALUES (?, ?, ?, ?, 'Issued')",
             (student_id, book_id, issue_date, due_date),
@@ -524,7 +526,6 @@ def issued_return(issue_id: int):
         if issue["return_date"]:
             conn.close()
             return jsonify({"success": False, "error": "Book already returned"}), 400
-        from datetime import date
         return_date = date.today().isoformat()
         conn.execute(
             "UPDATE Issued SET return_date=?, status='Returned' WHERE id=?",

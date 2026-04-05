@@ -33,7 +33,7 @@
                 </button>
             </div>
         </div>
-        <small class="text-muted">Due date is set to 14 days from today.</small>
+        <small class="text-muted">Due date is set to {{ DEFAULT_LOAN_PERIOD_DAYS|default(14) }} days from today.</small>
     </div>
 
     <div class="p-0">

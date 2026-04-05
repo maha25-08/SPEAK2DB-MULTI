@@ -190,11 +190,13 @@ def issued():
     """Issued books management page (table populated via AJAX /api/issued)."""
     role = session.get("role")
     user_id = session["user_id"]
+    from routes.api import DEFAULT_LOAN_PERIOD_DAYS
     return render_template(
         "librarian/issued.html",
         role=role,
         user=user_id,
         active_page="issued",
+        DEFAULT_LOAN_PERIOD_DAYS=DEFAULT_LOAN_PERIOD_DAYS,
     )
 
 
