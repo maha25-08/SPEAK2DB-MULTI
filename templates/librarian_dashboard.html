@@ -92,16 +92,16 @@
 <!-- Sidebar -->
 <nav id="sidebar">
     <div class="brand"><i class="fas fa-book-open me-2"></i>Speak2DB</div>
-    <a href="#section-overview" class="nav-link active" onclick="showSection('overview')">
+    <a href="{{ url_for('librarian.dashboard') }}" class="nav-link active">
         <i class="fas fa-tachometer-alt"></i> Dashboard
     </a>
-    <a href="#section-books" class="nav-link" onclick="showSection('books')">
+    <a href="{{ url_for('librarian.books') }}" class="nav-link">
         <i class="fas fa-book"></i> Books
     </a>
-    <a href="#section-issued" class="nav-link" onclick="showSection('issued')">
+    <a href="{{ url_for('librarian.issued') }}" class="nav-link">
         <i class="fas fa-book-reader"></i> Issued Books
     </a>
-    <a href="#section-fines" class="nav-link" onclick="showSection('fines')">
+    <a href="{{ url_for('librarian.fines') }}" class="nav-link">
         <i class="fas fa-money-bill-wave"></i> Fines
     </a>
     <div class="mt-auto pb-3">

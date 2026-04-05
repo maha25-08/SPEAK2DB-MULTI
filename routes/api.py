@@ -380,6 +380,43 @@ def books_add():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
+@api_bp.route("/books/<int:book_id>", methods=["PUT"])
+@require_roles("Librarian", "Administrator")
+def books_update(book_id: int):
+    """Update a book – Librarian/Administrator only."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    author = (data.get("author") or "").strip()
+    category = (data.get("category") or "").strip()
+    total_copies = data.get("total_copies", 1)
+    if not title or not author:
+        return jsonify({"success": False, "error": "title and author are required"}), 400
+    try:
+        total_copies = int(total_copies)
+        if total_copies < 1:
+            total_copies = 1
+    except (TypeError, ValueError):
+        total_copies = 1
+    try:
+        conn = get_db_connection(MAIN_DB)
+        existing = conn.execute("SELECT id, available_copies, total_copies FROM Books WHERE id = ?", (book_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"success": False, "error": "Book not found"}), 404
+        issued_count = existing["total_copies"] - existing["available_copies"]
+        new_available = max(0, total_copies - issued_count)
+        conn.execute(
+            "UPDATE Books SET title=?, author=?, category=?, total_copies=?, available_copies=? WHERE id=?",
+            (title, author, category, total_copies, new_available, book_id),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book updated successfully"})
+    except Exception as exc:
+        logger.error("api/books PUT error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
 @api_bp.route("/books/<int:book_id>", methods=["DELETE"])
 @require_roles("Librarian", "Administrator")
 def books_delete(book_id: int):
@@ -396,4 +433,137 @@ def books_delete(book_id: int):
         return jsonify({"success": True, "message": "Book deleted successfully"})
     except Exception as exc:
         logger.error("api/books DELETE error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Issued books CRUD
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/issued", methods=["GET"])
+@require_roles("Librarian", "Administrator")
+def issued_list():
+    """Return all issued books as JSON – Librarian/Administrator only."""
+    logger.info("api/issued GET accessed by role: %s", session.get("role"))
+    try:
+        conn = get_db_connection(MAIN_DB)
+        rows = conn.execute(
+            """SELECT i.id AS issue_id, s.roll_number, s.name AS student_name,
+                      b.title, b.author, i.issue_date, i.due_date, i.return_date, i.status
+               FROM Issued i
+               JOIN Books b ON i.book_id = b.id
+               JOIN Students s ON i.student_id = s.id
+               ORDER BY i.issue_date DESC LIMIT 500"""
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as exc:
+        logger.error("api/issued GET error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@api_bp.route("/issued", methods=["POST"])
+@require_roles("Librarian", "Administrator")
+def issued_create():
+    """Issue a book to a student – Librarian/Administrator only."""
+    data = request.get_json(silent=True) or {}
+    student_id = data.get("student_id")
+    book_id = data.get("book_id")
+    if not student_id or not book_id:
+        return jsonify({"success": False, "error": "student_id and book_id are required"}), 400
+    try:
+        student_id = int(student_id)
+        book_id = int(book_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "student_id and book_id must be integers"}), 400
+    try:
+        conn = get_db_connection(MAIN_DB)
+        book = conn.execute(
+            "SELECT id, available_copies FROM Books WHERE id = ?", (book_id,)
+        ).fetchone()
+        if not book:
+            conn.close()
+            return jsonify({"success": False, "error": "Book not found"}), 404
+        if book["available_copies"] < 1:
+            conn.close()
+            return jsonify({"success": False, "error": "No copies available"}), 400
+        student = conn.execute("SELECT id FROM Students WHERE id = ?", (student_id,)).fetchone()
+        if not student:
+            conn.close()
+            return jsonify({"success": False, "error": "Student not found"}), 404
+        from datetime import date, timedelta
+        issue_date = date.today().isoformat()
+        due_date = (date.today() + timedelta(days=14)).isoformat()
+        conn.execute(
+            "INSERT INTO Issued (student_id, book_id, issue_date, due_date, status) VALUES (?, ?, ?, ?, 'Issued')",
+            (student_id, book_id, issue_date, due_date),
+        )
+        conn.execute(
+            "UPDATE Books SET available_copies = available_copies - 1 WHERE id = ?", (book_id,)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book issued successfully"})
+    except Exception as exc:
+        logger.error("api/issued POST error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@api_bp.route("/issued/<int:issue_id>/return", methods=["PUT"])
+@require_roles("Librarian", "Administrator")
+def issued_return(issue_id: int):
+    """Mark an issued book as returned – Librarian/Administrator only."""
+    try:
+        conn = get_db_connection(MAIN_DB)
+        issue = conn.execute(
+            "SELECT id, book_id, return_date FROM Issued WHERE id = ?", (issue_id,)
+        ).fetchone()
+        if not issue:
+            conn.close()
+            return jsonify({"success": False, "error": "Issue record not found"}), 404
+        if issue["return_date"]:
+            conn.close()
+            return jsonify({"success": False, "error": "Book already returned"}), 400
+        from datetime import date
+        return_date = date.today().isoformat()
+        conn.execute(
+            "UPDATE Issued SET return_date=?, status='Returned' WHERE id=?",
+            (return_date, issue_id),
+        )
+        conn.execute(
+            "UPDATE Books SET available_copies = available_copies + 1 WHERE id = ?",
+            (issue["book_id"],),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Book returned successfully"})
+    except Exception as exc:
+        logger.error("api/issued return error: %s", exc)
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# Fines update
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/fines/<int:fine_id>", methods=["PUT"])
+@require_roles("Librarian", "Administrator")
+def fines_update(fine_id: int):
+    """Update fine status – Librarian/Administrator only."""
+    data = request.get_json(silent=True) or {}
+    status = (data.get("status") or "").strip()
+    if status not in ("Paid", "Unpaid", "Waived"):
+        return jsonify({"success": False, "error": "status must be Paid, Unpaid, or Waived"}), 400
+    try:
+        conn = get_db_connection(MAIN_DB)
+        existing = conn.execute("SELECT id FROM Fines WHERE id = ?", (fine_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"success": False, "error": "Fine not found"}), 404
+        conn.execute("UPDATE Fines SET status=? WHERE id=?", (status, fine_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": f"Fine status updated to {status}"})
+    except Exception as exc:
+        logger.error("api/fines PUT error: %s", exc)
         return jsonify({"success": False, "error": "Internal server error"}), 500

@@ -1,0 +1,97 @@
+{% extends "librarian/_base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-4 p-3 rounded-3 text-white" style="background:linear-gradient(135deg,var(--navy),var(--navy-light))">
+    <h4 class="mb-1"><i class="fas fa-book-open me-2"></i>Librarian Dashboard</h4>
+    <p class="mb-0 opacity-75">Welcome {{ user }} — Manage books, issued copies, and fines.</p>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-md-3">
+        <div class="card stat-card" style="background:linear-gradient(135deg,#1a237e,#3949ab)">
+            <div class="card-body text-center">
+                <div class="stat-icon"><i class="fas fa-book"></i></div>
+                <h2 class="fw-bold mt-1">{{ stats.get('total_books', 0) }}</h2>
+                <p class="mb-0">Total Books</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <div class="card stat-card" style="background:linear-gradient(135deg,#1565c0,#42a5f5)">
+            <div class="card-body text-center">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <h2 class="fw-bold mt-1">{{ stats.get('total_students', 0) }}</h2>
+                <p class="mb-0">Total Students</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <div class="card stat-card" style="background:linear-gradient(135deg,#e65100,#ffa726)">
+            <div class="card-body text-center">
+                <div class="stat-icon"><i class="fas fa-book-reader"></i></div>
+                <h2 class="fw-bold mt-1">{{ stats.get('active_issues', 0) }}</h2>
+                <p class="mb-0">Issued Books</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <div class="card stat-card" style="background:linear-gradient(135deg,#ad1457,#f48fb1)">
+            <div class="card-body text-center">
+                <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
+                <h2 class="fw-bold mt-1">{{ stats.get('unpaid_fines', 0) }}</h2>
+                <p class="mb-0">Unpaid Fines</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-md-3">
+        <a href="{{ url_for('librarian.books') }}" class="btn btn-outline-primary w-100 py-3">
+            <i class="fas fa-book d-block mb-1" style="font-size:1.5rem"></i>Manage Books
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <a href="{{ url_for('librarian.add_book') }}" class="btn btn-outline-success w-100 py-3">
+            <i class="fas fa-plus-circle d-block mb-1" style="font-size:1.5rem"></i>Add Book
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <a href="{{ url_for('librarian.issued') }}" class="btn btn-outline-warning w-100 py-3">
+            <i class="fas fa-book-reader d-block mb-1" style="font-size:1.5rem"></i>Issued Books
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-3">
+        <a href="{{ url_for('librarian.fines') }}" class="btn btn-outline-danger w-100 py-3">
+            <i class="fas fa-money-bill-wave d-block mb-1" style="font-size:1.5rem"></i>Fines
+        </a>
+    </div>
+</div>
+
+<!-- Recent Issues -->
+<div class="section-card">
+    <div class="section-header"><span><i class="fas fa-history"></i>Recent Issues</span></div>
+    <div class="p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Student</th><th>Book</th><th>Author</th><th>Issue Date</th></tr></thead>
+                <tbody>
+                {% for issue in recent_issues %}
+                    <tr>
+                        <td>{{ issue['student_name']|default('N/A') }}</td>
+                        <td>{{ issue['title']|default('N/A') }}</td>
+                        <td>{{ issue['author']|default('N/A') }}</td>
+                        <td>{{ issue['issue_date']|default('N/A') }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" class="text-center text-muted py-3">No recent issues</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
