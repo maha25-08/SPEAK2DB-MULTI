@@ -168,7 +168,7 @@ function initVoice() {
             // Pick the alternative with the highest confidence
             var bestAlt = result[0];
             for (var j = 1; j < result.length; j++) {
-                if (result[j].confidence > bestAlt.confidence) {
+                if ((result[j].confidence || 0) > (bestAlt.confidence || 0)) {
                     bestAlt = result[j];
                 }
             }
