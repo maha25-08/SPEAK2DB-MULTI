@@ -43,7 +43,7 @@ var isListening = false;
 var voiceStopTimer = null;
 var voiceResultReceived = false;
 var lastRecognizedText = '';
-var VOICE_TIMEOUT_MS = 4000;
+var VOICE_TIMEOUT_MS = 8000;
 
 function getVoiceButton() {
     return getEl('voiceBtn') || getEl('micBtn');
@@ -135,7 +135,7 @@ function initVoice() {
     recognition = new SR();
     recognition.lang = 'en-US';
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 3;
 
     recognition.onstart = function () {
@@ -145,12 +145,14 @@ function initVoice() {
         if (btn) {
             btn.classList.add('recording');
             btn.innerHTML = '🔴 Listening...';
-            btn.title = 'Listening...';
+            btn.title = 'Listening... click to stop';
         }
         setVoiceStatus('🎤 Listening... Speak clearly. Avoid background noise.', 'status-listening');
+        console.log('[Voice] Recognition started');
         clearVoiceTimer();
         voiceStopTimer = setTimeout(function () {
             if (recognition && isListening) {
+                console.log('[Voice] Auto-stop after timeout');
                 recognition.stop();
             }
         }, VOICE_TIMEOUT_MS);
@@ -158,12 +160,29 @@ function initVoice() {
 
     recognition.onresult = function (event) {
         clearVoiceTimer();
+        var interimTranscript = '';
         var finalTranscript = '';
 
         for (var i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-                finalTranscript = event.results[i][0].transcript || '';
+            var result = event.results[i];
+            // Pick the alternative with the highest confidence
+            var bestAlt = result[0];
+            for (var j = 1; j < result.length; j++) {
+                if ((result[j].confidence || 0) > (bestAlt.confidence || 0)) {
+                    bestAlt = result[j];
+                }
             }
+            var text = bestAlt.transcript || '';
+            if (result.isFinal) {
+                finalTranscript += text;
+            } else {
+                interimTranscript += text;
+            }
+        }
+
+        // Show partial (interim) text while the user is still speaking
+        if (interimTranscript) {
+            setVoiceStatus('🎤 Hearing: "' + escapeHtml(interimTranscript) + '"...', 'status-listening');
         }
 
         finalTranscript = finalTranscript.replace(/\s+/g, ' ').trim();
@@ -171,6 +190,7 @@ function initVoice() {
             return;
         }
 
+        console.log('[Voice] Recognized text:', finalTranscript);
         voiceResultReceived = true;
         showVoiceConfirmation(finalTranscript);
         recognition.stop();
@@ -185,16 +205,28 @@ function initVoice() {
             return;
         }
 
-        setVoiceStatus(
-            'Voice recognition failed. Please try again or type manually.',
-            'status-error'
-        );
+        console.warn('[Voice] Error:', event.error);
+
+        var msg;
+        if (event.error === 'not-allowed') {
+            msg = '⚠️ Microphone access denied. Please allow microphone permission in your browser and try again.';
+        } else if (event.error === 'no-speech') {
+            msg = '😶 No speech detected. Make sure your microphone is working and try again.';
+        } else if (event.error === 'audio-capture') {
+            msg = '🎙️ No microphone found. Please connect a microphone and try again.';
+        } else if (event.error === 'network') {
+            msg = '🌐 Network error during recognition. Check your internet connection and try again.';
+        } else {
+            msg = 'Voice recognition error (' + event.error + '). Please try again or type manually.';
+        }
+        setVoiceStatus(msg, 'status-error');
     };
 
     recognition.onend = function () {
         clearVoiceTimer();
         isListening = false;
         resetVoiceButton();
+        console.log('[Voice] Recognition ended. Result received:', voiceResultReceived);
 
         if (!voiceResultReceived) {
             setVoiceStatus(
@@ -874,8 +906,8 @@ function initializeApp() {
         qInput.focus();
     }
 
-    // Initialize voice only when mic button is present
-    if (getEl('micBtn')) initVoice();
+    // Initialize voice whenever any voice button is present
+    if (getVoiceButton()) initVoice();
     loadUiConfig();
 }
 
@@ -885,11 +917,11 @@ async function loadUiConfig() {
         if (!response.ok) return;
         const config = await response.json();
         const settings = config.settings || {};
-        const micBtn = getEl('micBtn');
-        if (micBtn && !settings.voice_input_enabled) {
-            micBtn.disabled = true;
-            micBtn.style.opacity = '0.5';
-            micBtn.title = 'Voice input disabled by administrator';
+        const voiceBtn = getVoiceButton();
+        if (voiceBtn && !settings.voice_input_enabled) {
+            voiceBtn.disabled = true;
+            voiceBtn.style.opacity = '0.5';
+            voiceBtn.title = 'Voice input disabled by administrator';
         }
     } catch (error) {
         console.warn('UI config unavailable', error);
