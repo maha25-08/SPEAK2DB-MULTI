@@ -1,0 +1,81 @@
+{% extends "librarian/_base.html" %}
+{% block title %}Fines{% endblock %}
+
+{% block content %}
+<div class="section-card">
+    <div class="section-header">
+        <span><i class="fas fa-money-bill-wave"></i>Fines Management</span>
+        <button class="btn btn-light btn-sm" onclick="loadFines()">
+            <i class="fas fa-sync-alt me-1"></i>Refresh
+        </button>
+    </div>
+    <div class="p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fine ID</th>
+                        <th>Student</th>
+                        <th>Roll No</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Update</th>
+                    </tr>
+                </thead>
+                <tbody id="finesBody">
+                    <tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', loadFines);
+
+function loadFines() {
+    var tbody = document.getElementById('finesBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Loading&#8230;</td></tr>';
+    fetch('/api/fines').then(function(r){ return r.json(); }).then(function(json) {
+        if (!json.success) { toast(json.error || 'Failed to load fines', 'error'); return; }
+        if (!json.data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No fines found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = json.data.map(function(f) {
+            var badge = f.status === 'Paid' ? 'bg-success' : (f.status === 'Waived' ? 'bg-secondary' : 'bg-danger');
+            return '<tr>' +
+                '<td>' + f.fine_id + '</td>' +
+                '<td>' + esc(f.student_name) + '</td>' +
+                '<td>' + esc(f.roll_number || '') + '</td>' +
+                '<td>' + (parseFloat(f.fine_amount) || 0).toFixed(2) + '</td>' +
+                '<td>' + esc(f.fine_type || '') + '</td>' +
+                '<td><span class="badge ' + badge + '">' + f.status + '</span></td>' +
+                '<td>' + (f.issue_date || '').substring(0, 10) + '</td>' +
+                '<td><select class="form-select form-select-sm d-inline-block" style="width:auto;min-width:90px" ' +
+                    'onchange="updateFineStatus(' + f.fine_id + ', this.value)">' +
+                    '<option value="" disabled selected>Update</option>' +
+                    '<option value="Paid">Paid</option>' +
+                    '<option value="Unpaid">Unpaid</option>' +
+                    '<option value="Waived">Waived</option>' +
+                '</select></td></tr>';
+        }).join('');
+    }).catch(function() { toast('Network error loading fines', 'error'); });
+}
+
+function updateFineStatus(fineId, status) {
+    fetch('/api/fines/' + fineId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: status})
+    }).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) { toast('Fine #' + fineId + ' marked as ' + status, 'success'); loadFines(); }
+        else { toast(json.error || 'Update failed', 'error'); }
+    }).catch(function() { toast('Network error', 'error'); });
+}
+</script>
+{% endblock %}

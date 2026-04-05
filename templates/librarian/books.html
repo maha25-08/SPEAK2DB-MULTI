@@ -1,0 +1,112 @@
+{% extends "librarian/_base.html" %}
+{% block title %}Books{% endblock %}
+
+{% block content %}
+<div class="section-card">
+    <div class="section-header">
+        <span><i class="fas fa-book"></i>Books Catalogue</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-light btn-sm" onclick="loadBooks()">
+                <i class="fas fa-sync-alt me-1"></i>Refresh
+            </button>
+            <a href="{{ url_for('librarian.add_book') }}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus me-1"></i>Add Book
+            </a>
+        </div>
+    </div>
+
+    <div class="p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="booksTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Category</th>
+                        <th>Copies</th>
+                        <th>Available</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="booksBody">
+                    <tr><td colspan="7" class="text-center text-muted py-3">Loading&#8230;</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header" style="background:var(--navy);color:#fff">
+                <h6 class="modal-title">Confirm Delete</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">Are you sure you want to delete this book?</div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger btn-sm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var _deleteId = null;
+var _deleteModal = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    _deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        if (_deleteId) doDelete(_deleteId);
+    });
+    loadBooks();
+});
+
+function loadBooks() {
+    var tbody = document.getElementById('booksBody');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading&#8230;</td></tr>';
+    fetch('/api/books').then(function(r){ return r.json(); }).then(function(json) {
+        if (!json.success) { toast(json.error || 'Failed to load books', 'error'); return; }
+        if (!json.data.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No books found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = json.data.map(function(b) {
+            var editUrl = '/librarian/edit_book/' + b.id;
+            return '<tr>' +
+                '<td>' + b.id + '</td>' +
+                '<td>' + esc(b.title) + '</td>' +
+                '<td>' + esc(b.author) + '</td>' +
+                '<td>' + esc(b.category || '') + '</td>' +
+                '<td>' + b.total_copies + '</td>' +
+                '<td>' + b.available_copies + '</td>' +
+                '<td>' +
+                    '<a href="' + editUrl + '" class="btn btn-sm btn-outline-primary btn-action me-1">' +
+                        '<i class="fas fa-edit"></i></a>' +
+                    '<button class="btn btn-sm btn-outline-danger btn-action" onclick="confirmDelete(' + b.id + ')">' +
+                        '<i class="fas fa-trash"></i></button>' +
+                '</td></tr>';
+        }).join('');
+    }).catch(function() { toast('Network error loading books', 'error'); });
+}
+
+function confirmDelete(id) {
+    _deleteId = id;
+    _deleteModal.show();
+}
+
+function doDelete(id) {
+    _deleteModal.hide();
+    fetch('/api/books/' + id, {method: 'DELETE'}).then(function(r){ return r.json(); }).then(function(json) {
+        if (json.success) { toast('Book deleted', 'success'); loadBooks(); }
+        else { toast(json.error || 'Delete failed', 'error'); }
+    }).catch(function() { toast('Network error', 'error'); });
+}
+</script>
+{% endblock %}

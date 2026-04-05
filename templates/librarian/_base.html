@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Librarian Portal{% endblock %} - Library Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --navy: #1a237e; --navy-dark: #0d1757; --navy-light: #3949ab; }
+        body { background: #f0f2f5; color: #222; margin: 0; }
+
+        /* Sidebar */
+        #sidebar {
+            width: 220px; min-height: 100vh; background: var(--navy);
+            position: fixed; top: 0; left: 0; z-index: 100;
+            display: flex; flex-direction: column; padding-top: 1rem;
+        }
+        #sidebar .brand {
+            color: #fff; font-weight: 700; font-size: 1.1rem;
+            padding: .8rem 1.2rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,.15);
+        }
+        #sidebar .nav-link {
+            color: rgba(255,255,255,.8); padding: .7rem 1.2rem;
+            font-size: .92rem; border-radius: 0;
+            display: flex; align-items: center; gap: .6rem;
+            text-decoration: none;
+        }
+        #sidebar .nav-link:hover, #sidebar .nav-link.active {
+            background: rgba(255,255,255,.15); color: #fff;
+        }
+        #sidebar .nav-link i { width: 18px; text-align: center; }
+
+        /* Main content */
+        #main { margin-left: 220px; min-height: 100vh; }
+        .topbar {
+            background: var(--navy); color: #fff; padding: .75rem 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 99;
+        }
+        .content-area { padding: 1.5rem; }
+
+        /* Stats */
+        .stat-card {
+            border: none; border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.1);
+            transition: transform .2s; color: #fff;
+        }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-card .card-body { padding: 1.4rem; }
+        .stat-icon { font-size: 2.2rem; opacity: .85; }
+
+        /* Section card */
+        .section-card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.07); margin-bottom: 1.5rem; overflow: hidden;
+        }
+        .section-header {
+            background: var(--navy); color: #fff;
+            padding: .75rem 1.25rem; font-weight: 600;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .section-header i { margin-right: .5rem; }
+        .table th { background: #e8eaf6; color: #333; }
+        .table td, .table th { vertical-align: middle; font-size: .88rem; }
+        .btn-action { padding: .25rem .6rem; font-size: .8rem; }
+
+        /* Toast */
+        #toastContainer {
+            position: fixed; bottom: 1rem; right: 1rem;
+            z-index: 10000; display: flex; flex-direction: column; gap: .5rem;
+        }
+        .toast-msg { padding: .65rem 1rem; border-radius: 8px; color: #fff; font-size: .88rem; }
+        .toast-success { background: #2e7d32; }
+        .toast-error   { background: #c62828; }
+        .toast-info    { background: #1565c0; }
+
+        @media (max-width: 768px) {
+            #sidebar { display: none; }
+            #main { margin-left: 0; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<!-- Sidebar -->
+<nav id="sidebar">
+    <div class="brand"><i class="fas fa-book-open me-2"></i>Speak2DB</div>
+    <a href="{{ url_for('librarian.dashboard') }}"
+       class="nav-link {{ 'active' if active_page == 'dashboard' else '' }}">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+    <a href="{{ url_for('librarian.books') }}"
+       class="nav-link {{ 'active' if active_page == 'books' else '' }}">
+        <i class="fas fa-book"></i> Books
+    </a>
+    <a href="{{ url_for('librarian.issued') }}"
+       class="nav-link {{ 'active' if active_page == 'issued' else '' }}">
+        <i class="fas fa-book-reader"></i> Issued Books
+    </a>
+    <a href="{{ url_for('librarian.fines') }}"
+       class="nav-link {{ 'active' if active_page == 'fines' else '' }}">
+        <i class="fas fa-money-bill-wave"></i> Fines
+    </a>
+    <div class="mt-auto pb-3">
+        <a href="{{ url_for('logout') }}" class="nav-link text-warning">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+</nav>
+
+<!-- Main -->
+<div id="main">
+    <!-- Topbar -->
+    <div class="topbar">
+        <span><i class="fas fa-book-open me-2"></i>Librarian Portal</span>
+        <span>
+            Logged in as: <strong>{{ user }}</strong>
+            <span class="badge bg-light text-primary ms-2">{{ role }}</span>
+        </span>
+    </div>
+
+    <div class="content-area">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toast(msg, type) {
+    type = type || 'info';
+    var el = document.createElement('div');
+    el.className = 'toast-msg toast-' + type;
+    el.textContent = msg;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3500);
+}
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

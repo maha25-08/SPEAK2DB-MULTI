@@ -28,6 +28,7 @@ from routes.api import api_bp
 from routes.auth_routes import register_auth_routes
 from routes.chat import chat_bp
 from routes.dashboard import dashboard_bp
+from routes.librarian import librarian_bp
 from routes.query_routes import register_query_routes
 from routes.views import views_bp
 from utils.constants import ADMIN_DASHBOARD_CONTEXT_BUILDER_KEY
@@ -105,6 +106,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(views_bp)
+app.register_blueprint(librarian_bp)
 # Compatibility aliases for code/tests that call url_for('..._route') without the
 # dashboard blueprint prefix.
 for source_endpoint, alias_endpoint, rule in (

@@ -1,0 +1,47 @@
+{% extends "librarian/_base.html" %}
+{% block title %}Edit Book{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="section-card">
+            <div class="section-header">
+                <span><i class="fas fa-edit"></i>Edit Book</span>
+            </div>
+            <div class="p-4">
+                <form method="POST" action="{{ url_for('librarian.edit_book', book_id=book.id) }}" novalidate>
+                    <div class="mb-3">
+                        <label for="title" class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+                        <input type="text" id="title" name="title" class="form-control"
+                               value="{{ request.form.get('title', book.title) }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="author" class="form-label fw-semibold">Author <span class="text-danger">*</span></label>
+                        <input type="text" id="author" name="author" class="form-control"
+                               value="{{ request.form.get('author', book.author) }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label fw-semibold">Category</label>
+                        <input type="text" id="category" name="category" class="form-control"
+                               value="{{ request.form.get('category', book.category or '') }}">
+                    </div>
+                    <div class="mb-4">
+                        <label for="total_copies" class="form-label fw-semibold">Total Copies</label>
+                        <input type="number" id="total_copies" name="total_copies" class="form-control"
+                               min="1" value="{{ request.form.get('total_copies', book.total_copies) }}">
+                        <div class="form-text">Currently {{ book.available_copies }} of {{ book.total_copies }} copies available.</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Update Book
+                        </button>
+                        <a href="{{ url_for('librarian.books') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
