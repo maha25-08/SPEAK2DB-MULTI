@@ -72,6 +72,11 @@ def _detect_intent(text: str) -> Optional[str]:
 # Entity extraction
 # ---------------------------------------------------------------------------
 
+def _normalize_spaces(text: str) -> str:
+    """Collapse multiple whitespace characters into a single space."""
+    return " ".join(text.split())
+
+
 def _extract_title_author(text: str) -> dict:
     """
     Extract title and author from text.
@@ -82,20 +87,23 @@ def _extract_title_author(text: str) -> dict:
     Returns only the keys that were actually found.
     """
     data: dict = {}
+    # Normalise whitespace first to prevent ReDoS with many-space inputs
+    text = _normalize_spaces(text)
     # Strip leading action words (add, delete, update, view etc.)
     clean = re.sub(
-        r"^\s*(add|insert|create|delete|remove|update|change|edit|view|show|list|get|new)\s+"
-        r"(a\s+|the\s+|an\s+)?book\s*",
+        r"^(add|insert|create|delete|remove|update|change|edit|view|show|list|get|new)"
+        r"( a| the| an)? book ?",
         "",
         text,
         flags=re.IGNORECASE,
     ).strip()
 
-    # "TITLE by AUTHOR" – use split instead of backtracking regex to avoid ReDoS
-    parts = re.split(r'\s+by\s+', clean, maxsplit=1, flags=re.IGNORECASE)
-    if len(parts) == 2:
-        data["title"] = parts[0].strip().strip('"').strip("'")
-        data["author"] = parts[1].strip().strip('"').strip("'")
+    # "TITLE by AUTHOR" – split on literal " by " (single-space-normalised)
+    lower = clean.lower()
+    by_idx = lower.find(" by ")
+    if by_idx != -1:
+        data["title"] = clean[:by_idx].strip().strip('"').strip("'")
+        data["author"] = clean[by_idx + 4:].strip().strip('"').strip("'")
         return data
 
     # Just a title without author
@@ -106,15 +114,23 @@ def _extract_title_author(text: str) -> dict:
 
 def _extract_copies(text: str) -> Optional[int]:
     """Return an explicit copies count mentioned in the text."""
-    m = re.search(r'\b(\d+)\s*cop(?:y|ies)\b', text, re.IGNORECASE)
+    # Normalise spaces first
+    text = _normalize_spaces(text)
+    m = re.search(r'\b(\d+) cop(?:y|ies)\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m = re.search(r'\bcopies?\s*[=:]\s*(\d+)\b', text, re.IGNORECASE)
+    m = re.search(r'\bcopies? ?[=:] ?(\d+)\b', text, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m = re.search(r'\bset\b[^,;]{0,50}\bto\b[^,;]{0,20}\b(\d+)\b', text, re.IGNORECASE)
-    if m:
-        return int(m.group(1))
+    # "set copies to N" – use split approach to avoid ReDoS
+    lower = text.lower()
+    if "set" in lower and "to" in lower:
+        idx_to = lower.rfind(" to ")
+        if idx_to != -1:
+            tail = lower[idx_to + 4:].strip()
+            m2 = re.match(r'^(\d+)\b', tail)
+            if m2:
+                return int(m2.group(1))
     return None
 
 
@@ -125,10 +141,11 @@ def _extract_entities(text: str, intent: str) -> dict:
     if copies is not None:
         data["copies"] = copies
 
-    # Category: "category: X" or "category X"
-    m = re.search(r'\bcategory\s*[=:]\s*([A-Za-z][^\s,]{0,50})', text, re.IGNORECASE)
+    # Category: "category: X" or "category X" (normalise spaces first)
+    norm = _normalize_spaces(text)
+    m = re.search(r'\bcategory ?[=:] ?([A-Za-z][^\s,]{0,50}?)\b', norm, re.IGNORECASE)
     if not m:
-        m = re.search(r'\bcategory\s+([A-Za-z][^\s,]{0,50})', text, re.IGNORECASE)
+        m = re.search(r'\bcategory ([A-Za-z][^\s,]{0,50}?)\b', norm, re.IGNORECASE)
     if m:
         data["category"] = m.group(1).strip()
 
@@ -157,7 +174,7 @@ def _view_books() -> dict:
         }
     except Exception as exc:
         logger.error("chat view_books error: %s", exc)
-        return {"message": "Failed to retrieve books.", "action": "view", "data": [], "error": str(exc)}
+        return {"message": "Failed to retrieve books.", "action": "view", "data": []}
 
 
 def _add_book(data: dict) -> dict:
@@ -287,20 +304,22 @@ def _absorb_answer(answer: str, pending_field: str, data: dict) -> dict:
     skip_words = {"skip", "none", "n/a", "-", ""}
 
     if pending_field == "title":
-        # Strip leading action phrases if the user re-stated the full command
+        # Normalise spaces and strip leading action phrases if user re-stated the full command
+        answer = _normalize_spaces(answer)
         clean = re.sub(
-            r"^\s*(add|insert|create|delete|remove|update|change|edit|view|show|list|get|new)\s+"
-            r"(a\s+|the\s+|an\s+)?book\s*",
+            r"^(add|insert|create|delete|remove|update|change|edit|view|show|list|get|new)"
+            r"( a| the| an)? book ?",
             "",
             answer,
             flags=re.IGNORECASE,
         ).strip()
         # Also handle "by AUTHOR" if provided together with title in the answer
-        parts_by = re.split(r'\s+by\s+', clean, maxsplit=1, flags=re.IGNORECASE)
-        if len(parts_by) == 2:
-            data["title"] = parts_by[0].strip().strip('"').strip("'")
+        lower = clean.lower()
+        by_idx = lower.find(" by ")
+        if by_idx != -1:
+            data["title"] = clean[:by_idx].strip().strip('"').strip("'")
             if not data.get("author"):
-                data["author"] = parts_by[1].strip().strip('"').strip("'")
+                data["author"] = clean[by_idx + 4:].strip().strip('"').strip("'")
         elif clean:
             data["title"] = clean.strip('"').strip("'")
     elif pending_field in ("copies",):
